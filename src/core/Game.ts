@@ -12,6 +12,7 @@ import { Assembly } from '../rocket/Assembly';
 import { findPart } from '../parts/PartCatalog';
 import { Achievements } from './Achievements';
 import { toast } from '../ui/Toast';
+import { loadSettings, SettingsPanel } from '../ui/Settings';
 import * as THREE from 'three';
 
 export class Game {
@@ -49,9 +50,14 @@ export class Game {
     this.mainMenu = new MainMenuScene(
       () => this.showFlight(),
       () => this.showVab(),
-      () => toast.show('Settings: TBD')
+      () => this.showSettings()
     );
     this.mainMenu.mount();
+  }
+
+  private showSettings(): void {
+    const panel = new SettingsPanel(loadSettings(), () => panel.unmount());
+    panel.mount();
   }
 
   private showVab(): void {
