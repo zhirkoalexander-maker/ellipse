@@ -46,3 +46,20 @@ HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type
   }
   return null;
 } as typeof HTMLCanvasElement.prototype.getContext;
+
+// In-memory localStorage shim (Node 26 ships an experimental `localStorage` global
+// that requires --localstorage-file; on older jsdom it's missing entirely.
+// Force a clean in-memory shim on `window` so tests can use the standard API.)
+if (typeof (globalThis as any).window !== 'undefined' && !(globalThis as any).window.localStorage) {
+  const store = new Map<string, string>();
+  const ls = {
+    getItem(k: string): string | null { return store.has(k) ? store.get(k)! : null; },
+    setItem(k: string, v: string): void { store.set(k, String(v)); },
+    removeItem(k: string): void { store.delete(k); },
+    clear(): void { store.clear(); },
+    key(i: number): string | null { return Array.from(store.keys())[i] ?? null; },
+    get length(): number { return store.size; }
+  };
+  (globalThis as any).window.localStorage = ls;
+  (globalThis as any).localStorage = ls;
+}
