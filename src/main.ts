@@ -1,29 +1,49 @@
-import { Renderer } from './core/Renderer';
-import { SceneManager } from './core/SceneManager';
+import { Game } from './core/Game';
 import '../styles/tokens.css';
 import '../styles/typography.css';
 import '../styles/components.css';
 
-const renderer = new Renderer();
-const sceneMgr = new SceneManager();
-document.getElementById('app')!.appendChild(renderer.domElement);
-renderer.setSize(window.innerWidth, window.innerHeight);
-
-const fpsEl = document.createElement('div');
-fpsEl.className = 'text-data';
-fpsEl.style.cssText = 'position:fixed;top:8px;left:8px;color:var(--starshine);font-size:14px;z-index:100;';
-document.body.appendChild(fpsEl);
-
-window.addEventListener('resize', () => {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  sceneMgr.camera.aspect = window.innerWidth / window.innerHeight;
-  sceneMgr.camera.updateProjectionMatrix();
-});
-
-function loop(): void {
-  sceneMgr.update();
-  renderer.three.render(sceneMgr.scene, sceneMgr.camera);
-  fpsEl.textContent = `${Math.round(sceneMgr.getFps())} FPS`;
-  requestAnimationFrame(loop);
+function showFatalError(err: unknown): void {
+  const root = document.getElementById('app') ?? document.body;
+  root.innerHTML = '';
+  const card = document.createElement('div');
+  card.style.cssText = `
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(180deg, #0A0E1A 0%, #1A1F2E 100%);
+    color: var(--starshine);
+  `;
+  const inner = document.createElement('div');
+  inner.style.cssText = `
+    background: var(--space-panel);
+    border: 1px solid #3A4055;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 560px;
+  `;
+  const title = document.createElement('h1');
+  title.textContent = 'ELLIPSE failed to start';
+  title.style.cssText = 'margin: 0 0 12px; font-size: 22px; color: #FF6B6B;';
+  const msg = document.createElement('pre');
+  msg.textContent = err instanceof Error ? `${err.message}\n\n${err.stack ?? ''}` : String(err);
+  msg.style.cssText = `
+    margin: 0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    color: var(--stardust);
+  `;
+  inner.appendChild(title);
+  inner.appendChild(msg);
+  card.appendChild(inner);
+  root.appendChild(card);
 }
-loop();
+
+try {
+  const game = new Game();
+  game.start();
+} catch (err) {
+  console.error(err);
+  showFatalError(err);
+}
