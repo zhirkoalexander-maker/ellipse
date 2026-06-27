@@ -1,0 +1,19 @@
+# Ellipse
+
+A browser game about building and flying rockets.
+
+Requires Node.js and npm.
+
+```sh
+npm ci
+npm run dev
+```
+
+Open http://localhost:3000/.
+
+```sh
+npm test
+npm run build
+```
+
+Saves are stored in your browser.
