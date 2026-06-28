@@ -120,6 +120,11 @@ function createTextureSet(
 /** Apply horizontal light gradient (bright centre, dark edges) for cylinder 3D illusion. */
 function applyLightGradient(ctx: CanvasRenderingContext2D, W: number, H: number): void {
   const grad = ctx.createLinearGradient(0, 0, W, 0);
+  if (!grad) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
   grad.addColorStop(0, 'rgba(0,0,0,0.25)');
   grad.addColorStop(0.15, 'rgba(0,0,0,0.05)');
   grad.addColorStop(0.5, 'rgba(255,255,255,0.20)');
@@ -349,10 +354,16 @@ export function generateMoonBumpMap(): THREE.CanvasTexture {
 
 // ── Rocket part textures ─────────────────────────────────────────────────
 
-export function generateTankTexture(): THREE.CanvasTexture {
-  const W = 512, H = 512;
-  const [canvas, ctx] = createCanvas(W, H);
-  // bold horizontal bands — white, light gray, dark gray sections
+const WEAR_FACTOR: Record<string, number> = { S: 0.15, M: 0.25, L: 0.4, XL: 0.55 };
+
+export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [heightCanvas, heightCtx] = createCanvas(W, H);
+
+  const wear = WEAR_FACTOR[size] ?? 0.3;
+
+  // colour bands
   const bands = [
     { y0: 0, y1: 0.15, color: '#d0d0d8' },
     { y0: 0.15, y1: 0.17, color: '#888890' },
@@ -360,156 +371,299 @@ export function generateTankTexture(): THREE.CanvasTexture {
     { y0: 0.50, y1: 0.52, color: '#888890' },
     { y0: 0.52, y1: 0.78, color: '#d0d0d8' },
     { y0: 0.78, y1: 0.80, color: '#888890' },
-    { y0: 0.80, y1: 0.88, color: '#c88840' },  // gold band
+    { y0: 0.80, y1: 0.88, color: '#c88840' },
     { y0: 0.88, y1: 0.90, color: '#886020' },
     { y0: 0.90, y1: 1.00, color: '#e8e8f0' },
   ];
   for (const b of bands) {
-    ctx.fillStyle = b.color;
-    ctx.fillRect(0, b.y0 * H, W, (b.y1 - b.y0) * H);
+    colorCtx.fillStyle = b.color;
+    colorCtx.fillRect(0, b.y0 * H, W, (b.y1 - b.y0) * H);
   }
-  // dark panel lines
-  ctx.strokeStyle = '#606068';
-  ctx.lineWidth = 2;
+
+  // wear
+  applyWear(colorCtx, W, H, wear);
+
+  // light gradient
+  applyLightGradient(colorCtx, W, H);
+
+  // height map
+  heightCtx.fillStyle = '#808080';
+  heightCtx.fillRect(0, 0, W, H);
+
+  // seam lines (raised)
+  heightCtx.strokeStyle = '#c0c0c0';
+  heightCtx.lineWidth = 6;
   for (const b of bands) {
-    ctx.beginPath(); ctx.moveTo(0, b.y0 * H); ctx.lineTo(W, b.y0 * H); ctx.stroke();
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, b.y0 * H);
+    heightCtx.lineTo(W, b.y0 * H);
+    heightCtx.stroke();
   }
-  // vertical seam
-  ctx.strokeStyle = '#808088';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(W * 0.5, 0); ctx.lineTo(W * 0.5, H); ctx.stroke();
-  // rivets
-  for (let y = 30; y < H; y += 64) {
-    for (let x = 20; x < W; x += 36) {
-      ctx.fillStyle = '#707078';
-      ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#c0c0c8';
-      ctx.beginPath(); ctx.arc(x + 1, y - 1, 1, 0, Math.PI * 2); ctx.fill();
+
+  // vertical seam (sunken)
+  heightCtx.strokeStyle = '#404040';
+  heightCtx.lineWidth = 3;
+  heightCtx.beginPath();
+  heightCtx.moveTo(W * 0.5, 0);
+  heightCtx.lineTo(W * 0.5, H);
+  heightCtx.stroke();
+
+  // rivets (raised dots)
+  heightCtx.fillStyle = '#d0d0d0';
+  for (let y = 32; y < H; y += 64) {
+    for (let x = 24; x < W; x += 48) {
+      heightCtx.beginPath();
+      heightCtx.arc(x, y, 4, 0, Math.PI * 2);
+      heightCtx.fill();
     }
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+
+  return createTextureSet(colorCanvas, heightCanvas);
 }
 
-export function generateCapsuleTexture(): THREE.CanvasTexture {
-  const W = 512, H = 512;
-  const [canvas, ctx] = createCanvas(W, H);
+export function generateCapsuleTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [heightCanvas, heightCtx] = createCanvas(W, H);
+
   // white body
-  ctx.fillStyle = '#f0f0f4';
-  ctx.fillRect(0, 0, W, H * 0.82);
-  // dark ablative heat shield
+  colorCtx.fillStyle = '#f0f0f4';
+  colorCtx.fillRect(0, 0, W, H * 0.82);
+
+  // heat shield gradient (dark to brown)
   for (let py = H * 0.82; py < H; py++) {
     const t = (py - H * 0.82) / (H * 0.18);
-    const v = Math.round(100 - t * 60);
-    ctx.fillStyle = `rgb(${v}, ${v-10}, ${v-20})`;
-    ctx.fillRect(0, py, W, 1);
+    const r = Math.round(100 + t * 40);
+    const g = Math.round(90 - t * 30);
+    const b = Math.round(80 - t * 30);
+    colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    colorCtx.fillRect(0, py, W, 1);
   }
-  // heat shield grid
-  ctx.strokeStyle = '#403030';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 20) {
-    ctx.beginPath(); ctx.moveTo(x, H * 0.82); ctx.lineTo(x, H); ctx.stroke();
+
+  // soot at the heat shield seam
+  for (let py = H * 0.81; py < H * 0.85; py++) {
+    const t = (py - H * 0.81) / (H * 0.04);
+    const alpha = t < 0.5 ? t * 0.4 : (1 - t) * 0.4;
+    colorCtx.fillStyle = `rgba(0,0,0,${alpha})`;
+    colorCtx.fillRect(0, py, W, 1);
   }
-  for (let y = H * 0.84; y < H; y += 20) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  // bold red/blue stripe
-  ctx.fillStyle = '#2a3a8a';
-  ctx.fillRect(0, H * 0.25, W, H * 0.025);
-  ctx.fillStyle = '#cc2244';
-  ctx.fillRect(0, H * 0.28, W, H * 0.025);
+
+  // stripes
+  colorCtx.fillStyle = '#2a3a8a';
+  colorCtx.fillRect(0, H * 0.25, W, H * 0.025);
+  colorCtx.fillStyle = '#cc2244';
+  colorCtx.fillRect(0, H * 0.28, W, H * 0.025);
+
+  // wear
+  applyWear(colorCtx, W, H, 0.2);
+
+  // light gradient
+  applyLightGradient(colorCtx, W, H);
+
+  // height map
+  heightCtx.fillStyle = '#808080';
+  heightCtx.fillRect(0, 0, W, H);
+
   // panel line between body and heat shield
-  ctx.strokeStyle = '#606068';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, H * 0.82); ctx.lineTo(W, H * 0.82); ctx.stroke();
-  // small rivets at the seam
-  for (let x = 12; x < W; x += 24) {
-    ctx.fillStyle = '#808088';
-    ctx.beginPath(); ctx.arc(x, H * 0.82 + 4, 2, 0, Math.PI * 2); ctx.fill();
+  heightCtx.strokeStyle = '#c0c0c0';
+  heightCtx.lineWidth = 6;
+  heightCtx.beginPath();
+  heightCtx.moveTo(0, H * 0.82);
+  heightCtx.lineTo(W, H * 0.82);
+  heightCtx.stroke();
+
+  // heat shield grid (cross-hatch)
+  heightCtx.strokeStyle = '#a0a0a0';
+  heightCtx.lineWidth = 3;
+  for (let x = 0; x < W; x += 24) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(x, H * 0.82);
+    heightCtx.lineTo(x, H);
+    heightCtx.stroke();
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  for (let y = H * 0.84; y < H; y += 24) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, y);
+    heightCtx.lineTo(W, y);
+    heightCtx.stroke();
+  }
+
+  // rivets at seam
+  heightCtx.fillStyle = '#c0c0c0';
+  for (let x = 16; x < W; x += 32) {
+    heightCtx.beginPath();
+    heightCtx.arc(x, H * 0.82 + 6, 4, 0, Math.PI * 2);
+    heightCtx.fill();
+  }
+
+  // window frame (raised ring)
+  heightCtx.strokeStyle = '#cccccc';
+  heightCtx.lineWidth = 8;
+  heightCtx.beginPath();
+  heightCtx.arc(W * 0.3, H * 0.12, 30, 0, Math.PI * 2);
+  heightCtx.stroke();
+  heightCtx.strokeStyle = '#606060';
+  heightCtx.lineWidth = 3;
+  heightCtx.beginPath();
+  heightCtx.arc(W * 0.3, H * 0.12, 24, 0, Math.PI * 2);
+  heightCtx.stroke();
+
+  return createTextureSet(colorCanvas, heightCanvas);
 }
 
-export function generateEngineTexture(): THREE.CanvasTexture {
-  const W = 512, H = 512;
-  const [canvas, ctx] = createCanvas(W, H);
+export function generateEngineTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [heightCanvas, heightCtx] = createCanvas(W, H);
+
   // dark metallic top
-  ctx.fillStyle = '#383838';
-  ctx.fillRect(0, 0, W, H * 0.35);
+  colorCtx.fillStyle = '#383838';
+  colorCtx.fillRect(0, 0, W, H * 0.35);
+
   // mid section
-  ctx.fillStyle = '#484848';
-  ctx.fillRect(0, H * 0.35, W, H * 0.10);
-  // copper/gold nozzle bell
+  colorCtx.fillStyle = '#484848';
+  colorCtx.fillRect(0, H * 0.35, W, H * 0.10);
+
+  // copper/gold nozzle bell with heat gradient
   for (let py = H * 0.45; py < H; py++) {
     const t = (py - H * 0.45) / (H * 0.55);
     const r = Math.round(140 + 60 * t);
-    const g = Math.round(90 + 40 * t);
+    const g = Math.round(90 + 40 * Math.max(0, 1 - t * 1.5));
     const b = Math.round(50 + 10 * t);
-    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    ctx.fillRect(0, py, W, 1);
+    colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    colorCtx.fillRect(0, py, W, 1);
   }
-  // horizontal detail lines
-  ctx.strokeStyle = '#202020';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, H * 0.35); ctx.lineTo(W, H * 0.35); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, H * 0.45); ctx.lineTo(W, H * 0.45); ctx.stroke();
-  // nozzle rim highlight
-  ctx.fillStyle = '#c8a870';
-  ctx.fillRect(0, H * 0.96, W, H * 0.015);
-  ctx.fillStyle = '#685030';
-  ctx.fillRect(0, H * 0.975, W, H * 0.025);
-  // bolt ring at mid section
-  for (let x = 10; x < W; x += 30) {
-    ctx.fillStyle = '#606060';
-    ctx.beginPath(); ctx.arc(x, H * 0.40, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#909090';
-    ctx.beginPath(); ctx.arc(x + 1, H * 0.40 - 1, 1.5, 0, Math.PI * 2); ctx.fill();
+
+  // soot around nozzle rim
+  for (let py = H * 0.94; py < H; py++) {
+    const t = (py - H * 0.94) / (H * 0.06);
+    colorCtx.fillStyle = `rgba(0,0,0,${t * 0.5})`;
+    colorCtx.fillRect(0, py, W, 1);
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+
+  // light gradient
+  applyLightGradient(colorCtx, W, H);
+
+  // height map
+  heightCtx.fillStyle = '#808080';
+  heightCtx.fillRect(0, 0, W, H);
+
+  // cooling channels on nozzle bell (vertical lines)
+  heightCtx.strokeStyle = '#404040';
+  heightCtx.lineWidth = 3;
+  for (let x = 4; x < W; x += 10) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(x, H * 0.45);
+    heightCtx.lineTo(x, H * 0.96);
+    heightCtx.stroke();
+  }
+
+  // horizontal detail lines (raised)
+  heightCtx.strokeStyle = '#c0c0c0';
+  heightCtx.lineWidth = 5;
+  const detailY = [H * 0.35, H * 0.45, H * 0.96];
+  for (const y of detailY) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, y);
+    heightCtx.lineTo(W, y);
+    heightCtx.stroke();
+  }
+
+  // nozzle rim (raised ring)
+  heightCtx.fillStyle = '#d0d0d0';
+  heightCtx.fillRect(0, H * 0.96, W, H * 0.02);
+
+  // bolts
+  heightCtx.fillStyle = '#c0c0c0';
+  for (let x = 14; x < W; x += 32) {
+    heightCtx.beginPath();
+    heightCtx.arc(x, H * 0.40, 5, 0, Math.PI * 2);
+    heightCtx.fill();
+  }
+
+  return createTextureSet(colorCanvas, heightCanvas);
 }
 
-export function generateParachuteTexture(): THREE.CanvasTexture {
-  const W = 512, H = 512;
-  const [canvas, ctx] = createCanvas(W, H);
-  // white/off-white alternating panels
+export function generateParachuteTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [heightCanvas, heightCtx] = createCanvas(W, H);
+
+  // alternating white/off-white panels
   for (let py = 0; py < H; py++) {
     const band = Math.floor(py / 32) % 2 === 0;
     const v = band ? 240 : 225;
-    ctx.fillStyle = `rgb(${v}, ${v+2}, ${v+5})`;
-    ctx.fillRect(0, py, W, 1);
+    colorCtx.fillStyle = `rgb(${v}, ${v + 2}, ${v + 5})`;
+    colorCtx.fillRect(0, py, W, 1);
   }
-  // stitching
-  ctx.strokeStyle = '#c0c0c8';
-  ctx.lineWidth = 1;
+
+  // red stripe
+  colorCtx.fillStyle = '#cc3344';
+  colorCtx.fillRect(0, H * 0.3, W, H * 0.03);
+  colorCtx.fillRect(0, H * 0.7, W, H * 0.03);
+
+  // shadow on one side
+  const shadowGrad = colorCtx.createLinearGradient(0, 0, W, 0);
+  if (shadowGrad) {
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    shadowGrad.addColorStop(0.3, 'rgba(0,0,0,0)');
+    shadowGrad.addColorStop(0.8, 'rgba(0,0,0,0.15)');
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
+    colorCtx.fillStyle = shadowGrad;
+  } else {
+    colorCtx.fillStyle = 'rgba(0,0,0,0.1)';
+  }
+  colorCtx.fillRect(0, 0, W, H);
+
+  // height map
+  heightCtx.fillStyle = '#808080';
+  heightCtx.fillRect(0, 0, W, H);
+
+  // weave pattern (fine grid)
+  heightCtx.strokeStyle = '#909090';
+  heightCtx.lineWidth = 1;
+  for (let y = 0; y < H; y += 8) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, y);
+    heightCtx.lineTo(W, y);
+    heightCtx.stroke();
+  }
+  for (let x = 0; x < W; x += 8) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(x, 0);
+    heightCtx.lineTo(x, H);
+    heightCtx.stroke();
+  }
+
+  // main stitching (dashed raised lines)
+  heightCtx.strokeStyle = '#c0c0c0';
+  heightCtx.lineWidth = 3;
+  heightCtx.setLineDash([6, 10]);
   for (let y = 0; y < H; y += 32) {
-    ctx.setLineDash([4, 8]);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    ctx.setLineDash([]);
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, y);
+    heightCtx.lineTo(W, y);
+    heightCtx.stroke();
   }
   for (let x = 0; x < W; x += 32) {
-    ctx.setLineDash([4, 8]);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    ctx.setLineDash([]);
+    heightCtx.beginPath();
+    heightCtx.moveTo(x, 0);
+    heightCtx.lineTo(x, H);
+    heightCtx.stroke();
   }
-  // center cross reinforcement
-  ctx.strokeStyle = '#a0a0aa';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(W / 2 - 20, 0); ctx.lineTo(W / 2 - 20, H); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(W / 2 + 20, 0); ctx.lineTo(W / 2 + 20, H); ctx.stroke();
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  heightCtx.setLineDash([]);
+
+  // centre cross reinforcements
+  heightCtx.strokeStyle = '#b0b0b0';
+  heightCtx.lineWidth = 5;
+  heightCtx.beginPath();
+  heightCtx.moveTo(W / 2 - 24, 0);
+  heightCtx.lineTo(W / 2 - 24, H);
+  heightCtx.stroke();
+  heightCtx.beginPath();
+  heightCtx.moveTo(W / 2 + 24, 0);
+  heightCtx.lineTo(W / 2 + 24, H);
+  heightCtx.stroke();
+
+  return createTextureSet(colorCanvas, heightCanvas);
 }

@@ -27,28 +27,38 @@ describe('ProceduralTextures', () => {
     expect(tex.image.height).toBe(256);
   });
 
-  it('generateTankTexture returns a CanvasTexture', () => {
-    const tex = generateTankTexture();
-    expect(tex.image.width).toBe(512);
-    expect(tex.image.height).toBe(512);
+  it('generateTankTexture returns TextureSet with 1024x1024 color map', () => {
+    const ts = generateTankTexture('M');
+    expect(ts.color.image.width).toBe(1024);
+    expect(ts.color.image.height).toBe(1024);
+    expect(ts.normal).toBeDefined();
   });
 
-  it('generateCapsuleTexture returns a CanvasTexture', () => {
-    const tex = generateCapsuleTexture();
-    expect(tex.image.width).toBe(512);
-    expect(tex.image.height).toBe(512);
+  it('generateTankTexture handles XL size without error', () => {
+    const ts = generateTankTexture('XL');
+    expect(ts.color.image.width).toBe(1024);
+    expect(ts.normal).toBeDefined();
   });
 
-  it('generateEngineTexture returns a CanvasTexture', () => {
-    const tex = generateEngineTexture();
-    expect(tex.image.width).toBe(512);
-    expect(tex.image.height).toBe(512);
+  it('generateCapsuleTexture returns TextureSet with 1024x1024 color map', () => {
+    const ts = generateCapsuleTexture();
+    expect(ts.color.image.width).toBe(1024);
+    expect(ts.color.image.height).toBe(1024);
+    expect(ts.normal).toBeDefined();
   });
 
-  it('generateParachuteTexture returns a CanvasTexture', () => {
-    const tex = generateParachuteTexture();
-    expect(tex.image.width).toBe(512);
-    expect(tex.image.height).toBe(512);
+  it('generateEngineTexture returns TextureSet with 1024x1024 color map', () => {
+    const ts = generateEngineTexture();
+    expect(ts.color.image.width).toBe(1024);
+    expect(ts.color.image.height).toBe(1024);
+    expect(ts.normal).toBeDefined();
+  });
+
+  it('generateParachuteTexture returns TextureSet with 1024x1024 color map', () => {
+    const ts = generateParachuteTexture();
+    expect(ts.color.image.width).toBe(1024);
+    expect(ts.color.image.height).toBe(1024);
+    expect(ts.normal).toBeDefined();
   });
 
   it('makeNormalMap produces a CanvasTexture of matching size', () => {
