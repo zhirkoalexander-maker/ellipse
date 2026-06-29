@@ -64,11 +64,8 @@ export class VABScene {
           <div style="color:#F4F5F2;font-size:11px;opacity:0.5;margin-top:4px;">Build your rocket</div>
         </div>
         <div style="padding:8px;border-bottom:1px solid rgba(234,205,158,0.1);">
-          <div style="font-size:9px;color:var(--accent-blue-bright);letter-spacing:0.05em;margin-bottom:4px;">AI BUILD — describe your mission</div>
-          <div style="display:flex;gap:4px;">
-            <input id="vab-ai-input" type="text" placeholder='e.g. "land on moon and return"' style="flex:1;padding:6px 8px;background:rgba(244,245,242,0.08);border:1px solid rgba(244,245,242,0.15);border-radius:3px;color:#F4F5F2;font-size:11px;outline:none;pointer-events:auto;">
-            <button id="vab-ai-build" style="padding:6px 10px;background:rgba(68,136,255,0.3);color:#4488FF;border:1px solid rgba(68,136,255,0.3);border-radius:3px;font-size:10px;cursor:pointer;pointer-events:auto;white-space:nowrap;">BUILD</button>
-          </div>
+          <div style="font-size:9px;color:var(--accent-blue-bright);letter-spacing:0.05em;margin-bottom:6px;">QUICK BUILD — pick a mission</div>
+          <div id="vab-presets" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
         </div>
         <div style="padding:8px 8px 4px;border-bottom:1px solid rgba(234,205,158,0.1);">
           <div id="vab-current" style="min-height:40px;padding:6px;background:rgba(244,245,242,0.05);border-radius:3px;"></div>
@@ -85,6 +82,7 @@ export class VABScene {
     this.partListEl = this.rootEl.querySelector('#vab-parts')!;
     this.currentRocketEl = this.rootEl.querySelector('#vab-current')!;
     this.buildPartList();
+    this.buildPresets();
     this.updateCurrentList();
 
     this.rootEl.querySelector('#vab-launch')!.addEventListener('click', () => {
@@ -92,19 +90,34 @@ export class VABScene {
     });
     this.rootEl.querySelector('#vab-remove')!.addEventListener('click', () => this.removeLast());
     this.rootEl.querySelector('#vab-clear')!.addEventListener('click', () => this.clearAll());
+  }
 
-    const aiInput = this.rootEl.querySelector('#vab-ai-input') as HTMLInputElement;
-    const aiBtn = this.rootEl.querySelector('#vab-ai-build')!;
-    const doAiBuild = () => {
-      const text = aiInput.value.trim();
-      if (!text) return;
-      this.clearAll();
-      this.assembly = buildRocketFromDescription(text);
-      this.refreshMesh();
-      this.syncPartsFromAssembly();
-    };
-    aiBtn.addEventListener('click', doAiBuild);
-    aiInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAiBuild(); });
+  private buildPresets(): void {
+    const presets = [
+      { label: '🚀 Suborbital', desc: 'suborbital test', color: '#6688aa' },
+      { label: '🛸 Earth Orbit', desc: 'earth orbit', color: '#4488FF' },
+      { label: '🌙 Moon Landing', desc: 'land on moon', color: '#88AACC' },
+      { label: '🌙 Moon Return', desc: 'land on moon and return', color: '#EACD9E' },
+      { label: '🔴 Mars', desc: 'mars mission', color: '#d4733a' },
+      { label: '☀️ Solar Orbit', desc: 'orbit around the sun', color: '#ffdd44' },
+      { label: '🪐 Heavy Lifter', desc: 'heavy interplanetary', color: '#CC88AA' },
+    ];
+    const el = this.rootEl.querySelector('#vab-presets')!;
+    for (const p of presets) {
+      const btn = document.createElement('button');
+      btn.textContent = p.label;
+      btn.title = p.desc;
+      btn.style.cssText = `flex:1;min-width:80px;padding:5px 6px;background:rgba(244,245,242,0.06);color:${p.color};border:1px solid rgba(244,245,242,0.1);border-radius:3px;font-size:9px;cursor:pointer;pointer-events:auto;text-align:center;white-space:nowrap;`;
+      btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(244,245,242,0.12)'; });
+      btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(244,245,242,0.06)'; });
+      btn.addEventListener('click', () => {
+        this.clearAll();
+        this.assembly = buildRocketFromDescription(p.desc);
+        this.refreshMesh();
+        this.syncPartsFromAssembly();
+      });
+      el.appendChild(btn);
+    }
   }
 
   private buildPartList(): void {
