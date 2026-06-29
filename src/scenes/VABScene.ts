@@ -98,6 +98,7 @@ export class VABScene {
       { label: '🛸 Earth Orbit', desc: 'earth orbit', color: '#4488FF' },
       { label: '🌙 Moon Landing', desc: 'land on moon', color: '#88AACC' },
       { label: '🌙 Moon Return', desc: 'land on moon and return', color: '#EACD9E' },
+      { label: '🌙+🛡️ Moon Safe', desc: 'safe moon landing and return with 50% fuel', color: '#66DD88' },
       { label: '🔴 Mars', desc: 'mars mission', color: '#d4733a' },
       { label: '☀️ Solar Orbit', desc: 'orbit around the sun', color: '#ffdd44' },
       { label: '🪐 Heavy Lifter', desc: 'heavy interplanetary', color: '#CC88AA' },
