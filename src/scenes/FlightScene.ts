@@ -35,7 +35,7 @@ export class FlightScene {
   private launched = false;
   private grounded = true;
   private engineFlame: EngineFlame;
-  private rocketRotation = { x: 0, y: 0, z: 0 };
+  private rocketQuat = new THREE.Quaternion();
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
@@ -376,21 +376,44 @@ export class FlightScene {
     if (this.controls.consumeSasToggle()) this.cycleSasMode();
     this.hud.setSasMode(this.controls.sasMode);
 
-    // 3D rotation from controls
-    const rotSpeed = 3.0;
+    // Current forward direction
+    const getFwd = () => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+
+    // Apply manual rotation or SAS
+    const rotSpeed = 2.5;
     const pitchInput = this.controls.getPitch();
     const yawInput = this.controls.getYaw();
-    this.rocketRotation.x += pitchInput * rotSpeed * baseDt;
-    this.rocketRotation.z += yawInput * rotSpeed * baseDt;
-    this.rocketRotation.x = Math.max(-Math.PI * 0.49, Math.min(Math.PI * 0.49, this.rocketRotation.x));
+
+    if (this.controls.sasMode === 'off' || (pitchInput !== 0 || yawInput !== 0)) {
+      // Manual control overrides SAS
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitchInput * rotSpeed * baseDt);
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yawInput * rotSpeed * baseDt);
+      this.rocketQuat.multiply(qPitch).multiply(qYaw);
+      this.rocketQuat.normalize();
+    } else if (this.controls.sasMode === 'prograde' || this.controls.sasMode === 'retrograde') {
+      const velMag = Math.sqrt(
+        this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+      );
+      if (velMag > 1) {
+        const tDir: [number, number, number] = this.controls.sasMode === 'prograde'
+          ? [this.state.velocity[0] / velMag, this.state.velocity[1] / velMag, this.state.velocity[2] / velMag]
+          : [-this.state.velocity[0] / velMag, -this.state.velocity[1] / velMag, -this.state.velocity[2] / velMag];
+
+        const currentFwd = getFwd();
+        const target = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
+        const targetQ = new THREE.Quaternion().setFromUnitVectors(currentFwd, target);
+        const sasRate = Math.min(1, currentFwd.angleTo(target) * 5) * baseDt * 3;
+        this.rocketQuat.slerp(targetQ.multiply(this.rocketQuat), sasRate);
+        this.rocketQuat.normalize();
+      }
+    }
 
     // Apply rotation to mesh
-    this.rocketGroup.rotation.set(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z);
+    const eulerOut = new THREE.Euler().setFromQuaternion(this.rocketQuat, 'YXZ');
+    this.rocketGroup.rotation.set(eulerOut.x, eulerOut.y, eulerOut.z);
 
-    // Thrust direction from 3D rotation
-    const fwd = new THREE.Vector3(0, 1, 0);
-    const euler = new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ');
-    fwd.applyEuler(euler);
+    // Thrust direction from quaternion
+    const fwd = getFwd();
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
     // Apply thrust
@@ -445,27 +468,17 @@ export class FlightScene {
       nearestBody = refBody;
       this.sanitize(this.state.velocity);
 
-      // SAS autopilot
-      if (this.controls.sasMode !== 'off') {
+      // Auto-throttle for retrograde landing
+      if (this.controls.sasMode === 'retrograde') {
         const velMag = Math.sqrt(
           this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
         );
-        if (velMag > 1) {
-          const targetDir: [number, number, number] = this.controls.sasMode === 'prograde'
-            ? [this.state.velocity[0] / velMag, this.state.velocity[1] / velMag, this.state.velocity[2] / velMag]
-            : [-this.state.velocity[0] / velMag, -this.state.velocity[1] / velMag, -this.state.velocity[2] / velMag];
-
-          const currentFwd = new THREE.Vector3(0, 1, 0).applyEuler(
-            new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ')
-          );
-          const target = new THREE.Vector3(targetDir[0], targetDir[1], targetDir[2]);
-          const angle = currentFwd.angleTo(target);
-          if (angle > 0.02) {
-            const cross = new THREE.Vector3().crossVectors(currentFwd, target).normalize();
-            const sasStrength = Math.min(2.0, angle * 3);
-            this.rocketRotation.x += cross.x * sasStrength * baseDt;
-            this.rocketRotation.z += cross.z * sasStrength * baseDt;
-            this.rocketRotation.x = Math.max(-Math.PI * 0.49, Math.min(Math.PI * 0.49, this.rocketRotation.x));
+        if (nearestBody && (nearestBody as any).radius) {
+          const alt = nearestDist - (nearestBody as any).radius;
+          if (alt < 5000 && velMag > 5) {
+            this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.3);
+          } else if (alt < 500 && velMag < 3) {
+            this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
           }
         }
       }
@@ -582,7 +595,8 @@ export class FlightScene {
         this.state.position[2] * VISUAL_SCALE
       );
 
-      this.chase.follow(this.state, _dt, this.rocketRotation);
+      const rotEuler = new THREE.Euler().setFromQuaternion(this.rocketQuat, 'YXZ');
+      this.chase.follow(this.state, _dt, { x: rotEuler.x, y: rotEuler.y, z: rotEuler.z });
 
       if (this.deployedChuteMesh) {
         this.deployedChuteMesh.position.set(
@@ -597,8 +611,7 @@ export class FlightScene {
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     this.hud.update(this.state, this.system);
 
-    const thrustEuler = new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ');
-    const rocketFwd = new THREE.Vector3(0, 1, 0).applyEuler(thrustEuler);
+    const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
       this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
     );
