@@ -8,7 +8,7 @@ const loader = new THREE.TextureLoader();
 
 export class Mars extends Planet {
   constructor(position: Vec3, velocity: Vec3) {
-    super('mars', 6.417e23, position, velocity, 3.390e6);
+    super('mars', 1.9e24, position, velocity, 3.390e6);
     const geom = new THREE.SphereGeometry(this.visualRadius, 48, 24);
     const mat = new THREE.MeshStandardMaterial({
       map: loader.load('/textures/mars.jpg'),

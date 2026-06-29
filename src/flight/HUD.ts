@@ -14,6 +14,7 @@ export class HUD {
   private throtPct!: HTMLSpanElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
+  onAction: ((action: string) => void) | null = null;
 
   constructor() {
     this.root = document.createElement('div');
@@ -37,8 +38,12 @@ export class HUD {
         <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--throttle throt-fill" style="width:0%;"></span></span></div>
       </div>
       <div class="separator"></div>
+      <div class="btn-bar">
+        <button class="btn btn--action" data-action="stage">STAGE</button>
+        <button class="btn btn--action" data-action="parachute">CHUTE</button>
+        <button class="btn btn--action" data-action="map">MAP</button>
+      </div>
       <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | M Map | Space Stage</div>
-      <div class="debug-input" style="color:#ff6644;font-size:10px;margin-top:4px;"></div>
     `;
     parent.appendChild(this.root);
 
@@ -51,6 +56,14 @@ export class HUD {
     this.fuelPct = this.root.querySelector('.fuel-pct')!;
     this.throtFill = this.root.querySelector('.throt-fill')!;
     this.throtPct = this.root.querySelector('.throt-pct')!;
+
+    // Button event delegation
+    this.root.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (btn && this.onAction) {
+        this.onAction(btn.dataset.action!);
+      }
+    });
 
     const navballContainer = document.createElement('div');
     navballContainer.className = 'navball-container';
@@ -68,11 +81,6 @@ export class HUD {
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
-  }
-
-  setDebugInput(text: string): void {
-    const el = this.root.querySelector('.debug-input');
-    if (el) el.textContent = text;
   }
 
   setNavballData(
