@@ -1,5 +1,6 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
+import type { SASMode } from './Controls';
 
 export class HUD {
   private root: HTMLDivElement;
@@ -12,6 +13,8 @@ export class HUD {
   private fuelPct!: HTMLSpanElement;
   private throtFill!: HTMLSpanElement;
   private throtPct!: HTMLSpanElement;
+  private sasLabel!: HTMLSpanElement;
+  private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
   onAction: ((action: string) => void) | null = null;
@@ -28,6 +31,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
       <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
       <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
+      <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value"><span class="sas-val" style="color:var(--accent-blue);">OFF</span></span></div>
       <div class="separator"></div>
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
         <div class="hud-row"><span class="hud-label">Fuel</span><span class="text-data-sm fuel-pct">0%</span></div>
@@ -42,8 +46,9 @@ export class HUD {
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
         <button class="btn btn--action" data-action="map">MAP</button>
+        <button class="btn btn--action" data-action="sas">SAS</button>
       </div>
-      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | M Map | Space Stage</div>
+      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | T SAS | Esc Pause</div>
     `;
     parent.appendChild(this.root);
 
@@ -56,13 +61,11 @@ export class HUD {
     this.fuelPct = this.root.querySelector('.fuel-pct')!;
     this.throtFill = this.root.querySelector('.throt-fill')!;
     this.throtPct = this.root.querySelector('.throt-pct')!;
+    this.sasLabel = this.root.querySelector('.sas-val')!;
 
-    // Button event delegation
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
-      if (btn && this.onAction) {
-        this.onAction(btn.dataset.action!);
-      }
+      if (btn && this.onAction) this.onAction(btn.dataset.action!);
     });
 
     const navballContainer = document.createElement('div');
@@ -76,11 +79,26 @@ export class HUD {
     parent.appendChild(navballContainer);
     this.navballCanvas = canvas;
     this.navballCtx = canvas.getContext('2d')!;
+
+    this.pauseOverlay = document.createElement('div');
+    this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(6,8,20,0.6);display:none;align-items:center;justify-content:center;font-size:48px;color:#F4F5F2;font-family:var(--font-display,monospace);';
+    this.pauseOverlay.textContent = 'PAUSED';
+    parent.appendChild(this.pauseOverlay);
   }
 
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
+  }
+
+  setSasMode(mode: SASMode): void {
+    const colors: Record<SASMode, string> = { off: 'var(--text-muted)', prograde: '#44FF44', retrograde: '#FF4444' };
+    this.sasLabel.textContent = mode === 'off' ? 'OFF' : mode === 'prograde' ? 'PRO' : 'RETRO';
+    this.sasLabel.style.color = colors[mode];
+  }
+
+  setPaused(paused: boolean): void {
+    this.pauseOverlay.style.display = paused ? 'flex' : 'none';
   }
 
   setNavballData(
@@ -107,7 +125,6 @@ export class HUD {
     ctx.fillStyle = '#885522';
     ctx.fillRect(cx - R, cy - horizonY, R * 2, R + horizonY);
 
-    // Pitch ladder lines at 10° intervals
     for (let deg = -80; deg <= 80; deg += 10) {
       const y = cy - Math.sin(deg * Math.PI / 180) * R;
       ctx.beginPath();
@@ -124,7 +141,6 @@ export class HUD {
       }
     }
 
-    // Horizon line
     ctx.beginPath();
     ctx.moveTo(cx - R, cy - horizonY);
     ctx.lineTo(cx + R, cy - horizonY);
@@ -132,7 +148,6 @@ export class HUD {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Project a 3D dir onto navball 2D
     const project = (dir: [number, number, number]) => {
       const m = Math.sqrt(dir[0]**2 + dir[1]**2 + dir[2]**2) || 1;
       const dx = dir[0] / m, dy = dir[1] / m, dz = dir[2] / m;
@@ -143,7 +158,6 @@ export class HUD {
       return { x: cx + (projX / plen) * R * 0.78, y: cy - (projY / plen) * R * 0.78, inFront: fwdD > 0 };
     };
 
-    // Prograde marker (green circle)
     const pg = project(velocityDir);
     if (pg.inFront) {
       ctx.beginPath(); ctx.arc(pg.x, pg.y, 6, 0, Math.PI * 2);
@@ -154,7 +168,6 @@ export class HUD {
       ctx.fillText('P', pg.x + 8, pg.y + 3);
     }
 
-    // Retrograde marker (crossed circle)
     const rgVel: [number, number, number] = [-velocityDir[0], -velocityDir[1], -velocityDir[2]];
     const rg = project(rgVel);
     if (rg.inFront) {
@@ -167,14 +180,12 @@ export class HUD {
       ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1.5; ctx.stroke();
     }
 
-    // Zenith (radial out) — blue triangle up
     const zn = project(upDir);
     if (zn.inFront) {
       ctx.beginPath(); ctx.moveTo(zn.x, zn.y - 8); ctx.lineTo(zn.x - 6, zn.y + 4); ctx.lineTo(zn.x + 6, zn.y + 4); ctx.closePath();
       ctx.fillStyle = '#4488FF'; ctx.fill();
     }
 
-    // Nadir (radial in) — blue triangle down
     const nd: [number, number, number] = [-upDir[0], -upDir[1], -upDir[2]];
     const ndp = project(nd);
     if (ndp.inFront) {
@@ -182,7 +193,6 @@ export class HUD {
       ctx.fillStyle = '#4488FF'; ctx.fill();
     }
 
-    // Heading dot
     ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#FFAA44'; ctx.fill();
 
@@ -206,7 +216,7 @@ export class HUD {
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       const r = (body as any).radius ?? 0;
       const alt = d - r;
-      if (alt < nearestAlt) { nearestAlt = alt; }
+      if (alt < nearestAlt) nearestAlt = alt;
     }
     const horiz = Math.sqrt(state.velocity[0] ** 2 + state.velocity[2] ** 2);
     const angle = Math.atan2(horiz, Math.abs(state.velocity[1])) * 180 / Math.PI;
@@ -233,5 +243,6 @@ export class HUD {
 
   unmount(): void {
     this.root.remove();
+    this.pauseOverlay.remove();
   }
 }

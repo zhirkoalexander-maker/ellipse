@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { FlightState } from './FlightState';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
@@ -22,7 +22,6 @@ export class ChaseCamera {
     this.polar = Math.acos(this.offset.y / this.offset.length());
   }
 
-  /** Call to enable mouse-drag orbit */
   enableOrbit(_el: HTMLElement): void {
     window.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -40,7 +39,7 @@ export class ChaseCamera {
     window.addEventListener('mouseup', () => { this.isDragging = false; });
   }
 
-  follow(state: FlightState, dt: number, rotation?: { x: number; y: number; z: number }): void {
+  follow(state: FlightState, _dt: number, _rotation?: { x: number; y: number; z: number }): void {
     const dist = this.offset.length();
     const ox = dist * Math.sin(this.polar) * Math.cos(this.azimuth);
     const oy = dist * Math.cos(this.polar);
