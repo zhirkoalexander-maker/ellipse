@@ -1,15 +1,22 @@
 import type { FlightState } from './FlightState';
 
+export type SASMode = 'off' | 'prograde' | 'retrograde';
+
 export class Controls {
   private keys: Set<string> = new Set();
   private stagePressed = false;
+  private sasToggle = false;
+  private pauseToggle = false;
   readonly state: FlightState;
+  sasMode: SASMode = 'off';
 
   constructor(state: FlightState) {
     this.state = state;
     window.addEventListener('keydown', (e) => {
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
+      if (e.key.toLowerCase() === 't') this.sasToggle = true;
+      if (e.key === 'Escape') this.pauseToggle = true;
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
@@ -41,6 +48,18 @@ export class Controls {
   getStageRequested(): boolean {
     const was = this.stagePressed;
     this.stagePressed = false;
+    return was;
+  }
+
+  consumeSasToggle(): boolean {
+    const was = this.sasToggle;
+    this.sasToggle = false;
+    return was;
+  }
+
+  consumePauseToggle(): boolean {
+    const was = this.pauseToggle;
+    this.pauseToggle = false;
     return was;
   }
 }

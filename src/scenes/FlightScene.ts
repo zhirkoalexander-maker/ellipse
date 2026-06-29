@@ -10,6 +10,7 @@ import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
 import { applyThrust } from '../flight/Thrust';
+import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
@@ -30,6 +31,7 @@ export class FlightScene {
   private chase: ChaseCamera;
   private controls: Controls;
   private hud: HUD;
+  private sound: SoundManager;
   private launched = false;
   private grounded = true;
   private engineFlame: EngineFlame;
@@ -38,8 +40,10 @@ export class FlightScene {
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
   private crashed = false;
+  private paused = false;
   private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
   private warpIndex = 0;
+  private heatTemp = 0;
 
   constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements) {
     this.renderer = renderer;
@@ -48,7 +52,6 @@ export class FlightScene {
     this.achievements = achievements;
     this.rocket = rocket;
 
-    // Spawn rocket just above Earth's surface (top side, away from Sun)
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
     const spawnPos: [number, number, number] = [
@@ -58,13 +61,11 @@ export class FlightScene {
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
 
-    // Build rocket mesh
     this.rocketGroup = rocket.assembly.toMesh();
     this.updateRocketMesh();
 
     sceneMgr.scene.add(this.rocketGroup);
 
-    // Add all planet/sun meshes to scene
     for (const body of system.bodies) {
       const pbody = body as any;
       if (pbody.mesh) sceneMgr.scene.add(pbody.mesh);
@@ -74,7 +75,6 @@ export class FlightScene {
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
 
-    // Planet sprites (visible from Earth as coloured dots)
     const spriteTex = (color: string) => {
       const c = document.createElement('canvas');
       c.width = 64; c.height = 64;
@@ -89,7 +89,7 @@ export class FlightScene {
     const planetSizes: Record<string, number> = { moon: 8, venus: 12, mars: 10, mercury: 8 };
     const spriteMeshes: THREE.Sprite[] = [];
     for (const body of system.bodies) {
-      if (body.name === 'earth' || body.name === 'sun') continue; // skip bodies w/ 3D mesh
+      if (body.name === 'earth' || body.name === 'sun') continue;
       const mat = new THREE.SpriteMaterial({ map: spriteTex(planetColors[body.name] || '#888'), transparent: true, depthTest: true });
       const sprite = new THREE.Sprite(mat);
       sprite.scale.set(planetSizes[body.name] || 10, planetSizes[body.name] || 10, 1);
@@ -99,7 +99,6 @@ export class FlightScene {
     }
     (window as any).__spriteMeshes = spriteMeshes;
 
-    // SOI spheres — visual gravitational influence zones
     const earthMass = 5.2e24;
     const earthPos = system.bodyByName('earth')!.position;
     const soiMeshes: THREE.LineSegments[] = [];
@@ -121,24 +120,26 @@ export class FlightScene {
     }
     (window as any).__soiMeshes = soiMeshes;
 
-    // Engine flame — child of rocket so it follows position + rotation
     this.engineFlame = new EngineFlame();
     this.engineFlame.getMesh().position.set(0, -0.001, 0);
     this.rocketGroup.add(this.engineFlame.getMesh());
 
     this.chase = new ChaseCamera(sceneMgr.camera);
     this.chase.enableOrbit(this.renderer.domElement);
-    // Immediately position camera behind rocket
     const vx = this.state.position[0] * VISUAL_SCALE;
     const vy = this.state.position[1] * VISUAL_SCALE;
     const vz = this.state.position[2] * VISUAL_SCALE;
     sceneMgr.camera.position.set(vx, vy + 0.02, vz + 0.05);
     sceneMgr.camera.lookAt(vx, vy, vz);
     this.controls = new Controls(this.state);
+
+    this.sound = new SoundManager();
+
     this.hud = new HUD();
     this.hud.onAction = (action) => {
       if (action === 'stage') this.performStage();
       else if (action === 'parachute') this.toggleParachute();
+      else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') {
         mapActive = !mapActive;
         mapEl.style.display = mapActive ? 'block' : 'none';
@@ -147,7 +148,6 @@ export class FlightScene {
     };
     this.hud.mount();
 
-    // Map view toggle (M or Tab) — full screen with zoom/pan
     let mapActive = false;
     let mapZoom = 1.0;
     let mapPanX = 0;
@@ -224,7 +224,6 @@ export class FlightScene {
         ctx.fillText(b.name.toUpperCase(), bx + 10, by + 4);
       }
 
-      // Rocket at center — triangle showing direction
       const velX = this.state.velocity[0] || 0;
       const velZ = this.state.velocity[2] || 1;
       const velA = Math.atan2(velZ, velX);
@@ -236,10 +235,8 @@ export class FlightScene {
       ctx.closePath();
       ctx.fillStyle = '#EACD9E'; ctx.fill();
 
-      // Orbit trajectory prediction
       const refBody = getReferenceBody(this.state.position, this.system);
       if (refBody && refBody.mass > 0) {
-        // Draw SOI boundary circle
         if (refBody.name !== 'sun') {
           const sun = this.system.bodyByName('sun')!;
           const dSx = refBody.position[0] - sun.position[0];
@@ -301,14 +298,15 @@ export class FlightScene {
       }
     });
 
-    // Time warp controls (Q/E)
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'q' || e.key === '[') {
+        if (this.paused) return;
         this.warpIndex = Math.max(0, this.warpIndex - 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
         this.hud.setWarpLabel(`x${this.timeWarp}`);
         e.preventDefault();
       } else if (e.key === 'e' || e.key === ']') {
+        if (this.paused) return;
         this.warpIndex = Math.min(this.warpLevels.length - 1, this.warpIndex + 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
         this.hud.setWarpLabel(`x${this.timeWarp}`);
@@ -333,7 +331,7 @@ export class FlightScene {
     });
 
     this.achievements.unlock('first_launch');
-    toast.show('You are at the launchpad. W/S throttle, Q/E warp, arrows pitch/yaw, Space stage.');
+    toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, T SAS, Esc pause.');
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -353,41 +351,69 @@ export class FlightScene {
 
   private updateInner(_dt: number): void {
     const baseDt = _dt;
-    _dt *= this.timeWarp;
-    if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
-    // Update controls (always at base speed, not warped)
-    this.controls.update(baseDt);
 
-    // Staging
-    if (this.controls.getStageRequested()) {
-      this.performStage();
+    // Pause toggle
+    if (this.controls.consumePauseToggle()) {
+      this.paused = !this.paused;
+      this.hud.setPaused(this.paused);
+      if (this.paused) this.sound.stopEngine();
     }
 
-    // 2D heading-based rotation (only rotation.z = heading)
-    const rotSpeed = 4.0;
-    if (this.controls.getYaw() !== 0) this.rocketRotation.z += this.controls.getYaw() * rotSpeed * baseDt;
-    this.rocketRotation.x = 0;
-    this.rocketRotation.y = 0;
-    this.rocketGroup.rotation.set(0, 0, this.rocketRotation.z);
+    if (this.paused) {
+      this.system.propagate(0, FIXED_DT);
+      for (const body of this.system.bodies) (body as any).syncMesh?.();
+      return;
+    }
 
-    // Thrust direction in 2D (heading = rotation.z, X-Y plane only)
-    const heading = this.rocketRotation.z;
-    const tx = -Math.sin(heading);
-    const ty = Math.cos(heading);
-    const tz = 0;
+    _dt *= this.timeWarp;
+    if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
 
-    // Apply thrust — take off when throttle > 0
-    if (this.state.throttle > 0) {
+    this.controls.update(baseDt);
+
+    if (this.controls.getStageRequested()) this.performStage();
+
+    // SAS toggle
+    if (this.controls.consumeSasToggle()) this.cycleSasMode();
+    this.hud.setSasMode(this.controls.sasMode);
+
+    // 3D rotation from controls
+    const rotSpeed = 3.0;
+    const pitchInput = this.controls.getPitch();
+    const yawInput = this.controls.getYaw();
+    this.rocketRotation.x += pitchInput * rotSpeed * baseDt;
+    this.rocketRotation.z += yawInput * rotSpeed * baseDt;
+    this.rocketRotation.x = Math.max(-Math.PI * 0.49, Math.min(Math.PI * 0.49, this.rocketRotation.x));
+
+    // Apply rotation to mesh
+    this.rocketGroup.rotation.set(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z);
+
+    // Thrust direction from 3D rotation
+    const fwd = new THREE.Vector3(0, 1, 0);
+    const euler = new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ');
+    fwd.applyEuler(euler);
+    const tx = fwd.x, ty = fwd.y, tz = fwd.z;
+
+    // Apply thrust
+    const engineActive = this.state.throttle > 0;
+    if (engineActive) {
       applyThrust(this.state, _dt, [tx, ty, tz]);
       this.sanitize(this.state.velocity);
       if (this.grounded) {
         this.grounded = false;
         this.launched = true;
         this.achievements.unlock('reach_space');
+        this.sound.startEngine();
       }
     }
 
-    // Engine flame — follows rocket automatically (child of rocketGroup)
+    // Engine sound
+    if (engineActive && !this.grounded) {
+      this.sound.setThrottle(this.state.throttle);
+    } else if (!engineActive) {
+      this.sound.setThrottle(0);
+    }
+
+    // Engine flame
     if (this.state.throttle > 0) {
       this.engineFlame.start();
     } else {
@@ -395,12 +421,11 @@ export class FlightScene {
     }
     this.engineFlame.update(baseDt);
 
-    // Always integrate position (even when grounded — sideways movement works on pad)
+    // Integrate position
     this.state.position[0] += this.state.velocity[0] * _dt;
     this.state.position[1] += this.state.velocity[1] * _dt;
     this.state.position[2] += this.state.velocity[2] * _dt;
 
-    // Physics only when not grounded (gravity, drag, collision)
     let nearestBody: any = null;
     let nearestDist = Infinity;
     if (!this.grounded) {
@@ -420,7 +445,32 @@ export class FlightScene {
       nearestBody = refBody;
       this.sanitize(this.state.velocity);
 
-      // Aerodynamic drag — v² model with mass-proportional CdA
+      // SAS autopilot
+      if (this.controls.sasMode !== 'off') {
+        const velMag = Math.sqrt(
+          this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+        );
+        if (velMag > 1) {
+          const targetDir: [number, number, number] = this.controls.sasMode === 'prograde'
+            ? [this.state.velocity[0] / velMag, this.state.velocity[1] / velMag, this.state.velocity[2] / velMag]
+            : [-this.state.velocity[0] / velMag, -this.state.velocity[1] / velMag, -this.state.velocity[2] / velMag];
+
+          const currentFwd = new THREE.Vector3(0, 1, 0).applyEuler(
+            new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ')
+          );
+          const target = new THREE.Vector3(targetDir[0], targetDir[1], targetDir[2]);
+          const angle = currentFwd.angleTo(target);
+          if (angle > 0.02) {
+            const cross = new THREE.Vector3().crossVectors(currentFwd, target).normalize();
+            const sasStrength = Math.min(2.0, angle * 3);
+            this.rocketRotation.x += cross.x * sasStrength * baseDt;
+            this.rocketRotation.z += cross.z * sasStrength * baseDt;
+            this.rocketRotation.x = Math.max(-Math.PI * 0.49, Math.min(Math.PI * 0.49, this.rocketRotation.x));
+          }
+        }
+      }
+
+      // Aerodynamic drag
       const speed = Math.sqrt(
         this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
       );
@@ -443,68 +493,76 @@ export class FlightScene {
             this.state.velocity[2] *= f;
           }
           this.sanitize(this.state.velocity);
+
+          // Heating from atmospheric friction
+          const heatRate = 0.5 * rho * speed * speed * speed * 0.001;
+          this.heatTemp += heatRate * _dt;
+          this.heatTemp -= 0.1 * _dt; // cooling
+          this.heatTemp = Math.max(0, Math.min(100, this.heatTemp));
+          if (this.heatTemp > 80) {
+            toast.show(`Warning: overheating! ${this.heatTemp.toFixed(0)}°`);
+          }
+        } else {
+          this.heatTemp = Math.max(0, this.heatTemp - _dt * 0.5);
         }
+      } else {
+        this.heatTemp = Math.max(0, this.heatTemp - _dt * 0.5);
       }
-      // In space with throttle 0: no drag — pure coasting
 
-      // Exception safety
-    if (nearestBody && (nearestBody as any).radius && nearestDist < (nearestBody as any).radius + 0.5 && isFinite(nearestDist)) {
-      const bodyR = (nearestBody as any).radius;
-      const dx = this.state.position[0] - nearestBody.position[0];
-      const dy = this.state.position[1] - nearestBody.position[1];
-      const dz = this.state.position[2] - nearestBody.position[2];
-      const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-      if (d > 0.001 && isFinite(d)) {
-        const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
-        const upDotBody = (0 * dx + 1 * dy + 0 * dz) / d;
-        const tiltDeg = Math.acos(Math.min(1, Math.abs(upDotBody))) * 180 / Math.PI;
-        const hasLegs = this.hasLandingLegs();
-        const speedLimit = this.parachuteDeployed ? 15 : 10;
-        const tiltLimit = hasLegs ? 30 : 20;
+      // Collision with surface
+      if (nearestBody && (nearestBody as any).radius && nearestDist < (nearestBody as any).radius + 0.5 && isFinite(nearestDist)) {
+        const bodyR = (nearestBody as any).radius;
+        const dx = this.state.position[0] - nearestBody.position[0];
+        const dy = this.state.position[1] - nearestBody.position[1];
+        const dz = this.state.position[2] - nearestBody.position[2];
+        const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (d > 0.001 && isFinite(d)) {
+          const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
+          const upDotBody = (0 * dx + 1 * dy + 0 * dz) / d;
+          const tiltDeg = Math.acos(Math.min(1, Math.abs(upDotBody))) * 180 / Math.PI;
+          const hasLegs = this.hasLandingLegs();
+          const speedLimit = this.parachuteDeployed ? 15 : 10;
+          const tiltLimit = hasLegs ? 30 : 20;
 
-        // Surface check: altitude vs body radius
-        const alt = nearestDist - bodyR;
-        if (alt < 0.5) {
-          if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
-            this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
-          } else if (tiltDeg > tiltLimit) {
-            this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
-          } else if (isFinite(vertSpeed) && d <= bodyR + 0.5) {
-            this.state.position = [nearestBody.position[0] + dx / d * (bodyR + 0.5), nearestBody.position[1] + dy / d * (bodyR + 0.5), nearestBody.position[2] + dz / d * (bodyR + 0.5)];
-            this.state.velocity = [0, 0, 0];
-            this.grounded = true;
-            const bodyName = nearestBody.name;
-            toast.show(`Landed on ${bodyName}!`);
-            if (bodyName === 'earth') this.achievements.unlock('land_earth');
-            else if (bodyName === 'moon') this.achievements.unlock('land_moon');
-            else if (bodyName === 'mars') this.achievements.unlock('land_mars');
-            else if (bodyName === 'venus') this.achievements.unlock('land_venus');
-            else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
+          const alt = nearestDist - bodyR;
+          if (alt < 0.5) {
+            if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
+              this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
+            } else if (tiltDeg > tiltLimit) {
+              this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
+            } else if (isFinite(vertSpeed) && d <= bodyR + 0.5) {
+              this.state.position = [nearestBody.position[0] + dx / d * (bodyR + 0.5), nearestBody.position[1] + dy / d * (bodyR + 0.5), nearestBody.position[2] + dz / d * (bodyR + 0.5)];
+              this.state.velocity = [0, 0, 0];
+              this.grounded = true;
+              this.sound.playLand();
+              this.sound.stopEngine();
+              const bodyName = nearestBody.name;
+              toast.show(`Landed on ${bodyName}!`);
+              if (bodyName === 'earth') this.achievements.unlock('land_earth');
+              else if (bodyName === 'moon') this.achievements.unlock('land_moon');
+              else if (bodyName === 'mars') this.achievements.unlock('land_mars');
+              else if (bodyName === 'venus') this.achievements.unlock('land_venus');
+              else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
+            }
           }
         }
       }
-    }
     } else {
-      // Grounded: keep rocket right on the surface
       const earth = this.system.bodyByName('earth')!;
       const earthR = (earth as any).radius ?? 6.371e6;
       this.state.position = [earth.position[0], earth.position[1] + earthR + 0.5, earth.position[2]];
       this.state.velocity = [0, 0, 0];
     }
 
-    // Final NaN safety
     this.sanitize(this.state.position);
     this.sanitize(this.state.velocity);
 
-    // Propagate physics for planets
     this.system.propagate(_dt, FIXED_DT);
 
-    // Sync all planet meshes
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
     }
 
-    // Sync planet sprites
     const sprites = (window as any).__spriteMeshes as THREE.Sprite[] | undefined;
     if (sprites) {
       let si = 0;
@@ -517,7 +575,6 @@ export class FlightScene {
       }
     }
 
-    // Sync rocket position from flight state (skip if crashed)
     if (!this.crashed) {
       this.rocketGroup.position.set(
         this.state.position[0] * VISUAL_SCALE,
@@ -525,10 +582,8 @@ export class FlightScene {
         this.state.position[2] * VISUAL_SCALE
       );
 
-      // Camera via ChaseCamera (mouse orbit)
       this.chase.follow(this.state, _dt, this.rocketRotation);
 
-      // Sync deployed parachute position
       if (this.deployedChuteMesh) {
         this.deployedChuteMesh.position.set(
           this.state.position[0] * VISUAL_SCALE,
@@ -537,16 +592,11 @@ export class FlightScene {
         );
         this.deployedChuteMesh.rotation.copy(this.rocketGroup.rotation);
       }
-
-      // Update camera (fixed offset, already set above)
     }
 
-    // Update HUD
-    const vis = this.rocketGroup.visible;
-    const altM = isFinite(nearestDist) && nearestBody && (nearestBody as any).radius ? (nearestDist - (nearestBody as any).radius).toFixed(1) : '?';
+    const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     this.hud.update(this.state, this.system);
 
-    // Navball data
     const thrustEuler = new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'YXZ');
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyEuler(thrustEuler);
     const velMag = Math.sqrt(
@@ -567,6 +617,14 @@ export class FlightScene {
     );
   }
 
+  private cycleSasMode(): void {
+    const modes: ('off' | 'prograde' | 'retrograde')[] = ['off', 'prograde', 'retrograde'];
+    const idx = modes.indexOf(this.controls.sasMode);
+    this.controls.sasMode = modes[(idx + 1) % modes.length]!;
+    this.hud.setSasMode(this.controls.sasMode);
+    toast.show(`SAS: ${this.controls.sasMode === 'off' ? 'OFF' : this.controls.sasMode === 'prograde' ? 'PROGRADE' : 'RETROGRADE'}`);
+  }
+
   private updateRocketMesh(): void {
     const earth = this.system.bodyByName('earth') as any;
     if (earth) this.rocketGroup.position.set(0, (earth.radius + 100) * VISUAL_SCALE, 0);
@@ -578,6 +636,8 @@ export class FlightScene {
       toast.show('No decouplers to stage.');
       return;
     }
+
+    this.sound.playStaging();
 
     const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.part.id);
     if (decouplerMesh) {
@@ -624,13 +684,13 @@ export class FlightScene {
     if (this.crashed) return;
     this.crashed = true;
     this.achievements.unlock('crash');
+    this.sound.playCrash();
+    this.sound.stopEngine();
     toast.show(`CRASH! ${reason}`);
 
-    // Hide rocket
     this.rocketGroup.visible = false;
     this.engineFlame.stop();
 
-    // Position at crash site
     this.state.position = [
       body.position[0] + dx / d * bodyR,
       body.position[1] + dy / d * bodyR,
@@ -655,5 +715,6 @@ export class FlightScene {
     this.sceneMgr.scene.remove(this.rocketGroup);
     this.engineFlame.dispose();
     this.hud.unmount();
+    this.sound.dispose();
   }
 }
