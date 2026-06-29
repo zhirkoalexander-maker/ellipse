@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { PART_CATALOG, findPart } from '../parts/PartCatalog';
-import { Assembly } from '../rocket/Assembly';
+import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
+import { buildRocketFromDescription } from '../parts/RocketBuilder';
 
 const PART_HEIGHT: Record<string, number> = {
   S: 0.6 * PART_SCALE,
@@ -60,7 +61,14 @@ export class VABScene {
       <div style="width:280px;background:rgba(10,12,24,0.95);border-right:1px solid rgba(234,205,158,0.2);display:flex;flex-direction:column;pointer-events:auto;">
         <div style="padding:16px;border-bottom:1px solid rgba(234,205,158,0.15);">
           <div style="color:#EACD9E;font-size:18px;letter-spacing:0.08em;">VAB</div>
-          <div style="color:#F4F5F2;font-size:11px;opacity:0.5;margin-top:4px;">Click parts to add to rocket</div>
+          <div style="color:#F4F5F2;font-size:11px;opacity:0.5;margin-top:4px;">Build your rocket</div>
+        </div>
+        <div style="padding:8px;border-bottom:1px solid rgba(234,205,158,0.1);">
+          <div style="font-size:9px;color:var(--accent-blue-bright);letter-spacing:0.05em;margin-bottom:4px;">AI BUILD — describe your mission</div>
+          <div style="display:flex;gap:4px;">
+            <input id="vab-ai-input" type="text" placeholder='e.g. "land on moon and return"' style="flex:1;padding:6px 8px;background:rgba(244,245,242,0.08);border:1px solid rgba(244,245,242,0.15);border-radius:3px;color:#F4F5F2;font-size:11px;outline:none;pointer-events:auto;">
+            <button id="vab-ai-build" style="padding:6px 10px;background:rgba(68,136,255,0.3);color:#4488FF;border:1px solid rgba(68,136,255,0.3);border-radius:3px;font-size:10px;cursor:pointer;pointer-events:auto;white-space:nowrap;">BUILD</button>
+          </div>
         </div>
         <div style="padding:8px 8px 4px;border-bottom:1px solid rgba(234,205,158,0.1);">
           <div id="vab-current" style="min-height:40px;padding:6px;background:rgba(244,245,242,0.05);border-radius:3px;"></div>
@@ -84,6 +92,19 @@ export class VABScene {
     });
     this.rootEl.querySelector('#vab-remove')!.addEventListener('click', () => this.removeLast());
     this.rootEl.querySelector('#vab-clear')!.addEventListener('click', () => this.clearAll());
+
+    const aiInput = this.rootEl.querySelector('#vab-ai-input') as HTMLInputElement;
+    const aiBtn = this.rootEl.querySelector('#vab-ai-build')!;
+    const doAiBuild = () => {
+      const text = aiInput.value.trim();
+      if (!text) return;
+      this.clearAll();
+      this.assembly = buildRocketFromDescription(text);
+      this.refreshMesh();
+      this.syncPartsFromAssembly();
+    };
+    aiBtn.addEventListener('click', doAiBuild);
+    aiInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAiBuild(); });
   }
 
   private buildPartList(): void {
@@ -147,8 +168,25 @@ export class VABScene {
       const child = this.rocketGroup.children[0];
       if (child) this.rocketGroup.remove(child);
     }
-    const mesh = this.assembly.toMesh();
-    this.rocketGroup.add(mesh);
+    if (this.assembly.roots.length > 0) {
+      const mesh = this.assembly.toMesh();
+      this.rocketGroup.add(mesh);
+    }
+  }
+
+  private syncPartsFromAssembly(): void {
+    this.addedPartNames = [];
+    this.stackHeight = 0;
+    const walk = (nodes: AssemblyNode[], depth: number) => {
+      for (const n of nodes) {
+        this.addedPartNames.push(n.part.name);
+        const h = PART_HEIGHT[n.part.size] || 0.6 * PART_SCALE;
+        this.stackHeight += h;
+        walk(n.children, depth + 1);
+      }
+    };
+    walk(this.assembly.roots, 0);
+    this.updateCurrentList();
   }
 
   mount(): void {
