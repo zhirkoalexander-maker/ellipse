@@ -43,7 +43,7 @@ export class FlightScene {
   private paused = false;
   private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
   private warpIndex = 0;
-  private heatTemp = 0;
+
 
   constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements) {
     this.renderer = renderer;
@@ -394,15 +394,20 @@ export class FlightScene {
       const velMag = Math.sqrt(
         this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
       );
-      if (velMag > 1) {
-        const tDir: [number, number, number] = this.controls.sasMode === 'prograde'
+      let tDir: [number, number, number] = [0, 1, 0];
+      if (velMag > 0.5) {
+        tDir = this.controls.sasMode === 'prograde'
           ? [this.state.velocity[0] / velMag, this.state.velocity[1] / velMag, this.state.velocity[2] / velMag]
           : [-this.state.velocity[0] / velMag, -this.state.velocity[1] / velMag, -this.state.velocity[2] / velMag];
-
-        const currentFwd = getFwd();
-        const target = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
+      } else if (this.controls.sasMode === 'retrograde') {
+        tDir = [0, -1, 0];
+      }
+      const currentFwd = getFwd();
+      const target = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
+      const angle = currentFwd.angleTo(target);
+      if (angle > 0.02) {
         const targetQ = new THREE.Quaternion().setFromUnitVectors(currentFwd, target);
-        const sasRate = Math.min(1, currentFwd.angleTo(target) * 5) * baseDt * 3;
+        const sasRate = Math.min(0.5, angle * 3) * baseDt * 5;
         this.rocketQuat.slerp(targetQ.multiply(this.rocketQuat), sasRate);
         this.rocketQuat.normalize();
       }
@@ -506,20 +511,7 @@ export class FlightScene {
             this.state.velocity[2] *= f;
           }
           this.sanitize(this.state.velocity);
-
-          // Heating from atmospheric friction
-          const heatRate = 0.5 * rho * speed * speed * speed * 0.001;
-          this.heatTemp += heatRate * _dt;
-          this.heatTemp -= 0.1 * _dt; // cooling
-          this.heatTemp = Math.max(0, Math.min(100, this.heatTemp));
-          if (this.heatTemp > 80) {
-            toast.show(`Warning: overheating! ${this.heatTemp.toFixed(0)}°`);
-          }
-        } else {
-          this.heatTemp = Math.max(0, this.heatTemp - _dt * 0.5);
         }
-      } else {
-        this.heatTemp = Math.max(0, this.heatTemp - _dt * 0.5);
       }
 
       // Collision with surface

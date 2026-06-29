@@ -13,6 +13,7 @@ export class Controls {
   constructor(state: FlightState) {
     this.state = state;
     window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
       if (e.key.toLowerCase() === 't') this.sasToggle = true;
