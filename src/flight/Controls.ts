@@ -1,31 +1,46 @@
 import type { FlightState } from './FlightState';
 
 export class Controls {
-  private keys: Record<string, boolean> = {};
-  private state: FlightState;
-  private tilt = 0; // -1..1 (left/right)
-  private pitch = 0; // -1..1 (forward/back tilt)
+  private keys: Set<string> = new Set();
+  private stagePressed = false;
+  readonly state: FlightState;
 
   constructor(state: FlightState) {
     this.state = state;
-    window.addEventListener('keydown', (e) => { this.keys[e.key.toLowerCase()] = true; });
-    window.addEventListener('keyup', (e) => { this.keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('keydown', (e) => {
+      this.keys.add(e.key.toLowerCase());
+      if (e.key === ' ') this.stagePressed = true;
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      this.keys.delete(e.key.toLowerCase());
+    });
   }
 
   update(dt: number): void {
-    // Throttle: W = up, S = down
-    if (this.keys['w']) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
-    if (this.keys['s']) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
-
-    // Attitude (for future SAS, not used in MVP physics but tracked)
-    this.tilt = 0;
-    this.pitch = 0;
-    if (this.keys['arrowleft']) this.tilt = -1;
-    if (this.keys['arrowright']) this.tilt = 1;
-    if (this.keys['arrowup']) this.pitch = 1;
-    if (this.keys['arrowdown']) this.pitch = -1;
+    if (this.keys.has('w')) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
+    if (this.keys.has('s')) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
   }
 
-  getTilt(): number { return this.tilt; }
-  getPitch(): number { return this.pitch; }
+  getPitch(): number {
+    let v = 0;
+    if (this.keys.has('arrowup')) v = 1;
+    if (this.keys.has('arrowdown')) v = -1;
+    return v;
+  }
+
+  getYaw(): number {
+    let v = 0;
+    if (this.keys.has('arrowleft')) v = 1;
+    if (this.keys.has('arrowright')) v = -1;
+    return v;
+  }
+
+  getStageRequested(): boolean {
+    const was = this.stagePressed;
+    this.stagePressed = false;
+    return was;
+  }
 }

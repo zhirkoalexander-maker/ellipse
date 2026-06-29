@@ -1,24 +1,32 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { VISUAL_PLANET_MULT } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
+import { AtmosphereGlow } from '../effects/AtmosphereGlow';
+
+const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
+const loader = new THREE.TextureLoader();
 
 export class Earth extends Planet {
-  constructor(position: Vec3, velocity: Vec3) {
-    super('earth', 5.972e24, position, velocity, 6.371e6);
+  atmosphereGlow: AtmosphereGlow;
 
-    // Re-create mesh with earth-like material
-    // (No external texture in MVP — procedural color for now)
+  constructor(position: Vec3, velocity: Vec3) {
+    super('earth', 7e24, position, velocity, 6.371e6);
+
     const geom = new THREE.SphereGeometry(this.visualRadius, 64, 32);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x2a6db5,
-      roughness: 0.7,
-      metalness: 0.0
+      map: loader.load('/textures/earth_daymap.jpg'),
+      roughness: 0.8,
+      metalness: 0.0,
+      color: 0x6688aa,
     });
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(position[0], position[1], position[2]);
+    this.mesh.position.set(position[0] * VISUAL_SCALE, position[1] * VISUAL_SCALE, position[2] * VISUAL_SCALE);
 
     // Tilt axis 23.5° (Earth's axial tilt)
     this.mesh.rotation.z = 23.5 * Math.PI / 180;
+
+    this.atmosphereGlow = new AtmosphereGlow(this.visualRadius);
+    this.mesh.add(this.atmosphereGlow.getMesh());
   }
 }

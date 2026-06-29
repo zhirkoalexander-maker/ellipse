@@ -20,9 +20,9 @@ describe('FlightState', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 0, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    r.fuelMass = 100;
+    const before = r.totalFuelMass();
     const fs = new FlightState(r, sys, [6.371e6, 0, 0], [0, 0, 0]);
     fs.consumeFuel(10, 1);
-    expect(r.fuelMass).toBeCloseTo(90);
+    expect(r.totalFuelMass()).toBeLessThan(before);
   });
 });

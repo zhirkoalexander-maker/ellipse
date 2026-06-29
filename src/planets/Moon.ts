@@ -1,16 +1,21 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
+
+const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
+const loader = new THREE.TextureLoader();
 
 export class Moon extends Planet {
   constructor(position: Vec3, velocity: Vec3) {
     super('moon', 7.342e22, position, velocity, 1.737e6);
     const geom = new THREE.SphereGeometry(this.visualRadius, 48, 24);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x9a9a9a,
-      roughness: 0.95
+      map: loader.load('/textures/moon.jpg'),
+      roughness: 0.95,
+      metalness: 0.0,
     });
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(position[0], position[1], position[2]);
+    this.mesh.position.set(position[0] * VISUAL_SCALE, position[1] * VISUAL_SCALE, position[2] * VISUAL_SCALE);
   }
 }

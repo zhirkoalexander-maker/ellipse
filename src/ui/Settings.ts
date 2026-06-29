@@ -25,33 +25,30 @@ export class SettingsPanel {
     this.root = document.createElement('div');
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 250;
-      background: rgba(10, 14, 26, 0.85);
+      background: rgba(6, 8, 20, 0.88);
       display: flex; align-items: center; justify-content: center;
     `;
 
     const card = document.createElement('div');
-    card.className = 'btn';
-    card.style.cssText = 'background: var(--space-panel); padding: 32px; min-width: 400px; border-radius: 12px;';
+    card.className = 'panel panel--elevated';
+    card.style.cssText = 'padding: var(--space-6); min-width: 400px;';
 
     const title = document.createElement('h2');
-    title.className = 'text-display';
-    title.textContent = 'SETTINGS';
-    title.style.cssText = 'margin-top: 0; font-size: 24px;';
+    title.className = 'text-display-sm';
+    title.textContent = 'Settings';
+    title.style.cssText = 'margin: 0 0 var(--space-5);';
     card.appendChild(title);
 
-    // Units toggle
     const unitsRow = this.makeRow('Units', ['metric', 'imperial', 'mixed'], current.units, (v) => { this.current.units = v as 'metric' | 'imperial' | 'mixed'; });
     card.appendChild(unitsRow);
 
-    // Auto-save toggle
     const autoSaveRow = this.makeToggle('Auto-save', current.autoSave, (v) => { this.current.autoSave = v; });
     card.appendChild(autoSaveRow);
 
-    // Close button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'btn btn--primary';
     closeBtn.textContent = 'Save & Close';
-    closeBtn.style.cssText = 'margin-top: 16px; width: 100%;';
+    closeBtn.style.cssText = 'margin-top: var(--space-4); width: 100%; padding: 12px;';
     closeBtn.addEventListener('click', () => { saveSettings(this.current); this.onClose(); });
     card.appendChild(closeBtn);
 
@@ -60,19 +57,20 @@ export class SettingsPanel {
 
   private makeRow(label: string, options: string[], current: string, onChange: (v: string) => void): HTMLDivElement {
     const row = document.createElement('div');
-    row.style.cssText = 'margin: 12px 0;';
+    row.style.cssText = 'margin: var(--space-3) 0;';
     const lbl = document.createElement('div');
+    lbl.className = 'text-caption';
     lbl.textContent = label;
-    lbl.style.cssText = 'font-size: 13px; color: var(--stardust); margin-bottom: 6px;';
+    lbl.style.cssText = 'margin-bottom: var(--space-2);';
     row.appendChild(lbl);
     const group = document.createElement('div');
+    group.style.cssText = 'display:flex;gap:var(--space-2);';
     for (const opt of options) {
       const b = document.createElement('button');
-      b.className = 'btn';
+      b.className = `btn${opt === current ? ' btn--secondary' : ''}`;
       b.textContent = opt;
-      b.style.cssText = 'margin-right: 6px;';
-      if (opt === current) b.style.background = 'var(--plasma-deep)';
-      b.addEventListener('click', () => { onChange(opt); saveSettings(this.current); /* refresh */ });
+      if (opt === current) b.style.borderColor = 'var(--accent-blue)';
+      b.addEventListener('click', () => { onChange(opt); saveSettings(this.current); });
       group.appendChild(b);
     }
     row.appendChild(group);
@@ -81,10 +79,10 @@ export class SettingsPanel {
 
   private makeToggle(label: string, current: boolean, onChange: (v: boolean) => void): HTMLDivElement {
     const row = document.createElement('div');
-    row.style.cssText = 'margin: 12px 0; display: flex; justify-content: space-between; align-items: center;';
-    const lbl = document.createElement('div');
+    row.style.cssText = 'margin: var(--space-3) 0; display: flex; justify-content: space-between; align-items: center;';
+    const lbl = document.createElement('span');
+    lbl.className = 'text-body';
     lbl.textContent = label;
-    lbl.style.cssText = 'font-size: 14px;';
     const toggle = document.createElement('input');
     toggle.type = 'checkbox';
     toggle.checked = current;

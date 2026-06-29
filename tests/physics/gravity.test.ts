@@ -12,7 +12,7 @@ describe('Gravity', () => {
     // Direction: from target toward source, i.e. +x
     expect(f[0]).toBeGreaterThan(0);
     expect(f[1]).toBeCloseTo(0);
-    // magnitude ≈ G ≈ 6.67e-11
+    // magnitude = G * 100 * 1 / 10² = G ≈ 6.67e-11
     expect(Math.abs(f[0])).toBeCloseTo(6.6743e-11, 15);
   });
 

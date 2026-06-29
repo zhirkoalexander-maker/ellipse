@@ -6,7 +6,7 @@ export const PART_CATALOG: Part[] = [
     id: 'capsule_mk1',
     name: 'MK-1 Capsule',
     kind: 'capsule',
-    size: 'S',
+    size: 'M',
     mass: 1200,
     crewCapacity: 1,
     hasParachute: true,
@@ -19,7 +19,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'S',
     mass: 200,
-    fuelCapacity: 200,
+    fuelCapacity: 3000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -28,8 +28,28 @@ export const PART_CATALOG: Part[] = [
     name: 'Fuel Tank M (LFO)',
     kind: 'tank',
     size: 'M',
-    mass: 400,
-    fuelCapacity: 400,
+    mass: 600,
+    fuelCapacity: 30000,
+    fuelType: 'LFO',
+    dragCoeff: 0.4
+  },
+  {
+    id: 'tank_l_lfo',
+    name: 'Fuel Tank L (LFO)',
+    kind: 'tank',
+    size: 'L',
+    mass: 1200,
+    fuelCapacity: 60000,
+    fuelType: 'LFO',
+    dragCoeff: 0.4
+  },
+  {
+    id: 'tank_xl_lfo',
+    name: 'Fuel Tank XL (LFO)',
+    kind: 'tank',
+    size: 'XL',
+    mass: 2500,
+    fuelCapacity: 150000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -40,8 +60,8 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 40,            // kN
-    isp: 310,             // s
+    thrust: 1500,           // kN
+    isp: 350,             // s
     fuelType: 'LFO'
   },
   {
@@ -49,9 +69,29 @@ export const PART_CATALOG: Part[] = [
     name: '"Vector" Engine',
     kind: 'engine',
     size: 'M',
-    mass: 200,
-    thrust: 120,
-    isp: 325,
+    mass: 400,
+    thrust: 800,
+    isp: 340,
+    fuelType: 'LFO'
+  },
+  {
+    id: 'engine_mastodon',
+    name: '"Mastodon" Engine',
+    kind: 'engine',
+    size: 'L',
+    mass: 1200,
+    thrust: 2000,
+    isp: 330,
+    fuelType: 'LFO'
+  },
+  {
+    id: 'engine_mammoth',
+    name: '"Mammoth" Engine',
+    kind: 'engine',
+    size: 'XL',
+    mass: 3000,
+    thrust: 5000,
+    isp: 310,
     fuelType: 'LFO'
   },
   // Parachute (separate part that attaches to capsule)
@@ -71,6 +111,15 @@ export const PART_CATALOG: Part[] = [
     size: 'S',
     mass: 80,
     dragCoeff: 0.1
+  },
+  // Decoupler
+  {
+    id: 'decoupler_1',
+    name: 'TD-1 Decoupler',
+    kind: 'decoupler',
+    size: 'M',
+    mass: 100,
+    dragCoeff: 0.3
   }
 ];
 
