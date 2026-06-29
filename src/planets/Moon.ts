@@ -8,7 +8,7 @@ const loader = new THREE.TextureLoader();
 
 export class Moon extends Planet {
   constructor(position: Vec3, velocity: Vec3) {
-    super('moon', 7.342e22, position, velocity, 1.737e6);
+    super('moon', 2.2e23, position, velocity, 1.737e6);
     const geom = new THREE.SphereGeometry(this.visualRadius, 48, 24);
     const mat = new THREE.MeshStandardMaterial({
       map: loader.load('/textures/moon.jpg'),

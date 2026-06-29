@@ -62,14 +62,6 @@ export class FlightScene {
     this.rocketGroup = rocket.assembly.toMesh();
     this.updateRocketMesh();
 
-    // Debug marker to visualize rotation — red sphere offset from center
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.008, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xff4444 })
-    );
-    marker.position.set(0.008, 0, 0.008);
-    this.rocketGroup.add(marker);
-
     sceneMgr.scene.add(this.rocketGroup);
 
     // Add all planet/sun meshes to scene
@@ -144,6 +136,15 @@ export class FlightScene {
     sceneMgr.camera.lookAt(vx, vy, vz);
     this.controls = new Controls(this.state);
     this.hud = new HUD();
+    this.hud.onAction = (action) => {
+      if (action === 'stage') this.performStage();
+      else if (action === 'parachute') this.toggleParachute();
+      else if (action === 'map') {
+        mapActive = !mapActive;
+        mapEl.style.display = mapActive ? 'block' : 'none';
+        if (mapActive) requestAnimationFrame(drawMap);
+      }
+    };
     this.hud.mount();
 
     // Map view toggle (M or Tab) — full screen with zoom/pan
@@ -362,20 +363,18 @@ export class FlightScene {
       this.performStage();
     }
 
-    // Direct rotation from arrow keys
+    // 2D heading-based rotation (only rotation.z = heading)
     const rotSpeed = 4.0;
-    if (this.controls.getPitch() !== 0) this.rocketRotation.x += this.controls.getPitch() * rotSpeed * baseDt;
-    if (this.controls.getYaw() !== 0) this.rocketRotation.y += this.controls.getYaw() * rotSpeed * baseDt;
-    this.rocketRotation.z = 0;
+    if (this.controls.getYaw() !== 0) this.rocketRotation.z += this.controls.getYaw() * rotSpeed * baseDt;
+    this.rocketRotation.x = 0;
+    this.rocketRotation.y = 0;
+    this.rocketGroup.rotation.set(0, 0, this.rocketRotation.z);
 
-    this.rocketGroup.rotation.set(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z);
-
-    // Compute thrust direction (order: pitch then yaw)
-    const euler = new THREE.Euler(this.rocketRotation.x, this.rocketRotation.y, this.rocketRotation.z, 'XYZ');
-    const thrustVec = new THREE.Vector3(0, 1, 0).applyEuler(euler);
-    const tx = thrustVec.x;
-    const ty = thrustVec.y;
-    const tz = thrustVec.z;
+    // Thrust direction in 2D (heading = rotation.z, X-Y plane only)
+    const heading = this.rocketRotation.z;
+    const tx = -Math.sin(heading);
+    const ty = Math.cos(heading);
+    const tz = 0;
 
     // Apply thrust — take off when throttle > 0
     if (this.state.throttle > 0) {
@@ -395,18 +394,6 @@ export class FlightScene {
       this.engineFlame.stop();
     }
     this.engineFlame.update(baseDt);
-
-    // Sideways movement from left/right arrows — direct position shift (bypass velocity)
-    if (this.controls.getYaw() !== 0) {
-      const right = new THREE.Vector3(1, 0, 0).applyEuler(euler);
-      const moveRate = 2000000.0;
-      const yaw = this.controls.getYaw();
-      const delta = right.clone().multiplyScalar(-yaw * moveRate * _dt);
-      this.state.position[0] += delta.x;
-      this.state.position[1] += delta.y;
-      this.state.position[2] += delta.z;
-      console.log('YAW MOVE', yaw, 'delta', delta.x.toFixed(0), delta.y.toFixed(0), delta.z.toFixed(0), 'pos', this.state.position[0].toFixed(0));
-    }
 
     // Always integrate position (even when grounded — sideways movement works on pad)
     this.state.position[0] += this.state.velocity[0] * _dt;
@@ -557,12 +544,6 @@ export class FlightScene {
     // Update HUD
     const vis = this.rocketGroup.visible;
     const altM = isFinite(nearestDist) && nearestBody && (nearestBody as any).radius ? (nearestDist - (nearestBody as any).radius).toFixed(1) : '?';
-    this.hud.setDebugInput(
-      `pitch:${this.controls.getPitch()} yaw:${this.controls.getYaw()} ` +
-      `pos:${this.state.position[0].toFixed(0)},${this.state.position[1].toFixed(0)},${this.state.position[2].toFixed(0)} ` +
-      `vel:${this.state.velocity[0].toFixed(1)},${this.state.velocity[1].toFixed(1)},${this.state.velocity[2].toFixed(1)} ` +
-      `g:${this.grounded} c:${this.crashed} v:${vis} alt:${altM}m body:${nearestBody?.name||'?'} warp:${this.timeWarp} mouse:${this.chase.isDragging}`
-    );
     this.hud.update(this.state, this.system);
 
     // Navball data
@@ -620,6 +601,23 @@ export class FlightScene {
     };
     walk(nodes);
     return last;
+  }
+
+  private toggleParachute(): void {
+    const hasChute = this.rocket.assembly.roots.some(r => r.part.kind === 'parachute') ||
+      this.rocket.assembly.roots.some(r => r.children.some(c => c.part.kind === 'parachute'));
+    if (hasChute) {
+      this.parachuteDeployed = !this.parachuteDeployed;
+      if (this.parachuteDeployed) {
+        const d = { radius: 0.6 * PART_SCALE, height: 1.0 * PART_SCALE };
+        this.deployedChuteMesh = buildDeployedParachute(d);
+        this.sceneMgr.scene.add(this.deployedChuteMesh);
+      } else if (this.deployedChuteMesh) {
+        this.sceneMgr.scene.remove(this.deployedChuteMesh);
+        this.deployedChuteMesh = null;
+      }
+      toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
+    }
   }
 
   private doCrash(reason: string, body: any, dx: number, dy: number, dz: number, d: number, bodyR: number): void {

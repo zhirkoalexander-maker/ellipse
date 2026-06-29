@@ -8,7 +8,7 @@ const loader = new THREE.TextureLoader();
 
 export class Venus extends Planet {
   constructor(position: Vec3, velocity: Vec3) {
-    super('venus', 4.867e24, position, velocity, 6.052e6);
+    super('venus', 1.46e25, position, velocity, 6.052e6);
     const geom = new THREE.SphereGeometry(this.visualRadius, 48, 24);
     const mat = new THREE.MeshStandardMaterial({
       map: loader.load('/textures/venus.jpg'),

@@ -8,7 +8,7 @@ const loader = new THREE.TextureLoader();
 
 export class Mercury extends Planet {
   constructor(position: Vec3, velocity: Vec3) {
-    super('mercury', 3.285e23, position, velocity, 2.440e6);
+    super('mercury', 1e24, position, velocity, 2.440e6);
     const geom = new THREE.SphereGeometry(this.visualRadius, 48, 24);
     const mat = new THREE.MeshStandardMaterial({
       map: loader.load('/textures/mercury.jpg'),
