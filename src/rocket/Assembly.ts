@@ -17,6 +17,16 @@ export class Assembly {
     this.roots.push(node);
   }
 
+  totalFuelCapacity(): number {
+    let f = 0;
+    const walk = (n: AssemblyNode) => {
+      if (n.part.fuelCapacity) f += n.part.fuelCapacity;
+      n.children.forEach(walk);
+    };
+    this.roots.forEach(walk);
+    return f;
+  }
+
   totalMass(): number {
     let m = 0;
     const walk = (n: AssemblyNode) => {
@@ -64,6 +74,13 @@ export class Assembly {
       n.children.forEach((c) => walk(c, mesh));
     };
     this.roots.forEach((r) => walk(r, group));
+    // Center group at center of mass so rotation pivots naturally
+    const com = this.centerOfMass();
+    for (const child of group.children) {
+      child.position.x -= com[0];
+      child.position.y -= com[1];
+      child.position.z -= com[2];
+    }
     return group;
   }
 }

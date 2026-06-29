@@ -28,6 +28,7 @@ export class System {
 
   private step(dt: number): void {
     for (const body of this.bodies) {
+      if (body.mass <= 0) continue; // skip massless (Sun)
       const force: Vec3 = totalGravityOn(body, this.bodies);
       rk4Step(body, () => force, dt);
     }

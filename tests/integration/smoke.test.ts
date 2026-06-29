@@ -16,7 +16,7 @@ describe('integration smoke', () => {
     a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 1, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    r.fuelMass = 400;
+    r.fuelTanks[0]!.remaining = 400;
     const fs = new FlightState(r, sys, [6.371e6 + 100, 0, 0], [0, 0, 0]);
     fs.throttle = 1;
     for (let i = 0; i < 60; i++) {

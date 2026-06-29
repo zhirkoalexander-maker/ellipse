@@ -1,87 +1,226 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
-import type { Vec3 } from '../physics/Body';
 
 export class HUD {
   private root: HTMLDivElement;
-  private speedEl!: HTMLDivElement;
-  private altEl!: HTMLDivElement;
-  private angleEl!: HTMLDivElement;
-  private fuelEl!: HTMLDivElement;
-  private throtEl!: HTMLDivElement;
+  private speedVal!: HTMLSpanElement;
+  private speedUnit!: HTMLSpanElement;
+  private altVal!: HTMLSpanElement;
+  private altUnit!: HTMLSpanElement;
+  private angleVal!: HTMLSpanElement;
+  private fuelFill!: HTMLSpanElement;
+  private fuelPct!: HTMLSpanElement;
+  private throtFill!: HTMLSpanElement;
+  private throtPct!: HTMLSpanElement;
+  private navballCanvas!: HTMLCanvasElement;
+  private navballCtx!: CanvasRenderingContext2D;
 
   constructor() {
     this.root = document.createElement('div');
-    this.root.style.cssText = `
-      position: fixed; top: 16px; left: 16px; z-index: 100;
-      background: rgba(37, 43, 61, 0.85);
-      border: 1px solid #3A4055;
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--starshine);
-      min-width: 120px;
-    `;
+    this.root.className = 'hud-panel';
+    this.root.style.cssText = 'position:fixed;top:16px;left:16px;z-index:100;min-width:180px;';
   }
 
   mount(parent: HTMLElement = document.body): void {
-    this.speedEl = this.makeRow('SPEED', '0', 'm/s');
-    this.altEl = this.makeRow('ALTITUDE', '0', 'm');
-    this.angleEl = this.makeRow('ANGLE', '0', '°');
-    this.fuelEl = this.makeRow('FUEL', '0', '%');
-    this.throtEl = this.makeRow('THROTTLE', '0', '%');
+    this.root.innerHTML = `
+      <div class="hud-row"><span class="hud-label">Velocity</span><span class="hud-value"><span class="speed-val">0</span> <span class="speed-unit" style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
+      <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
+      <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
+      <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
+      <div class="separator"></div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+        <div class="hud-row"><span class="hud-label">Fuel</span><span class="text-data-sm fuel-pct">0%</span></div>
+        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--fuel fuel-fill" style="width:0%;"></span></span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+        <div class="hud-row"><span class="hud-label">Throttle</span><span class="text-data-sm throt-pct">0%</span></div>
+        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--throttle throt-fill" style="width:0%;"></span></span></div>
+      </div>
+      <div class="separator"></div>
+      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | M Map | Space Stage</div>
+      <div class="debug-input" style="color:#ff6644;font-size:10px;margin-top:4px;"></div>
+    `;
     parent.appendChild(this.root);
+
+    this.speedVal = this.root.querySelector('.speed-val')!;
+    this.speedUnit = this.root.querySelector('.speed-unit')!;
+    this.altVal = this.root.querySelector('.alt-val')!;
+    this.altUnit = this.root.querySelector('.alt-unit')!;
+    this.angleVal = this.root.querySelector('.angle-val')!;
+    this.fuelFill = this.root.querySelector('.fuel-fill')!;
+    this.fuelPct = this.root.querySelector('.fuel-pct')!;
+    this.throtFill = this.root.querySelector('.throt-fill')!;
+    this.throtPct = this.root.querySelector('.throt-pct')!;
+
+    const navballContainer = document.createElement('div');
+    navballContainer.className = 'navball-container';
+    navballContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:100;';
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 160;
+    canvas.style.cssText = 'width:160px;height:160px;border-radius:80px;opacity:0.85;';
+    navballContainer.appendChild(canvas);
+    parent.appendChild(navballContainer);
+    this.navballCanvas = canvas;
+    this.navballCtx = canvas.getContext('2d')!;
   }
 
-  private makeRow(label: string, value: string, unit: string): HTMLDivElement {
-    const row = document.createElement('div');
-    row.style.cssText = 'margin-bottom: 6px; font-size: 13px;';
-    row.innerHTML = `
-      <div style="font-size:10px;color:var(--stardust);text-transform:uppercase;letter-spacing:0.05em;">${label}</div>
-      <div style="font-size:18px;font-weight:500;"><span class="val">${value}</span> <span style="font-size:11px;color:var(--stardust);">${unit}</span></div>
-    `;
-    this.root.appendChild(row);
-    return row;
+  setWarpLabel(label: string): void {
+    const el = this.root.querySelector('.warp-val');
+    if (el) el.textContent = label;
+  }
+
+  setDebugInput(text: string): void {
+    const el = this.root.querySelector('.debug-input');
+    if (el) el.textContent = text;
+  }
+
+  setNavballData(
+    rocketFwd: [number, number, number],
+    velocityDir: [number, number, number],
+    upDir: [number, number, number]
+  ): void {
+    const ctx = this.navballCtx;
+    const cw = 160, ch = 160, cx = 80, cy = 80, R = 75;
+    ctx.clearRect(0, 0, cw, ch);
+
+    ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a0a1a'; ctx.fill();
+
+    const dotUp = upDir[0] * rocketFwd[0] + upDir[1] * rocketFwd[1] + upDir[2] * rocketFwd[2];
+    const horizonY = dotUp * R;
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.fillStyle = '#2244aa';
+    ctx.fillRect(cx - R, cy - R - horizonY, R * 2, R + horizonY);
+    ctx.fillStyle = '#885522';
+    ctx.fillRect(cx - R, cy - horizonY, R * 2, R + horizonY);
+
+    // Pitch ladder lines at 10° intervals
+    for (let deg = -80; deg <= 80; deg += 10) {
+      const y = cy - Math.sin(deg * Math.PI / 180) * R;
+      ctx.beginPath();
+      const lineW = deg === 0 ? 30 : deg % 20 === 0 ? 22 : 14;
+      ctx.moveTo(cx - lineW, y);
+      ctx.lineTo(cx + lineW, y);
+      ctx.strokeStyle = deg === 0 ? '#FFCC44' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = deg === 0 ? 1.5 : 0.7;
+      ctx.stroke();
+      if (deg % 20 === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '8px sans-serif';
+        ctx.fillText(`${Math.abs(deg)}`, cx + lineW + 3, y + 3);
+      }
+    }
+
+    // Horizon line
+    ctx.beginPath();
+    ctx.moveTo(cx - R, cy - horizonY);
+    ctx.lineTo(cx + R, cy - horizonY);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Project a 3D dir onto navball 2D
+    const project = (dir: [number, number, number]) => {
+      const m = Math.sqrt(dir[0]**2 + dir[1]**2 + dir[2]**2) || 1;
+      const dx = dir[0] / m, dy = dir[1] / m, dz = dir[2] / m;
+      const fwdD = dx * rocketFwd[0] + dy * rocketFwd[1] + dz * rocketFwd[2];
+      const projX = dx - rocketFwd[0] * fwdD;
+      const projY = dy - rocketFwd[1] * fwdD;
+      const plen = Math.sqrt(projX * projX + projY * projY) || 1;
+      return { x: cx + (projX / plen) * R * 0.78, y: cy - (projY / plen) * R * 0.78, inFront: fwdD > 0 };
+    };
+
+    // Prograde marker (green circle)
+    const pg = project(velocityDir);
+    if (pg.inFront) {
+      ctx.beginPath(); ctx.arc(pg.x, pg.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#44FF44'; ctx.fill();
+      ctx.beginPath(); ctx.arc(pg.x, pg.y, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#44FF44'; ctx.font = 'bold 8px sans-serif';
+      ctx.fillText('P', pg.x + 8, pg.y + 3);
+    }
+
+    // Retrograde marker (crossed circle)
+    const rgVel: [number, number, number] = [-velocityDir[0], -velocityDir[1], -velocityDir[2]];
+    const rg = project(rgVel);
+    if (rg.inFront) {
+      ctx.beginPath(); ctx.arc(rg.x, rg.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(68,255,68,0.6)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(rg.x, rg.y, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(rg.x - 5, rg.y - 5); ctx.lineTo(rg.x + 5, rg.y + 5);
+      ctx.moveTo(rg.x + 5, rg.y - 5); ctx.lineTo(rg.x - 5, rg.y + 5);
+      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+
+    // Zenith (radial out) — blue triangle up
+    const zn = project(upDir);
+    if (zn.inFront) {
+      ctx.beginPath(); ctx.moveTo(zn.x, zn.y - 8); ctx.lineTo(zn.x - 6, zn.y + 4); ctx.lineTo(zn.x + 6, zn.y + 4); ctx.closePath();
+      ctx.fillStyle = '#4488FF'; ctx.fill();
+    }
+
+    // Nadir (radial in) — blue triangle down
+    const nd: [number, number, number] = [-upDir[0], -upDir[1], -upDir[2]];
+    const ndp = project(nd);
+    if (ndp.inFront) {
+      ctx.beginPath(); ctx.moveTo(ndp.x, ndp.y + 8); ctx.lineTo(ndp.x - 6, ndp.y - 4); ctx.lineTo(ndp.x + 6, ndp.y - 4); ctx.closePath();
+      ctx.fillStyle = '#4488FF'; ctx.fill();
+    }
+
+    // Heading dot
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFAA44'; ctx.fill();
+
+    ctx.restore();
+
+    ctx.beginPath(); ctx.arc(cx, cy, R + 1, 0, Math.PI * 2);
+    ctx.strokeStyle = '#334466'; ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   update(state: FlightState, system: System): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
-    // altitude = distance to nearest body minus body radius
     let nearestAlt = Infinity;
     for (const body of system.bodies) {
-      if (body.name === 'rocket') continue;
+      if (body.mass <= 0) continue;
       const dx = state.position[0] - body.position[0];
       const dy = state.position[1] - body.position[1];
       const dz = state.position[2] - body.position[2];
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      // Use body.radius if it's a Planet; else 0
       const r = (body as any).radius ?? 0;
       const alt = d - r;
-      if (alt < nearestAlt) nearestAlt = alt;
+      if (alt < nearestAlt) { nearestAlt = alt; }
     }
-    // tilt angle from vertical (assume rocket points up)
     const horiz = Math.sqrt(state.velocity[0] ** 2 + state.velocity[2] ** 2);
     const angle = Math.atan2(horiz, Math.abs(state.velocity[1])) * 180 / Math.PI;
 
-    const fuelPct = state.rocket.totalMass() > 0
-      ? (state.rocket.fuelMass / (state.rocket.totalMass() - state.rocket.dryMass() + state.rocket.fuelMass)) * 100
+    const maxFuelMass = state.rocket.assembly.totalFuelCapacity();
+    const fuelPct = maxFuelMass > 0
+      ? (state.rocket.totalFuelMass() / maxFuelMass) * 100
       : 0;
 
-    this.setVal(this.speedEl, speed.toFixed(1));
-    this.setVal(this.altEl, nearestAlt > 1000 ? (nearestAlt / 1000).toFixed(2) : nearestAlt.toFixed(0));
-    this.setUnit(this.altEl, nearestAlt > 1000 ? 'km' : 'm');
-    this.setVal(this.angleEl, angle.toFixed(0));
-    this.setVal(this.fuelEl, fuelPct.toFixed(0));
-    this.setVal(this.throtEl, (state.throttle * 100).toFixed(0));
-  }
-
-  private setVal(row: HTMLDivElement, val: string): void {
-    row.querySelector('.val')!.textContent = val;
-  }
-  private setUnit(row: HTMLDivElement, unit: string): void {
-    row.querySelectorAll('span')[1]!.textContent = unit;
+    this.speedVal.textContent = speed.toFixed(1);
+    if (nearestAlt > 1000) {
+      this.altVal.textContent = (nearestAlt / 1000).toFixed(2);
+      this.altUnit.textContent = 'km';
+    } else {
+      this.altVal.textContent = nearestAlt.toFixed(0);
+      this.altUnit.textContent = 'm';
+    }
+    this.angleVal.textContent = angle.toFixed(0);
+    this.fuelPct.textContent = `${fuelPct.toFixed(0)}%`;
+    this.fuelFill.style.width = `${Math.min(100, fuelPct)}%`;
+    this.throtPct.textContent = `${(state.throttle * 100).toFixed(0)}%`;
+    this.throtFill.style.width = `${state.throttle * 100}%`;
   }
 
   unmount(): void {

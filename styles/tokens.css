@@ -1,36 +1,60 @@
 :root {
-    /* Backgrounds */
-    --space-deep: #0A0E1A;
-    --space-hangar: #1A1F2E;
-    --space-panel: #252B3D;
-    --space-elevated: #323849;
+  /* SPACE ENVIRONMENT */
+  --space-deep: #060814;
+  --space-bg: #0D0D0D;
+  --space-atmosphere: #0E1424;
+  --nebula: #2A1A3A;
 
-    /* Text */
-    --starshine: #E8EAF0;
-    --stardust: #9DA3B5;
-    --stardim: #5C6275;
+  /* PANELS */
+  --panel-bg: #242831;
+  --panel-bg-alt: #1E222B;
+  --panel-border: #3A4055;
+  --panel-elevated: #2C3136;
+  --panel-hover: #2E333A;
 
-    /* Accents */
-    --flare: #FF6B1A;
-    --flare-soft: #FFAA66;
-    --flare-glow: #FFD9A0;
-    --plasma: #4FC3F7;
-    --plasma-deep: #1976D2;
-    --red-giant: #FF3D5A;
-    --green-cosmic: #7CFFB2;
-    --gold-solar: #FFC857;
+  /* TEXT */
+  --text-primary: #F4F5F2;
+  --text-secondary: #9DA3B5;
+  --text-muted: #5C6275;
+  --text-data: #F4F5F2;
 
-    /* Spacing (4px base) */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --space-5: 24px;
-    --space-6: 32px;
+  /* ACCENTS */
+  --accent-gold: #EACD9E;
+  --accent-gold-hover: #F0D9B0;
+  --accent-gold-dim: #C4A87A;
+  --accent-blue: #145181;
+  --accent-blue-bright: #4FC3F7;
+  --accent-blue-hover: #1A6BAC;
+  --success: #7CFFB2;
+  --warning: #FFC857;
+  --danger: #FF3D5A;
+  --danger-bg: #690509;
 
-    /* Radius */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-full: 9999px;
-  }
+  /* SPACING (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 64px;
+
+  /* RADIUS */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* SHADOWS */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+  --shadow-glow-gold: 0 0 12px rgba(234, 205, 158, 0.2);
+  --shadow-glow-blue: 0 0 12px rgba(20, 81, 129, 0.3);
+  --shadow-glow-danger: 0 0 12px rgba(255, 61, 90, 0.3);
+
+  /* BORDERS */
+  --border-thin: 1px solid var(--panel-border);
+  --border-focus: 2px solid var(--accent-gold);
+}

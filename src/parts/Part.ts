@@ -1,6 +1,6 @@
 export type FuelType = 'LFO' | 'LF';
-export type PartKind = 'capsule' | 'tank' | 'engine' | 'parachute' | 'legs';
-export type PartSize = 'S' | 'M' | 'L';
+export type PartKind = 'capsule' | 'tank' | 'engine' | 'parachute' | 'legs' | 'decoupler';
+export type PartSize = 'S' | 'M' | 'L' | 'XL';
 
 export interface Part {
   id: string;

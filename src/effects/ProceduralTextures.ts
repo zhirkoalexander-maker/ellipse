@@ -65,7 +65,7 @@ export interface TextureSet {
 }
 
 /** Generate a normal map from a height map canvas using Sobel filter. */
-export function makeNormalMap(src: HTMLCanvasElement, strength = 2.0): THREE.CanvasTexture {
+export function makeNormalMap(src: HTMLCanvasElement, strength = 3.0): THREE.CanvasTexture {
   const W = src.width, H = src.height;
   const sCtx = src.getContext('2d')!;
   const sImg = sCtx.getImageData(0, 0, W, H);
@@ -112,7 +112,7 @@ function createTextureSet(
   color.anisotropy = 4;
   let normal: THREE.CanvasTexture | undefined;
   if (heightCanvas) {
-    normal = makeNormalMap(heightCanvas, 2.0);
+    normal = makeNormalMap(heightCanvas, 3.0);
   }
   return { color, normal };
 }
@@ -125,11 +125,11 @@ function applyLightGradient(ctx: CanvasRenderingContext2D, W: number, H: number)
     ctx.fillRect(0, 0, W, H);
     return;
   }
-  grad.addColorStop(0, 'rgba(0,0,0,0.25)');
-  grad.addColorStop(0.15, 'rgba(0,0,0,0.05)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.20)');
-  grad.addColorStop(0.85, 'rgba(0,0,0,0.05)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.25)');
+  grad.addColorStop(0, 'rgba(0,0,0,0.45)');
+  grad.addColorStop(0.2, 'rgba(0,0,0,0.10)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(0.8, 'rgba(0,0,0,0.10)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.45)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 }
@@ -354,53 +354,66 @@ export function generateMoonBumpMap(): THREE.CanvasTexture {
 
 // ── Rocket part textures ─────────────────────────────────────────────────
 
-const WEAR_FACTOR: Record<string, number> = { S: 0.15, M: 0.25, L: 0.4, XL: 0.55 };
-
 export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): TextureSet {
   const W = 1024, H = 1024;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
   const [heightCanvas, heightCtx] = createCanvas(W, H);
 
-  const wear = WEAR_FACTOR[size] ?? 0.3;
+  const colors: Record<string, { body: string; strip: string }> = {
+    S: { body: '#e8e8ec', strip: '#888890' },
+    M: { body: '#f0f0f4', strip: '#909098' },
+    L: { body: '#d8d8e0', strip: '#787880' },
+    XL: { body: '#c8c8d0', strip: '#686870' },
+  };
+  const c = colors[size]!;
 
-  // colour bands
-  const bands = [
-    { y0: 0, y1: 0.15, color: '#d0d0d8' },
-    { y0: 0.15, y1: 0.17, color: '#888890' },
-    { y0: 0.17, y1: 0.50, color: '#e8e8f0' },
-    { y0: 0.50, y1: 0.52, color: '#888890' },
-    { y0: 0.52, y1: 0.78, color: '#d0d0d8' },
-    { y0: 0.78, y1: 0.80, color: '#888890' },
-    { y0: 0.80, y1: 0.88, color: '#c88840' },
-    { y0: 0.88, y1: 0.90, color: '#886020' },
-    { y0: 0.90, y1: 1.00, color: '#e8e8f0' },
-  ];
-  for (const b of bands) {
-    colorCtx.fillStyle = b.color;
-    colorCtx.fillRect(0, b.y0 * H, W, (b.y1 - b.y0) * H);
+  // clean body colour
+  colorCtx.fillStyle = c.body;
+  colorCtx.fillRect(0, 0, W, H);
+
+  // top and bottom metallic caps
+  colorCtx.fillStyle = '#707080';
+  colorCtx.fillRect(0, 0, W, H * 0.02);
+  colorCtx.fillRect(0, H * 0.98, W, H * 0.02);
+
+  // horizontal seam lines
+  colorCtx.strokeStyle = c.strip;
+  colorCtx.lineWidth = 3;
+  const seams = [0.02, 0.15, 0.17, 0.50, 0.52, 0.78, 0.80, 0.98];
+  for (const s of seams) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, s * H);
+    colorCtx.lineTo(W, s * H);
+    colorCtx.stroke();
   }
 
-  // wear
-  applyWear(colorCtx, W, H, wear);
+  // gold band at bottom
+  colorCtx.fillStyle = '#c88840';
+  colorCtx.fillRect(0, H * 0.80, W, H * 0.02);
 
-  // light gradient
-  applyLightGradient(colorCtx, W, H);
+  // vertical seam
+  colorCtx.strokeStyle = '#808088';
+  colorCtx.lineWidth = 2;
+  colorCtx.beginPath();
+  colorCtx.moveTo(W * 0.5, 0);
+  colorCtx.lineTo(W * 0.5, H);
+  colorCtx.stroke();
 
   // height map
   heightCtx.fillStyle = '#808080';
   heightCtx.fillRect(0, 0, W, H);
 
-  // seam lines (raised)
+  // seam lines
   heightCtx.strokeStyle = '#c0c0c0';
   heightCtx.lineWidth = 6;
-  for (const b of bands) {
+  for (const s of seams) {
     heightCtx.beginPath();
-    heightCtx.moveTo(0, b.y0 * H);
-    heightCtx.lineTo(W, b.y0 * H);
+    heightCtx.moveTo(0, s * H);
+    heightCtx.lineTo(W, s * H);
     heightCtx.stroke();
   }
 
-  // vertical seam (sunken)
+  // vertical seam
   heightCtx.strokeStyle = '#404040';
   heightCtx.lineWidth = 3;
   heightCtx.beginPath();
@@ -408,12 +421,12 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   heightCtx.lineTo(W * 0.5, H);
   heightCtx.stroke();
 
-  // rivets (raised dots)
+  // rivets
   heightCtx.fillStyle = '#d0d0d0';
-  for (let y = 32; y < H; y += 64) {
-    for (let x = 24; x < W; x += 48) {
+  for (let y = 20; y < H; y += 48) {
+    for (let x = 16; x < W; x += 40) {
       heightCtx.beginPath();
-      heightCtx.arc(x, y, 4, 0, Math.PI * 2);
+      heightCtx.arc(x, y, 2, 0, Math.PI * 2);
       heightCtx.fill();
     }
   }
@@ -430,83 +443,64 @@ export function generateCapsuleTexture(): TextureSet {
   colorCtx.fillStyle = '#f0f0f4';
   colorCtx.fillRect(0, 0, W, H * 0.82);
 
-  // heat shield gradient (dark to brown)
-  for (let py = H * 0.82; py < H; py++) {
-    const t = (py - H * 0.82) / (H * 0.18);
-    const r = Math.round(100 + t * 40);
-    const g = Math.round(90 - t * 30);
-    const b = Math.round(80 - t * 30);
-    colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    colorCtx.fillRect(0, py, W, 1);
-  }
+  // dark heat shield
+  colorCtx.fillStyle = '#3a3a40';
+  colorCtx.fillRect(0, H * 0.82, W, H * 0.18);
 
-  // soot at the heat shield seam
-  for (let py = H * 0.81; py < H * 0.85; py++) {
-    const t = (py - H * 0.81) / (H * 0.04);
-    const alpha = t < 0.5 ? t * 0.4 : (1 - t) * 0.4;
-    colorCtx.fillStyle = `rgba(0,0,0,${alpha})`;
-    colorCtx.fillRect(0, py, W, 1);
-  }
+  // seam
+  colorCtx.fillStyle = '#808088';
+  colorCtx.fillRect(0, H * 0.81, W, H * 0.01);
 
-  // stripes
+  // blue stripe
   colorCtx.fillStyle = '#2a3a8a';
-  colorCtx.fillRect(0, H * 0.25, W, H * 0.025);
+  colorCtx.fillRect(0, H * 0.24, W, H * 0.03);
+
+  // red stripe
   colorCtx.fillStyle = '#cc2244';
   colorCtx.fillRect(0, H * 0.28, W, H * 0.025);
 
-  // wear
-  applyWear(colorCtx, W, H, 0.2);
-
-  // light gradient
-  applyLightGradient(colorCtx, W, H);
+  // window
+  colorCtx.fillStyle = '#1a1a2e';
+  colorCtx.beginPath();
+  colorCtx.arc(W * 0.3, H * 0.10, 22, 0, Math.PI * 2);
+  colorCtx.fill();
+  colorCtx.strokeStyle = '#b0b0b8';
+  colorCtx.lineWidth = 4;
+  colorCtx.beginPath();
+  colorCtx.arc(W * 0.3, H * 0.10, 26, 0, Math.PI * 2);
+  colorCtx.stroke();
 
   // height map
   heightCtx.fillStyle = '#808080';
   heightCtx.fillRect(0, 0, W, H);
 
-  // panel line between body and heat shield
+  // seam lines
   heightCtx.strokeStyle = '#c0c0c0';
-  heightCtx.lineWidth = 6;
-  heightCtx.beginPath();
-  heightCtx.moveTo(0, H * 0.82);
-  heightCtx.lineTo(W, H * 0.82);
-  heightCtx.stroke();
+  heightCtx.lineWidth = 5;
+  for (const y of [0.03, 0.24, 0.305, 0.81, 0.82]) {
+    heightCtx.beginPath();
+    heightCtx.moveTo(0, y * H);
+    heightCtx.lineTo(W, y * H);
+    heightCtx.stroke();
+  }
 
-  // heat shield grid (cross-hatch)
-  heightCtx.strokeStyle = '#a0a0a0';
+  // heat shield grid
+  heightCtx.strokeStyle = '#909090';
   heightCtx.lineWidth = 3;
   for (let x = 0; x < W; x += 24) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(x, H * 0.82);
-    heightCtx.lineTo(x, H);
-    heightCtx.stroke();
+    heightCtx.beginPath(); heightCtx.moveTo(x, H * 0.82); heightCtx.lineTo(x, H); heightCtx.stroke();
   }
   for (let y = H * 0.84; y < H; y += 24) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, y);
-    heightCtx.lineTo(W, y);
-    heightCtx.stroke();
+    heightCtx.beginPath(); heightCtx.moveTo(0, y); heightCtx.lineTo(W, y); heightCtx.stroke();
   }
 
-  // rivets at seam
-  heightCtx.fillStyle = '#c0c0c0';
-  for (let x = 16; x < W; x += 32) {
-    heightCtx.beginPath();
-    heightCtx.arc(x, H * 0.82 + 6, 4, 0, Math.PI * 2);
-    heightCtx.fill();
-  }
-
-  // window frame (raised ring)
-  heightCtx.strokeStyle = '#cccccc';
+  // window frame
+  heightCtx.strokeStyle = '#e0e0e0';
   heightCtx.lineWidth = 8;
-  heightCtx.beginPath();
-  heightCtx.arc(W * 0.3, H * 0.12, 30, 0, Math.PI * 2);
-  heightCtx.stroke();
-  heightCtx.strokeStyle = '#606060';
+  heightCtx.beginPath(); heightCtx.arc(W * 0.3, H * 0.10, 26, 0, Math.PI * 2); heightCtx.stroke();
+  heightCtx.strokeStyle = '#505050';
   heightCtx.lineWidth = 3;
-  heightCtx.beginPath();
-  heightCtx.arc(W * 0.3, H * 0.12, 24, 0, Math.PI * 2);
-  heightCtx.stroke();
+  heightCtx.beginPath(); heightCtx.arc(W * 0.3, H * 0.10, 20, 0, Math.PI * 2); heightCtx.stroke();
 
   return createTextureSet(colorCanvas, heightCanvas);
 }
@@ -516,68 +510,65 @@ export function generateEngineTexture(): TextureSet {
   const [colorCanvas, colorCtx] = createCanvas(W, H);
   const [heightCanvas, heightCtx] = createCanvas(W, H);
 
-  // dark metallic top
-  colorCtx.fillStyle = '#383838';
-  colorCtx.fillRect(0, 0, W, H * 0.35);
+  // metallic body
+  colorCtx.fillStyle = '#404048';
+  colorCtx.fillRect(0, 0, W, H * 0.40);
 
-  // mid section
-  colorCtx.fillStyle = '#484848';
-  colorCtx.fillRect(0, H * 0.35, W, H * 0.10);
+  // mid ring
+  colorCtx.fillStyle = '#505058';
+  colorCtx.fillRect(0, H * 0.40, W, H * 0.06);
 
-  // copper/gold nozzle bell with heat gradient
-  for (let py = H * 0.45; py < H; py++) {
-    const t = (py - H * 0.45) / (H * 0.55);
+  // copper nozzle
+  for (let py = H * 0.46; py < H; py++) {
+    const t = (py - H * 0.46) / (H * 0.54);
     const r = Math.round(140 + 60 * t);
-    const g = Math.round(90 + 40 * Math.max(0, 1 - t * 1.5));
+    const g = Math.round(90 + 40 * t);
     const b = Math.round(50 + 10 * t);
     colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     colorCtx.fillRect(0, py, W, 1);
   }
 
-  // soot around nozzle rim
-  for (let py = H * 0.94; py < H; py++) {
-    const t = (py - H * 0.94) / (H * 0.06);
-    colorCtx.fillStyle = `rgba(0,0,0,${t * 0.5})`;
-    colorCtx.fillRect(0, py, W, 1);
-  }
+  // nozzle rim
+  colorCtx.fillStyle = '#c8a870';
+  colorCtx.fillRect(0, H * 0.96, W, H * 0.02);
+  colorCtx.fillStyle = '#685030';
+  colorCtx.fillRect(0, H * 0.98, W, H * 0.02);
 
-  // light gradient
-  applyLightGradient(colorCtx, W, H);
+  // bolts
+  for (let x = 12; x < W; x += 32) {
+    colorCtx.fillStyle = '#606060';
+    colorCtx.beginPath(); colorCtx.arc(x, H * 0.40, 4, 0, Math.PI * 2); colorCtx.fill();
+  }
 
   // height map
   heightCtx.fillStyle = '#808080';
   heightCtx.fillRect(0, 0, W, H);
 
-  // cooling channels on nozzle bell (vertical lines)
+  // cooling channels
   heightCtx.strokeStyle = '#404040';
-  heightCtx.lineWidth = 3;
-  for (let x = 4; x < W; x += 10) {
+  heightCtx.lineWidth = 4;
+  for (let x = 6; x < W; x += 14) {
     heightCtx.beginPath();
-    heightCtx.moveTo(x, H * 0.45);
+    heightCtx.moveTo(x, H * 0.46);
     heightCtx.lineTo(x, H * 0.96);
     heightCtx.stroke();
   }
 
-  // horizontal detail lines (raised)
+  // seam lines
   heightCtx.strokeStyle = '#c0c0c0';
   heightCtx.lineWidth = 5;
-  const detailY = [H * 0.35, H * 0.45, H * 0.96];
-  for (const y of detailY) {
+  for (const y of [H * 0.40, H * 0.46, H * 0.96]) {
     heightCtx.beginPath();
     heightCtx.moveTo(0, y);
     heightCtx.lineTo(W, y);
     heightCtx.stroke();
   }
 
-  // nozzle rim (raised ring)
-  heightCtx.fillStyle = '#d0d0d0';
-  heightCtx.fillRect(0, H * 0.96, W, H * 0.02);
-
   // bolts
-  heightCtx.fillStyle = '#c0c0c0';
-  for (let x = 14; x < W; x += 32) {
+  heightCtx.fillStyle = '#d0d0d0';
+  for (let x = 12; x < W; x += 32) {
     heightCtx.beginPath();
-    heightCtx.arc(x, H * 0.40, 5, 0, Math.PI * 2);
+    heightCtx.arc(x, H * 0.40, 4, 0, Math.PI * 2);
     heightCtx.fill();
   }
 
@@ -589,7 +580,7 @@ export function generateParachuteTexture(): TextureSet {
   const [colorCanvas, colorCtx] = createCanvas(W, H);
   const [heightCanvas, heightCtx] = createCanvas(W, H);
 
-  // alternating white/off-white panels
+  // white/off-white alternating panels
   for (let py = 0; py < H; py++) {
     const band = Math.floor(py / 32) % 2 === 0;
     const v = band ? 240 : 225;
@@ -597,73 +588,54 @@ export function generateParachuteTexture(): TextureSet {
     colorCtx.fillRect(0, py, W, 1);
   }
 
-  // red stripe
-  colorCtx.fillStyle = '#cc3344';
-  colorCtx.fillRect(0, H * 0.3, W, H * 0.03);
-  colorCtx.fillRect(0, H * 0.7, W, H * 0.03);
-
-  // shadow on one side
-  const shadowGrad = colorCtx.createLinearGradient(0, 0, W, 0);
-  if (shadowGrad) {
-    shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    shadowGrad.addColorStop(0.3, 'rgba(0,0,0,0)');
-    shadowGrad.addColorStop(0.8, 'rgba(0,0,0,0.15)');
-    shadowGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
-    colorCtx.fillStyle = shadowGrad;
-  } else {
-    colorCtx.fillStyle = 'rgba(0,0,0,0.1)';
+  // stitching lines
+  colorCtx.strokeStyle = '#c0c0c8';
+  colorCtx.lineWidth = 2;
+  for (let y = 0; y < H; y += 32) {
+    colorCtx.setLineDash([4, 8]);
+    colorCtx.beginPath(); colorCtx.moveTo(0, y); colorCtx.lineTo(W, y); colorCtx.stroke();
+    colorCtx.setLineDash([]);
   }
-  colorCtx.fillRect(0, 0, W, H);
+  for (let x = 0; x < W; x += 32) {
+    colorCtx.setLineDash([4, 8]);
+    colorCtx.beginPath(); colorCtx.moveTo(x, 0); colorCtx.lineTo(x, H); colorCtx.stroke();
+    colorCtx.setLineDash([]);
+  }
+
+  // center cross reinforcement
+  colorCtx.strokeStyle = '#a0a0aa';
+  colorCtx.lineWidth = 3;
+  colorCtx.beginPath(); colorCtx.moveTo(W / 2 - 20, 0); colorCtx.lineTo(W / 2 - 20, H); colorCtx.stroke();
+  colorCtx.beginPath(); colorCtx.moveTo(W / 2 + 20, 0); colorCtx.lineTo(W / 2 + 20, H); colorCtx.stroke();
 
   // height map
   heightCtx.fillStyle = '#808080';
   heightCtx.fillRect(0, 0, W, H);
 
-  // weave pattern (fine grid)
+  // fabric weave
   heightCtx.strokeStyle = '#909090';
   heightCtx.lineWidth = 1;
-  for (let y = 0; y < H; y += 8) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, y);
-    heightCtx.lineTo(W, y);
-    heightCtx.stroke();
-  }
-  for (let x = 0; x < W; x += 8) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(x, 0);
-    heightCtx.lineTo(x, H);
-    heightCtx.stroke();
+  for (let i = 0; i < W; i += 8) {
+    heightCtx.beginPath(); heightCtx.moveTo(i, 0); heightCtx.lineTo(i, H); heightCtx.stroke();
+    heightCtx.beginPath(); heightCtx.moveTo(0, i); heightCtx.lineTo(W, i); heightCtx.stroke();
   }
 
-  // main stitching (dashed raised lines)
+  // seam stitching for normal map
   heightCtx.strokeStyle = '#c0c0c0';
   heightCtx.lineWidth = 3;
-  heightCtx.setLineDash([6, 10]);
+  heightCtx.setLineDash([6, 8]);
   for (let y = 0; y < H; y += 32) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, y);
-    heightCtx.lineTo(W, y);
-    heightCtx.stroke();
+    heightCtx.beginPath(); heightCtx.moveTo(0, y); heightCtx.lineTo(W, y); heightCtx.stroke();
   }
   for (let x = 0; x < W; x += 32) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(x, 0);
-    heightCtx.lineTo(x, H);
-    heightCtx.stroke();
+    heightCtx.beginPath(); heightCtx.moveTo(x, 0); heightCtx.lineTo(x, H); heightCtx.stroke();
   }
   heightCtx.setLineDash([]);
 
-  // centre cross reinforcements
-  heightCtx.strokeStyle = '#b0b0b0';
-  heightCtx.lineWidth = 5;
-  heightCtx.beginPath();
-  heightCtx.moveTo(W / 2 - 24, 0);
-  heightCtx.lineTo(W / 2 - 24, H);
-  heightCtx.stroke();
-  heightCtx.beginPath();
-  heightCtx.moveTo(W / 2 + 24, 0);
-  heightCtx.lineTo(W / 2 + 24, H);
-  heightCtx.stroke();
+  // center cross for normal map
+  heightCtx.fillStyle = '#b0b0b0';
+  heightCtx.fillRect(W / 2 - 22, 0, 4, H);
+  heightCtx.fillRect(W / 2 + 18, 0, 4, H);
 
   return createTextureSet(colorCanvas, heightCanvas);
 }

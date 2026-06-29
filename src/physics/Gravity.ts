@@ -13,11 +13,12 @@ export function gravitationalForce(source: Body, target: Body): Vec3 {
   return [(fmag * dx) / r, (fmag * dy) / r, (fmag * dz) / r];
 }
 
-/** Sum gravitational force on target from all sources. */
+/** Sum gravitational force on target from all sources (skips massless). */
 export function totalGravityOn(target: Body, sources: Body[]): Vec3 {
   let fx = 0, fy = 0, fz = 0;
   for (const s of sources) {
     if (s === target) continue;
+    if (s.mass <= 0) continue;
     const f = gravitationalForce(s, target);
     fx += f[0]; fy += f[1]; fz += f[2];
   }

@@ -7,9 +7,9 @@ try {
   const game = new Game();
   game.start();
 } catch (e) {
-  console.error('Failed to start Ellipse:', e);
+  console.error('Failed to start StarWeld:', e);
   document.body.innerHTML = `<div style="color:white;padding:32px;font-family:monospace;">
-      <h1>Ellipse failed to start</h1>
+      <h1>StarWeld failed to start</h1>
       <pre>${String(e)}</pre>
     </div>`;
 }

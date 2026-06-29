@@ -1,9 +1,7 @@
 // Minimal WebGL shim for jsdom so THREE.WebGLRenderer can initialize in tests.
-// The test only checks domElement.tagName === 'CANVAS' and calls dispose();
-// no actual rendering happens, so a no-op Proxy is sufficient.
 const WEBGL_TYPES = new Set(['webgl', 'webgl2', 'experimental-webgl']);
 
-const handler: ProxyHandler<object> = {
+const webglHandler: ProxyHandler<object> = {
   get(_target, prop) {
     if (prop === 'canvas') return _target;
     if (prop === 'drawingBufferWidth' || prop === 'drawingBufferHeight') return 0;
@@ -40,16 +38,58 @@ const handler: ProxyHandler<object> = {
   },
 };
 
+// Minimal 2D canvas context shim for procedural texture generation tests.
+function create2DShim(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const state: Record<string, unknown> = {
+    fillStyle: '#000000',
+    strokeStyle: '#000000',
+    lineWidth: 1,
+    globalAlpha: 1,
+    imageData: new Map<string, ImageData>(),
+  };
+  const handler: ProxyHandler<Record<string, unknown>> = {
+    get(target, prop: string) {
+      if (prop === 'canvas') return canvas;
+      if (prop in target) return target[prop];
+      if (prop === 'fillRect' || prop === 'clearRect' || prop === 'beginPath' || prop === 'closePath' ||
+          prop === 'fill' || prop === 'stroke' || prop === 'moveTo' || prop === 'lineTo' ||
+          prop === 'arc' || prop === 'ellipse' || prop === 'save' || prop === 'restore' ||
+          prop === 'putImageData' || prop === 'scale' || prop === 'rotate' || prop === 'translate') {
+        return () => undefined;
+      }
+      if (prop === 'createImageData') {
+        return (w: number, h: number) => {
+          const data = new Uint8ClampedArray(w * h * 4);
+          return { width: w, height: h, data } as ImageData;
+        };
+      }
+      if (prop === 'getImageData') {
+        return (_x: number, _y: number, w: number, h: number) => {
+          const data = new Uint8ClampedArray(w * h * 4);
+          return { width: w, height: h, data } as ImageData;
+        };
+      }
+      return () => undefined;
+    },
+    set(target, prop: string, value) {
+      target[prop] = value;
+      return true;
+    },
+  };
+  return new Proxy(state, handler) as unknown as CanvasRenderingContext2D;
+}
+
 HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string) {
   if (WEBGL_TYPES.has(type)) {
-    return new Proxy({ canvas: this }, handler);
+    return new Proxy({ canvas: this }, webglHandler);
+  }
+  if (type === '2d') {
+    return create2DShim(this);
   }
   return null;
 } as typeof HTMLCanvasElement.prototype.getContext;
 
-// In-memory localStorage shim (Node 26 ships an experimental `localStorage` global
-// that requires --localstorage-file; on older jsdom it's missing entirely.
-// Force a clean in-memory shim on `window` so tests can use the standard API.)
+// In-memory localStorage shim for jsdom
 if (typeof (globalThis as any).window !== 'undefined' && !(globalThis as any).window.localStorage) {
   const store = new Map<string, string>();
   const ls = {

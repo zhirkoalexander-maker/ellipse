@@ -13,12 +13,10 @@ describe('applyThrust', () => {
     a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 0, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, -0.5, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    r.fuelMass = 200;
     const fs = new FlightState(r, sys, [0, 0, 0], [0, 0, 0]);
     fs.throttle = 1;
     const before = [...fs.velocity] as [number, number, number];
     applyThrust(fs, 1);
-    // Should accelerate in +Y
     expect(fs.velocity[1]).toBeGreaterThan(before[1]);
   });
 
@@ -28,11 +26,11 @@ describe('applyThrust', () => {
     a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 0, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, -0.5, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    r.fuelMass = 200;
+    const before = r.totalFuelMass();
     const fs = new FlightState(r, sys, [0, 0, 0], [0, 0, 0]);
     fs.throttle = 0.5;
     applyThrust(fs, 1);
-    expect(r.fuelMass).toBeLessThan(200);
+    expect(r.totalFuelMass()).toBeLessThan(before);
   });
 
   it('with throttle 0, no thrust', () => {
@@ -40,12 +38,12 @@ describe('applyThrust', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('engine_ant')!, position: [0, -0.5, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    r.fuelMass = 100;
+    const before = r.totalFuelMass();
     const fs = new FlightState(r, sys, [0, 0, 0], [0, 0, 0]);
     fs.throttle = 0;
-    const before = [...fs.velocity] as [number, number, number];
+    const beforeVel = [...fs.velocity] as [number, number, number];
     applyThrust(fs, 1);
-    expect(fs.velocity[1]).toBe(before[1]);
-    expect(r.fuelMass).toBe(100);
+    expect(fs.velocity[1]).toBe(beforeVel[1]);
+    expect(r.totalFuelMass()).toBe(before);
   });
 });

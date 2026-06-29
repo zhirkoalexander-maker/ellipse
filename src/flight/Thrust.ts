@@ -6,7 +6,7 @@ import { G0 } from '../config/constants';
  * Finds active engine in rocket assembly, applies force along +Y in local frame.
  * Consumes fuel at mass_flow = thrust / (Isp * g0) * throttle.
  */
-export function applyThrust(state: FlightState, dt: number): void {
+export function applyThrust(state: FlightState, dt: number, direction?: [number, number, number]): void {
   if (state.throttle <= 0) return;
 
   // Find first engine in assembly
@@ -18,10 +18,14 @@ export function applyThrust(state: FlightState, dt: number): void {
   // Mass flow in kg/s
   const massFlow = forceN / (engine.isp * G0);
 
-  // Acceleration (F = m*a)
-  const a = forceN / state.rocket.totalMass();
-  // Apply in +Y world frame (simplified — no rotation in MVP)
-  state.velocity[1] += a * dt;
+  // Apply force in direction (default +Y = up)
+  const dir = direction ?? [0, 1, 0];
+  const ax = forceN * dir[0] / state.rocket.totalMass();
+  const ay = forceN * dir[1] / state.rocket.totalMass();
+  const az = forceN * dir[2] / state.rocket.totalMass();
+  state.velocity[0] += ax * dt;
+  state.velocity[1] += ay * dt;
+  state.velocity[2] += az * dt;
 
   // Consume fuel
   state.consumeFuel(massFlow, dt);

@@ -18,6 +18,6 @@ export class FlightState {
 
   /** Subtract fuel at rate (kg/s) for dt seconds. */
   consumeFuel(rate: number, dt: number): void {
-    this.rocket.fuelMass = Math.max(0, this.rocket.fuelMass - rate * dt);
+    this.rocket.consumeFuel(rate, dt);
   }
 }

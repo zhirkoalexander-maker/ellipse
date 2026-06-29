@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Stars } from '../effects/Stars';
 
 export class SceneManager {
   readonly scene: THREE.Scene;
@@ -7,23 +8,24 @@ export class SceneManager {
   private frames = 0;
   private lastFpsUpdate = 0;
   private fps = 0;
+  private stars: Stars;
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0A0E1A);
+    this.scene.background = new THREE.Color(0x000000);
 
-    // Ambient + Directional (sun) light
-    this.scene.add(new THREE.AmbientLight(0x404050, 0.4));
-    const sun = new THREE.DirectionalLight(0xFFF5E0, 1.2);
-    sun.position.set(5, 3, 5);
-    this.scene.add(sun);
+    this.stars = new Stars();
+    this.scene.add(this.stars.getMesh());
 
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(0, 0, 5);
+    this.scene.add(new THREE.AmbientLight(0x8888aa, 0.6));
+    this.scene.add(new THREE.HemisphereLight(0x8899cc, 0x445566, 0.7));
+
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.001, 5000);
+    this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
   }
 
-  update(): void {
+  update(dt: number): void {
     const t = this.clock.getElapsedTime();
     this.frames++;
     if (t - this.lastFpsUpdate >= 1) {
@@ -31,6 +33,8 @@ export class SceneManager {
       this.frames = 0;
       this.lastFpsUpdate = t;
     }
+    this.stars.getMesh().position.copy(this.camera.position);
+    this.stars.update(dt);
   }
 
   getFps(): number { return this.fps; }
