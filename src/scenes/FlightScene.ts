@@ -376,16 +376,15 @@ export class FlightScene {
     if (this.controls.consumeSasToggle()) this.cycleSasMode();
     this.hud.setSasMode(this.controls.sasMode);
 
-    // Current forward direction
-    const getFwd = () => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+    // Current forward direction (rocket local +Y in world space)
+    const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
 
     // Apply manual rotation or SAS
     const rotSpeed = 2.5;
     const pitchInput = this.controls.getPitch();
     const yawInput = this.controls.getYaw();
 
-    if (this.controls.sasMode === 'off' || (pitchInput !== 0 || yawInput !== 0)) {
-      // Manual control overrides SAS
+    if (this.controls.sasMode === 'off' || pitchInput !== 0 || yawInput !== 0) {
       const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitchInput * rotSpeed * baseDt);
       const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yawInput * rotSpeed * baseDt);
       this.rocketQuat.multiply(qPitch).multiply(qYaw);
@@ -402,15 +401,14 @@ export class FlightScene {
       } else if (this.controls.sasMode === 'retrograde') {
         tDir = [0, -1, 0];
       }
-      const currentFwd = getFwd();
-      const target = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
-      const angle = currentFwd.angleTo(target);
-      if (angle > 0.02) {
-        const targetQ = new THREE.Quaternion().setFromUnitVectors(currentFwd, target);
-        const sasRate = Math.min(0.5, angle * 3) * baseDt * 5;
-        this.rocketQuat.slerp(targetQ.multiply(this.rocketQuat), sasRate);
-        this.rocketQuat.normalize();
-      }
+
+      const upRef = new THREE.Vector3(0, 1, 0);
+      const tVec = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
+      if (tVec.dot(upRef) < -0.999) tVec.set(0.001, -1, 0.001).normalize();
+      const qTarget = new THREE.Quaternion().setFromUnitVectors(upRef, tVec);
+      const slerpT = Math.min(1, 8 * baseDt);
+      this.rocketQuat.slerp(qTarget, slerpT);
+      this.rocketQuat.normalize();
     }
 
     // Apply rotation to mesh
