@@ -4,6 +4,7 @@ import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
 import { buildRocketFromDescription } from '../parts/RocketBuilder';
+import { gltfCache, loadGLTF } from '../parts/PartBuilder';
 
 const PART_HEIGHT: Record<string, number> = {
   S: 0.6 * PART_SCALE,
@@ -177,12 +178,27 @@ export class VABScene {
       ).join('');
   }
 
-  private refreshMesh(): void {
+  private async refreshMesh(): Promise<void> {
     while (this.rocketGroup.children.length > 0) {
       const child = this.rocketGroup.children[0];
       if (child) this.rocketGroup.remove(child);
     }
     if (this.assembly.roots.length > 0) {
+      // Check if any part needs GLTF loading
+      const needsGLTF = this.assembly.roots.some(n => 
+        n.part.kind === 'gltf' && n.part.gltfUrl && !gltfCache.has(n.part.gltfUrl)
+      );
+      
+      if (needsGLTF) {
+        // Load missing GLTF models
+        const { loadGLTF } = await import('../parts/PartBuilder');
+        for (const root of this.assembly.roots) {
+          if (root.part.kind === 'gltf' && root.part.gltfUrl && !gltfCache.has(root.part.gltfUrl)) {
+            await loadGLTF(root.part.gltfUrl, root.part.gltfScale ?? 1);
+          }
+        }
+      }
+      
       const mesh = this.assembly.toMesh();
       this.rocketGroup.add(mesh);
     }

@@ -20,6 +20,7 @@ import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
 import * as THREE from 'three';
+import { loadGLTF } from '../parts/PartBuilder';
 
 export class Game {
   renderer: Renderer;
@@ -40,16 +41,23 @@ export class Game {
     // Sun at center with reduced mass for compressed system
     const sunMass = 2e26;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
-    // Earth orbits Sun at 1e8 m
-    this.system.add(new Earth([1e8, 0, 0], [0, 0, 11550]));
-    // Moon orbits Earth +1e7 m further out
-    this.system.add(new Moon([1.1e8, 0, 0], [0, 0, 17850]));
-    // Venus at ~8.5e7 m from Sun
-    this.system.add(new Venus([6e7, 0, 6e7], [-8870, 0, 8870]));
-    // Mars at ~1.52e8 m from Sun
-    this.system.add(new Mars([-1.4e8, 0, 6e7], [3690, 0, 8600]));
-    // Mercury at 4e7 m from Sun (innermost)
-    this.system.add(new Mercury([4e7, 0, 0], [0, 0, 18270]));
+    // Scaled solar system for gameplay (distances ×1e-3 of real, fits in camera far plane)
+    // Mercury at 1.5e8 m
+    this.system.add(new Mercury([1.5e8, 0, 0], [0, 0, 42000]));
+    // Venus at 3e8 m
+    this.system.add(new Venus([3e8, 0, 0], [0, 0, 30000]));
+    // Earth at 5e8 m (1 AU scaled)
+    const earthPos: [number, number, number] = [5e8, 0, 0];
+    const earthVel: [number, number, number] = [0, 0, 24000];
+    this.system.add(new Earth(earthPos, earthVel));
+    // Moon orbits Earth at 3.84e8 m (real distance)
+    const moonPos: [number, number, number] = [earthPos[0] + 3.844e8, 0, 0];
+    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 1020];
+    this.system.add(new Moon(moonPos, moonVel));
+    // Mars at 7.5e8 m
+    this.system.add(new Mars([7.5e8, 0, 0], [0, 0, 19500]));
+    // Jupiter at 1.5e9 m (optional, far)
+    // this.system.add(new Jupiter([1.5e9, 0, 0], [0, 0, 13000]));
 
     document.getElementById('app')!.appendChild(this.renderer.domElement);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -60,6 +68,15 @@ export class Game {
     });
 
     this.achievements.onUnlock((id) => toast.show(`Achievement: ${id}`));
+
+    // Preload GLTF models
+    this.preloadModels();
+  }
+
+  private async preloadModels(): Promise<void> {
+    const { loadGLTF } = await import('../parts/PartBuilder');
+    // Preload Agena Target Vehicle
+    await loadGLTF('/models/agena.glb', 1.0);
   }
 
   start(): void {

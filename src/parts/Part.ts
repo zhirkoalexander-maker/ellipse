@@ -1,5 +1,5 @@
 export type FuelType = 'LFO' | 'LF';
-export type PartKind = 'capsule' | 'tank' | 'engine' | 'parachute' | 'legs' | 'decoupler';
+export type PartKind = 'capsule' | 'tank' | 'engine' | 'parachute' | 'legs' | 'decoupler' | 'heatshield' | 'gltf';
 export type PartSize = 'S' | 'M' | 'L' | 'XL';
 
 export interface Part {
@@ -14,5 +14,8 @@ export interface Part {
   isp?: number;            // s (engines only)
   crewCapacity?: number;   // crew (capsules only)
   hasParachute?: boolean;  // capsules
+  heatCapacity?: number;   // J (heat shields)
   dragCoeff?: number;      // aerodynamic
+  gltfUrl?: string;        // GLTF model URL (for gltf kind)
+  gltfScale?: number;      // scale factor for GLTF model
 }
