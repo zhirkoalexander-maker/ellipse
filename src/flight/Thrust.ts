@@ -31,7 +31,7 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
   state.consumeFuel(massFlow, dt);
 }
 
-function findFirstEngine(nodes: any[]): { thrust: number; isp: number } | null {
+export function findFirstEngine(nodes: any[]): { thrust: number; isp: number } | null {
   for (const n of nodes) {
     if (n.part.kind === 'engine' && n.part.thrust && n.part.isp) {
       return { thrust: n.part.thrust, isp: n.part.isp };

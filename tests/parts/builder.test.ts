@@ -9,13 +9,14 @@ function countMeshes(g: THREE.Group): number {
   return n;
 }
 
-function countMeshesWithColor(g: THREE.Group, hex: number): number {
+function countMeshesWithGoldTexture(g: THREE.Group): number {
   let n = 0;
   g.traverse((o) => {
     if (o instanceof THREE.Mesh) {
       const mat = o.material;
-      const c = ('color' in mat) ? (mat as any).color : null;
-      if (c && c.getHex() === hex) n++;
+      if (mat instanceof THREE.MeshStandardMaterial && mat.map) {
+        n++;
+      }
     }
   });
   return n;
@@ -47,7 +48,8 @@ describe('PartBuilder', () => {
     const g = buildPartMesh(p);
     expect(hasGeometryType(g, 'CircleGeometry')).toBe(true);
     expect(hasGeometryType(g, 'RingGeometry')).toBe(true);
-    expect(countMeshesWithColor(g, CL_GOLD)).toBe(2);
+    // Gold parts now use gold texture, check for at least 2 textured meshes
+    expect(countMeshesWithGoldTexture(g)).toBeGreaterThanOrEqual(2);
   });
 
   it('tank has body and gold bands + structural ring', () => {

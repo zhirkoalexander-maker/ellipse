@@ -1,14 +1,10 @@
 import type { FlightState } from './FlightState';
 
-export type SASMode = 'off' | 'prograde' | 'retrograde';
-
 export class Controls {
   private keys: Set<string> = new Set();
   private stagePressed = false;
-  private sasToggle = false;
   private pauseToggle = false;
   readonly state: FlightState;
-  sasMode: SASMode = 'off';
 
   constructor(state: FlightState) {
     this.state = state;
@@ -16,7 +12,6 @@ export class Controls {
       if (e.repeat) return;
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
-      if (e.key.toLowerCase() === 't') this.sasToggle = true;
       if (e.key === 'Escape') this.pauseToggle = true;
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
         e.preventDefault();
@@ -41,20 +36,14 @@ export class Controls {
 
   getYaw(): number {
     let v = 0;
-    if (this.keys.has('arrowleft')) v = 1;
-    if (this.keys.has('arrowright')) v = -1;
+    if (this.keys.has('arrowleft')) v = -1;
+    if (this.keys.has('arrowright')) v = 1;
     return v;
   }
 
   getStageRequested(): boolean {
     const was = this.stagePressed;
     this.stagePressed = false;
-    return was;
-  }
-
-  consumeSasToggle(): boolean {
-    const was = this.sasToggle;
-    this.sasToggle = false;
     return was;
   }
 

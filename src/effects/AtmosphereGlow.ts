@@ -21,16 +21,18 @@ varying vec3 vViewDir;
 
 void main() {
   float fresnel = pow(1.0 - abs(dot(vNormal, vViewDir)), 3.0);
-  gl_FragColor = vec4(glowColor, fresnel * intensity);
+  float alpha = fresnel * intensity;
+  if (alpha < 0.01) discard;
+  gl_FragColor = vec4(glowColor, alpha);
 }
 `;
 
-const DEFAULT_RADIUS_SCALE = 1.05;
+const DEFAULT_RADIUS_SCALE = 1.035;
 
 export class AtmosphereGlow {
   private mesh: THREE.Mesh;
 
-  constructor(planetRadius: number, color = 0x4fc3f7, intensity = 0.6) {
+  constructor(planetRadius: number, color = 0x4fc3f7, intensity = 0.4) {
     const radius = planetRadius * DEFAULT_RADIUS_SCALE;
     const geom = new THREE.SphereGeometry(radius, 48, 24);
 
@@ -42,9 +44,9 @@ export class AtmosphereGlow {
         intensity: { value: intensity },
       },
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       depthWrite: false,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
