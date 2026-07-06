@@ -62,10 +62,13 @@ export interface TextureSet {
   normal?: THREE.CanvasTexture;
   roughness?: THREE.CanvasTexture;
   metalness?: THREE.CanvasTexture;
+  // New PBR maps
+  ao?: THREE.CanvasTexture;
+  emissive?: THREE.CanvasTexture;
 }
 
 /** Generate a normal map from a height map canvas using Sobel filter. */
-export function makeNormalMap(src: HTMLCanvasElement, strength = 3.0): THREE.CanvasTexture {
+function makeNormalMap(src: HTMLCanvasElement, strength = 2.0): THREE.CanvasTexture {
   const W = src.width, H = src.height;
   const sCtx = src.getContext('2d')!;
   const sImg = sCtx.getImageData(0, 0, W, H);
@@ -102,54 +105,80 @@ export function makeNormalMap(src: HTMLCanvasElement, strength = 3.0): THREE.Can
   return tex;
 }
 
-function createTextureSet(
+function createFullTextureSet(
   colorCanvas: HTMLCanvasElement,
-  heightCanvas?: HTMLCanvasElement,
+  normalCanvas?: HTMLCanvasElement,
+  roughnessCanvas?: HTMLCanvasElement,
+  metalnessCanvas?: HTMLCanvasElement,
+  aoCanvas?: HTMLCanvasElement,
 ): TextureSet {
   const color = new THREE.CanvasTexture(colorCanvas);
   color.wrapS = color.wrapT = THREE.RepeatWrapping;
   color.colorSpace = THREE.SRGBColorSpace;
   color.anisotropy = 4;
+
   let normal: THREE.CanvasTexture | undefined;
-  if (heightCanvas) {
-    normal = makeNormalMap(heightCanvas, 3.0);
+  if (normalCanvas) {
+    normal = makeNormalMap(normalCanvas, 2.0);
   }
-  return { color, normal };
+
+  let roughness: THREE.CanvasTexture | undefined;
+  if (roughnessCanvas) {
+    roughness = new THREE.CanvasTexture(roughnessCanvas);
+    roughness.wrapS = roughness.wrapT = THREE.RepeatWrapping;
+    roughness.anisotropy = 4;
+  }
+
+  let metalness: THREE.CanvasTexture | undefined;
+  if (metalnessCanvas) {
+    metalness = new THREE.CanvasTexture(metalnessCanvas);
+    metalness.wrapS = metalness.wrapT = THREE.RepeatWrapping;
+    metalness.anisotropy = 4;
+  }
+
+  let ao: THREE.CanvasTexture | undefined;
+  if (aoCanvas) {
+    ao = new THREE.CanvasTexture(aoCanvas);
+    ao.wrapS = ao.wrapT = THREE.RepeatWrapping;
+    ao.anisotropy = 4;
+  }
+
+  return { color, normal, roughness, metalness, ao };
 }
 
-/** Apply horizontal light gradient (bright centre, dark edges) for cylinder 3D illusion. */
-function applyLightGradient(ctx: CanvasRenderingContext2D, W: number, H: number): void {
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  if (!grad) {
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.fillRect(0, 0, W, H);
-    return;
-  }
-  grad.addColorStop(0, 'rgba(0,0,0,0.45)');
-  grad.addColorStop(0.2, 'rgba(0,0,0,0.10)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.35)');
-  grad.addColorStop(0.8, 'rgba(0,0,0,0.10)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.45)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+function seededRandomFast(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
 }
 
-/** Apply random wear lines (scratches, scuffs) to a canvas. */
-function applyWear(ctx: CanvasRenderingContext2D, W: number, H: number, density = 0.3): void {
-  const count = Math.floor(W * H * density * 0.0001);
-  for (let i = 0; i < count; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    const angle = Math.random() * Math.PI * 2;
-    ctx.globalAlpha = 0.05 + Math.random() * 0.12;
-    ctx.strokeStyle = Math.random() > 0.5 ? '#fff' : '#000';
-    ctx.lineWidth = 0.5 + Math.random() * 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + Math.cos(angle) * (5 + Math.random() * 25), y + Math.sin(angle) * (5 + Math.random() * 25));
-    ctx.stroke();
+function drawNoise(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number, seed: number, min = 0, max = 255) {
+  const rng = seededRandomFast(seed);
+  const img = ctx.createImageData(W, H);
+  const data = img.data;
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const idx = (py * W + px) * 4;
+      const v = min + rng() * (max - min);
+      data[idx] = data[idx + 1] = data[idx + 2] = v;
+      data[idx + 3] = 255;
+    }
   }
-  ctx.globalAlpha = 1;
+  ctx.putImageData(img, 0, 0);
+}
+
+function addFilmGrain(ctx: CanvasRenderingContext2D, W: number, H: number, amount = 0.02) {
+  const img = ctx.getImageData(0, 0, W, H);
+  const data = img.data!;
+  for (let i = 0; i < data.length; i += 4) {
+    const grain = (Math.random() - 0.5) * 2 * amount * 255;
+    data[i]! = Math.min(255, Math.max(0, data[i]! + grain));
+    data[i + 1]! = Math.min(255, Math.max(0, data[i + 1]! + grain));
+    data[i + 2]! = Math.min(255, Math.max(0, data[i + 2]! + grain));
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 // ── public API ────────────────────────────────────────────────────────────
@@ -357,285 +386,1605 @@ export function generateMoonBumpMap(): THREE.CanvasTexture {
 export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): TextureSet {
   const W = 1024, H = 1024;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
-  const [heightCanvas, heightCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
 
-  const colors: Record<string, { body: string; strip: string }> = {
-    S: { body: '#e8e8ec', strip: '#888890' },
-    M: { body: '#f0f0f4', strip: '#909098' },
-    L: { body: '#d8d8e0', strip: '#787880' },
-    XL: { body: '#c8c8d0', strip: '#686870' },
+  const rng = seededRandomFast(size.charCodeAt(0) * 1000 + 42);
+
+  // Base colors per size (NASA/SpaceX style)
+  const baseColors: Record<string, { 
+    primary: string; 
+    secondary: string; 
+    accent: string;
+    foam: string;
+    metal: string;
+  }> = {
+    S: { primary: '#f5f5f0', secondary: '#e8e8e0', accent: '#d4a574', foam: '#e8c8a0', metal: '#6a6a70' },
+    M: { primary: '#fafaf5', secondary: '#eeeee8', accent: '#c89568', foam: '#e0c090', metal: '#606068' },
+    L: { primary: '#f0f0eb', secondary: '#e0e0d8', accent: '#b88558', foam: '#d8b888', metal: '#585860' },
+    XL: { primary: '#e8e8e0', secondary: '#d8d8d0', accent: '#a87848', foam: '#d0b080', metal: '#505058' },
   };
-  const c = colors[size]!;
+  const c = baseColors[size]!;
 
-  // clean body colour
-  colorCtx.fillStyle = c.body;
+  // === COLOR MAP ===
+  // Base white/grey with slight variation
+  colorCtx.fillStyle = c.primary;
   colorCtx.fillRect(0, 0, W, H);
 
-  // top and bottom metallic caps
-  colorCtx.fillStyle = '#707080';
-  colorCtx.fillRect(0, 0, W, H * 0.02);
-  colorCtx.fillRect(0, H * 0.98, W, H * 0.02);
+  // Add subtle vertical gradient (top darker - interstage, bottom lighter)
+  const grad = colorCtx.createLinearGradient(0, 0, 0, H);
+  if (grad) {
+    grad.addColorStop(0, 'rgba(30,30,35,0.08)');
+    grad.addColorStop(0.15, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.85, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(30,30,35,0.06)');
+    colorCtx.fillStyle = grad;
+    colorCtx.fillRect(0, 0, W, H);
+  }
 
-  // horizontal seam lines
-  colorCtx.strokeStyle = c.strip;
-  colorCtx.lineWidth = 3;
-  const seams = [0.02, 0.15, 0.17, 0.50, 0.52, 0.78, 0.80, 0.98];
-  for (const s of seams) {
+  // Horizontal panel seams (weld lines)
+  const panelHeight = H / (size === 'S' ? 8 : size === 'M' ? 12 : size === 'L' ? 16 : 20);
+  colorCtx.strokeStyle = c.secondary;
+  colorCtx.lineWidth = 2;
+  for (let y = panelHeight; y < H; y += panelHeight) {
     colorCtx.beginPath();
-    colorCtx.moveTo(0, s * H);
-    colorCtx.lineTo(W, s * H);
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+    
+    // Weld bead highlight
+    colorCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    colorCtx.lineWidth = 1;
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y - 1);
+    colorCtx.lineTo(W, y - 1);
+    colorCtx.stroke();
+    colorCtx.strokeStyle = c.secondary;
+    colorCtx.lineWidth = 2;
+  }
+
+  // Stringers (vertical structural ribs) - subtle
+  colorCtx.strokeStyle = 'rgba(60,60,70,0.08)';
+  colorCtx.lineWidth = 1;
+  const stringerCount = size === 'S' ? 12 : size === 'M' ? 16 : size === 'L' ? 24 : 32;
+  for (let i = 0; i < stringerCount; i++) {
+    const x = (i / stringerCount) * W;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, 0);
+    colorCtx.lineTo(x, H);
     colorCtx.stroke();
   }
 
-  // gold band at bottom
-  colorCtx.fillStyle = '#c88840';
-  colorCtx.fillRect(0, H * 0.80, W, H * 0.02);
+  // Insulation foam patches (SpaceX style - orange/brown areas)
+  const foamAreas = size === 'S' ? 3 : size === 'M' ? 5 : size === 'L' ? 8 : 12;
+  for (let i = 0; i < foamAreas; i++) {
+    const x = rng() * W * 0.8 + W * 0.1;
+    const y = rng() * H * 0.7 + H * 0.15;
+    const w = 40 + rng() * 120;
+    const h = 30 + rng() * 80;
+    colorCtx.fillStyle = c.foam;
+    colorCtx.globalAlpha = 0.6 + rng() * 0.3;
+    colorCtx.fillRect(x, y, w, h);
+    colorCtx.globalAlpha = 1;
+  }
 
-  // vertical seam
-  colorCtx.strokeStyle = '#808088';
-  colorCtx.lineWidth = 2;
+  // Top/bottom domes (metallic)
+  colorCtx.fillStyle = c.metal;
+  colorCtx.fillRect(0, 0, W, H * 0.03);
+  colorCtx.fillRect(0, H * 0.97, W, H * 0.03);
+
+  // Vertical seam (single weld line)
+  colorCtx.strokeStyle = 'rgba(80,80,90,0.5)';
+  colorCtx.lineWidth = 3;
   colorCtx.beginPath();
   colorCtx.moveTo(W * 0.5, 0);
   colorCtx.lineTo(W * 0.5, H);
   colorCtx.stroke();
 
-  // height map
-  heightCtx.fillStyle = '#808080';
-  heightCtx.fillRect(0, 0, W, H);
+  // === NORMAL MAP (height) ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
 
-  // seam lines
-  heightCtx.strokeStyle = '#c0c0c0';
-  heightCtx.lineWidth = 6;
-  for (const s of seams) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, s * H);
-    heightCtx.lineTo(W, s * H);
-    heightCtx.stroke();
+  // Panel seams as ridges
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 8;
+  for (let y = panelHeight; y < H; y += panelHeight) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
   }
 
-  // vertical seam
-  heightCtx.strokeStyle = '#404040';
-  heightCtx.lineWidth = 3;
-  heightCtx.beginPath();
-  heightCtx.moveTo(W * 0.5, 0);
-  heightCtx.lineTo(W * 0.5, H);
-  heightCtx.stroke();
+  // Stringers
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 3;
+  for (let i = 0; i < stringerCount; i++) {
+    const x = (i / stringerCount) * W;
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, H);
+    normalCtx.stroke();
+  }
 
-  // rivets
-  heightCtx.fillStyle = '#d0d0d0';
-  for (let y = 20; y < H; y += 48) {
-    for (let x = 16; x < W; x += 40) {
-      heightCtx.beginPath();
-      heightCtx.arc(x, y, 2, 0, Math.PI * 2);
-      heightCtx.fill();
+  // Rivets along seams
+  normalCtx.fillStyle = '#e0e0e0';
+  for (let y = panelHeight; y < H; y += panelHeight) {
+    for (let x = 20; x < W; x += 40) {
+      normalCtx.beginPath();
+      normalCtx.arc(x, y, 3, 0, Math.PI * 2);
+      normalCtx.fill();
     }
   }
 
-  return createTextureSet(colorCanvas, heightCanvas);
+  // Vertical seam
+  normalCtx.strokeStyle = '#505050';
+  normalCtx.lineWidth = 6;
+  normalCtx.beginPath();
+  normalCtx.moveTo(W * 0.5, 0);
+  normalCtx.lineTo(W * 0.5, H);
+  normalCtx.stroke();
+
+  // === ROUGHNESS MAP ===
+  // Base: slightly rough painted metal
+  roughCtx.fillStyle = '#a0a0a0';
+  roughCtx.fillRect(0, W, W, H);
+
+  // Seams more rough
+  roughCtx.strokeStyle = '#e0e0e0';
+  roughCtx.lineWidth = 10;
+  for (let y = panelHeight; y < H; y += panelHeight) {
+    roughCtx.beginPath();
+    roughCtx.moveTo(0, y);
+    roughCtx.lineTo(W, y);
+    roughCtx.stroke();
+  }
+
+  // Foam areas very rough
+  for (let i = 0; i < foamAreas; i++) {
+    const x = rng() * W * 0.8 + W * 0.1;
+    const y = rng() * H * 0.7 + H * 0.15;
+    const w = 40 + rng() * 120;
+    const h = 30 + rng() * 80;
+    roughCtx.fillStyle = '#ffffff';
+    roughCtx.globalAlpha = 0.5;
+    roughCtx.fillRect(x, y, w, h);
+    roughCtx.globalAlpha = 1;
+  }
+
+  // Metallic domes - smoother
+  roughCtx.fillStyle = '#606060';
+  roughCtx.fillRect(0, 0, W, H * 0.03);
+  roughCtx.fillRect(0, H * 0.97, W, H * 0.03);
+
+  // === METALNESS MAP ===
+  metalCtx.fillStyle = '#101010'; // Painted = non-metal
+  metalCtx.fillRect(0, 0, W, H);
+  
+  // Metallic areas
+  metalCtx.fillStyle = '#e0e0e0';
+  metalCtx.fillRect(0, 0, W, H * 0.03);
+  metalCtx.fillRect(0, H * 0.97, W, H * 0.03);
+  // Vertical seam metallic
+  metalCtx.fillStyle = '#808080';
+  metalCtx.fillRect(W * 0.49, 0, W * 0.02, H);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+  // Darken seams
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 12;
+  for (let y = panelHeight; y < H; y += panelHeight) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(0, y);
+    aoCtx.lineTo(W, y);
+    aoCtx.stroke();
+  }
+  aoCtx.strokeStyle = '#a0a0a0';
+  aoCtx.lineWidth = 6;
+  for (let i = 0; i < stringerCount; i++) {
+    const x = (i / stringerCount) * W;
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, 0);
+    aoCtx.lineTo(x, H);
+    aoCtx.stroke();
+  }
+
+  // Add film grain to color
+  addFilmGrain(colorCtx, W, H, 0.015);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
 
 export function generateCapsuleTexture(): TextureSet {
   const W = 1024, H = 1024;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
-  const [heightCanvas, heightCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
 
-  // white body
-  colorCtx.fillStyle = '#f0f0f4';
-  colorCtx.fillRect(0, 0, W, H * 0.82);
+  const rng = seededRandomFast(12345);
 
-  // dark heat shield
-  colorCtx.fillStyle = '#3a3a40';
-  colorCtx.fillRect(0, H * 0.82, W, H * 0.18);
+  // === COLOR MAP ===
+  // White capsule body (NASA Apollo/Orion style)
+  colorCtx.fillStyle = '#f8f8f0';
+  colorCtx.fillRect(0, 0, W, H * 0.78);
 
-  // seam
-  colorCtx.fillStyle = '#808088';
-  colorCtx.fillRect(0, H * 0.81, W, H * 0.01);
+  // Subtle vertical gradient on body
+  const bodyGrad = colorCtx.createLinearGradient(0, 0, 0, H * 0.78);
+  if (bodyGrad) {
+    bodyGrad.addColorStop(0, 'rgba(20,20,25,0.06)');
+    bodyGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
+    bodyGrad.addColorStop(1, 'rgba(20,20,25,0.04)');
+    colorCtx.fillStyle = bodyGrad;
+    colorCtx.fillRect(0, 0, W, H * 0.78);
+  }
 
-  // blue stripe
-  colorCtx.fillStyle = '#2a3a8a';
-  colorCtx.fillRect(0, H * 0.24, W, H * 0.03);
+  // Heat shield - ablative material (dark charcoal with texture)
+  colorCtx.fillStyle = '#2a2a2e';
+  colorCtx.fillRect(0, H * 0.78, W, H * 0.22);
 
-  // red stripe
-  colorCtx.fillStyle = '#cc2244';
-  colorCtx.fillRect(0, H * 0.28, W, H * 0.025);
+  // Ablative texture on heat shield
+  for (let i = 0; i < 800; i++) {
+    const x = rng() * W;
+    const y = H * 0.78 + rng() * H * 0.22;
+    const r = 1 + rng() * 3;
+    const brightness = 30 + rng() * 40;
+    colorCtx.fillStyle = `rgb(${brightness},${brightness},${brightness + 5})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
 
-  // window
-  colorCtx.fillStyle = '#1a1a2e';
+  // Heat shield char marks (darker streaks from reentry)
+  colorCtx.strokeStyle = 'rgba(10,10,12,0.4)';
+  colorCtx.lineWidth = 1 + rng() * 2;
+  for (let i = 0; i < 30; i++) {
+    const x = rng() * W;
+    const y = H * 0.78 + rng() * H * 0.2;
+    const len = 20 + rng() * 80;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x + (rng() - 0.5) * 30, y + len);
+    colorCtx.stroke();
+  }
+
+  // Separation ring (metallic)
+  colorCtx.fillStyle = '#5a5a60';
+  colorCtx.fillRect(0, H * 0.77, W, H * 0.015);
+  colorCtx.fillStyle = '#8a8a90';
+  colorCtx.fillRect(0, H * 0.775, W, H * 0.005);
+
+  // NASA-style stripes
+  // Blue stripe
+  colorCtx.fillStyle = '#003366';
+  colorCtx.fillRect(0, H * 0.20, W, H * 0.035);
+  // Red stripe
+  colorCtx.fillStyle = '#b31b1b';
+  colorCtx.fillRect(0, H * 0.245, W, H * 0.025);
+  // White pinstripe
+  colorCtx.fillStyle = 'rgba(255,255,255,0.3)';
+  colorCtx.fillRect(0, H * 0.27, W, H * 0.003);
+
+  // Window (command module style)
+  const winX = W * 0.3, winY = H * 0.12;
+  // Window glass - dark with slight reflection
+  colorCtx.fillStyle = '#0a0a15';
   colorCtx.beginPath();
-  colorCtx.arc(W * 0.3, H * 0.10, 22, 0, Math.PI * 2);
+  colorCtx.ellipse(winX, winY, W * 0.045, H * 0.035, 0, 0, Math.PI * 2);
   colorCtx.fill();
-  colorCtx.strokeStyle = '#b0b0b8';
-  colorCtx.lineWidth = 4;
+  // Window frame - metallic
+  colorCtx.strokeStyle = '#9a9a9e';
+  colorCtx.lineWidth = 6;
   colorCtx.beginPath();
-  colorCtx.arc(W * 0.3, H * 0.10, 26, 0, Math.PI * 2);
+  colorCtx.ellipse(winX, winY, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+  colorCtx.stroke();
+  colorCtx.strokeStyle = '#5a5a5e';
+  colorCtx.lineWidth = 3;
+  colorCtx.beginPath();
+  colorCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
   colorCtx.stroke();
 
-  // height map
-  heightCtx.fillStyle = '#808080';
-  heightCtx.fillRect(0, 0, W, H);
-
-  // seam lines
-  heightCtx.strokeStyle = '#c0c0c0';
-  heightCtx.lineWidth = 5;
-  for (const y of [0.03, 0.24, 0.305, 0.81, 0.82]) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, y * H);
-    heightCtx.lineTo(W, y * H);
-    heightCtx.stroke();
+  // RCS thruster ports (4 quads)
+  colorCtx.fillStyle = '#3a3a3e';
+  for (let q = 0; q < 4; q++) {
+    const angle = (q / 4) * Math.PI * 2;
+    const x = W * 0.5 + Math.cos(angle) * W * 0.35;
+    const y = H * 0.35 + Math.sin(angle) * H * 0.05;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, 12, 0, Math.PI * 2);
+    colorCtx.fill();
+    colorCtx.strokeStyle = '#5a5a5e';
+    colorCtx.lineWidth = 2;
+    colorCtx.stroke();
   }
 
-  // heat shield grid
-  heightCtx.strokeStyle = '#909090';
-  heightCtx.lineWidth = 3;
-  for (let x = 0; x < W; x += 24) {
-    heightCtx.beginPath(); heightCtx.moveTo(x, H * 0.82); heightCtx.lineTo(x, H); heightCtx.stroke();
-  }
-  for (let y = H * 0.84; y < H; y += 24) {
-    heightCtx.beginPath(); heightCtx.moveTo(0, y); heightCtx.lineTo(W, y); heightCtx.stroke();
+  // Parachute cover (top)
+  colorCtx.fillStyle = '#e8e8e0';
+  colorCtx.fillRect(0, 0, W, H * 0.04);
+  colorCtx.strokeStyle = '#a0a0a0';
+  colorCtx.lineWidth = 2;
+  colorCtx.beginPath();
+  colorCtx.moveTo(0, H * 0.04);
+  colorCtx.lineTo(W, H * 0.04);
+  colorCtx.stroke();
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Body panel lines
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 4;
+  for (let y = H * 0.1; y < H * 0.75; y += H * 0.08) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
   }
 
-  // window frame
-  heightCtx.strokeStyle = '#e0e0e0';
-  heightCtx.lineWidth = 8;
-  heightCtx.beginPath(); heightCtx.arc(W * 0.3, H * 0.10, 26, 0, Math.PI * 2); heightCtx.stroke();
-  heightCtx.strokeStyle = '#505050';
-  heightCtx.lineWidth = 3;
-  heightCtx.beginPath(); heightCtx.arc(W * 0.3, H * 0.10, 20, 0, Math.PI * 2); heightCtx.stroke();
+  // Heat shield ablation pattern
+  normalCtx.strokeStyle = '#606060';
+  normalCtx.lineWidth = 2;
+  for (let x = 0; x < W; x += 32) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, H * 0.78);
+    normalCtx.lineTo(x, H);
+    normalCtx.stroke();
+  }
+  for (let y = H * 0.8; y < H; y += 32) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
+  }
 
-  return createTextureSet(colorCanvas, heightCanvas);
+  // Separation ring
+  normalCtx.strokeStyle = '#c0c0c0';
+  normalCtx.lineWidth = 6;
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.775);
+  normalCtx.lineTo(W, H * 0.775);
+  normalCtx.stroke();
+
+  // Window frame
+  normalCtx.strokeStyle = '#e0e0e0';
+  normalCtx.lineWidth = 10;
+  normalCtx.beginPath();
+  normalCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
+  normalCtx.stroke();
+
+  // === ROUGHNESS MAP ===
+  roughCtx.fillStyle = '#808080'; // Painted body
+  roughCtx.fillRect(0, 0, W, H * 0.78);
+
+  // Heat shield - very rough (ablative)
+  roughCtx.fillStyle = '#ffffff';
+  roughCtx.fillRect(0, H * 0.78, W, H * 0.22);
+
+  // Separation ring - metallic (smoother)
+  roughCtx.fillStyle = '#404040';
+  roughCtx.fillRect(0, H * 0.77, W, H * 0.015);
+
+  // Window - smooth glass
+  roughCtx.fillStyle = '#101010';
+  roughCtx.beginPath();
+  roughCtx.ellipse(winX, winY, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+  roughCtx.fill();
+
+  // === METALNESS MAP ===
+  metalCtx.fillStyle = '#101010'; // Non-metallic paint
+  metalCtx.fillRect(0, 0, W, H);
+
+  // Metallic areas
+  metalCtx.fillStyle = '#e0e0e0';
+  metalCtx.fillRect(0, H * 0.77, W, H * 0.015); // Separation ring
+  metalCtx.fillRect(0, 0, W, H * 0.04); // Parachute cover
+
+  // Window frame metallic
+  metalCtx.fillStyle = '#c0c0c0';
+  metalCtx.beginPath();
+  metalCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
+  metalCtx.fill();
+
+  // RCS ports metallic
+  for (let q = 0; q < 4; q++) {
+    const angle = (q / 4) * Math.PI * 2;
+    const x = W * 0.5 + Math.cos(angle) * W * 0.35;
+    const y = H * 0.35 + Math.sin(angle) * H * 0.05;
+    metalCtx.beginPath();
+    metalCtx.arc(x, y, 14, 0, Math.PI * 2);
+    metalCtx.fill();
+  }
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  // Panel lines shadow
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 8;
+  for (let y = H * 0.1; y < H * 0.75; y += H * 0.08) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(0, y);
+    aoCtx.lineTo(W, y);
+    aoCtx.stroke();
+  }
+
+  // Heat shield grid
+  aoCtx.strokeStyle = '#606060';
+  aoCtx.lineWidth = 4;
+  for (let x = 0; x < W; x += 32) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, H * 0.78);
+    aoCtx.lineTo(x, H);
+    aoCtx.stroke();
+  }
+  for (let y = H * 0.8; y < H; y += 32) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(0, y);
+    aoCtx.lineTo(W, y);
+    aoCtx.stroke();
+  }
+
+  // Separation ring
+  aoCtx.strokeStyle = '#909090';
+  aoCtx.lineWidth = 10;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.775);
+  aoCtx.lineTo(W, H * 0.775);
+  aoCtx.stroke();
+
+  // Window frame
+  aoCtx.strokeStyle = '#707070';
+  aoCtx.lineWidth = 12;
+  aoCtx.beginPath();
+  aoCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
+  aoCtx.stroke();
+
+  addFilmGrain(colorCtx, W, H, 0.02);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
 
 export function generateEngineTexture(): TextureSet {
   const W = 1024, H = 1024;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
-  const [heightCanvas, heightCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
 
-  // metallic body
-  colorCtx.fillStyle = '#404048';
-  colorCtx.fillRect(0, 0, W, H * 0.40);
+  const rng = seededRandomFast(54321);
 
-  // mid ring
-  colorCtx.fillStyle = '#505058';
-  colorCtx.fillRect(0, H * 0.40, W, H * 0.06);
+  // === COLOR MAP ===
+  // Upper engine body - Inconel/stainless steel
+  colorCtx.fillStyle = '#3a3a40';
+  colorCtx.fillRect(0, 0, W, H * 0.35);
 
-  // copper nozzle
-  for (let py = H * 0.46; py < H; py++) {
-    const t = (py - H * 0.46) / (H * 0.54);
-    const r = Math.round(140 + 60 * t);
-    const g = Math.round(90 + 40 * t);
-    const b = Math.round(50 + 10 * t);
+  // Subtle brushed metal texture on body
+  for (let i = 0; i < 200; i++) {
+    const x = rng() * W;
+    const y = rng() * H * 0.35;
+    const len = 5 + rng() * 30;
+    colorCtx.strokeStyle = `rgba(255,255,255,${0.02 + rng() * 0.03})`;
+    colorCtx.lineWidth = 0.5;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x, y + len);
+    colorCtx.stroke();
+  }
+
+  // Mid flange (bolted connection)
+  colorCtx.fillStyle = '#4a4a50';
+  colorCtx.fillRect(0, H * 0.35, W, H * 0.06);
+
+  // Bolt holes on flange
+  colorCtx.fillStyle = '#2a2a2e';
+  for (let x = 16; x < W; x += 32) {
+    colorCtx.beginPath();
+    colorCtx.arc(x, H * 0.38, 5, 0, Math.PI * 2);
+    colorCtx.fill();
+    colorCtx.strokeStyle = '#5a5a60';
+    colorCtx.lineWidth = 1;
+    colorCtx.stroke();
+  }
+
+  // Nozzle - copper alloy (regenerative cooling channels visible)
+  // Gradient from copper to dark copper
+  for (let py = H * 0.41; py < H * 0.95; py++) {
+    const t = (py - H * 0.41) / (H * 0.54);
+    // Copper color shifting to darker oxidized copper
+    const r = Math.round(180 + 40 * (1 - t));
+    const g = Math.round(100 + 20 * (1 - t));
+    const b = Math.round(40 + 10 * (1 - t));
     colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     colorCtx.fillRect(0, py, W, 1);
   }
 
-  // nozzle rim
-  colorCtx.fillStyle = '#c8a870';
-  colorCtx.fillRect(0, H * 0.96, W, H * 0.02);
-  colorCtx.fillStyle = '#685030';
-  colorCtx.fillRect(0, H * 0.98, W, H * 0.02);
-
-  // bolts
-  for (let x = 12; x < W; x += 32) {
-    colorCtx.fillStyle = '#606060';
-    colorCtx.beginPath(); colorCtx.arc(x, H * 0.40, 4, 0, Math.PI * 2); colorCtx.fill();
+  // Cooling channel ridges (vertical lines)
+  colorCtx.strokeStyle = 'rgba(120,70,30,0.4)';
+  colorCtx.lineWidth = 1;
+  for (let x = 8; x < W; x += 16) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, H * 0.41);
+    colorCtx.lineTo(x, H * 0.95);
+    colorCtx.stroke();
   }
 
-  // height map
-  heightCtx.fillStyle = '#808080';
-  heightCtx.fillRect(0, 0, W, H);
-
-  // cooling channels
-  heightCtx.strokeStyle = '#404040';
-  heightCtx.lineWidth = 4;
-  for (let x = 6; x < W; x += 14) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(x, H * 0.46);
-    heightCtx.lineTo(x, H * 0.96);
-    heightCtx.stroke();
+  // Soot/carbon buildup near exit (darker)
+  const sootGrad = colorCtx.createLinearGradient(0, H * 0.85, 0, H);
+  if (sootGrad) {
+    sootGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    sootGrad.addColorStop(0.5, 'rgba(0,0,0,0.3)');
+    sootGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+    colorCtx.fillStyle = sootGrad;
+    colorCtx.fillRect(0, H * 0.85, W, H * 0.15);
   }
 
-  // seam lines
-  heightCtx.strokeStyle = '#c0c0c0';
-  heightCtx.lineWidth = 5;
-  for (const y of [H * 0.40, H * 0.46, H * 0.96]) {
-    heightCtx.beginPath();
-    heightCtx.moveTo(0, y);
-    heightCtx.lineTo(W, y);
-    heightCtx.stroke();
+  // Nozzle exit rim - Inconel (high temp alloy)
+  colorCtx.fillStyle = '#5a5a60';
+  colorCtx.fillRect(0, H * 0.95, W, H * 0.025);
+  colorCtx.fillStyle = '#7a7a80';
+  colorCtx.fillRect(0, H * 0.975, W, H * 0.025);
+
+  // Gimbal mounting points (4 lugs)
+  colorCtx.fillStyle = '#4a4a50';
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const x = W * 0.5 + Math.cos(angle) * W * 0.42;
+    const y = H * 0.25 + Math.sin(angle) * H * 0.05;
+    colorCtx.fillRect(x - 15, y - 15, 30, 30);
+    colorCtx.strokeStyle = '#6a6a70';
+    colorCtx.lineWidth = 2;
+    colorCtx.strokeRect(x - 15, y - 15, 30, 30);
   }
 
-  // bolts
-  heightCtx.fillStyle = '#d0d0d0';
-  for (let x = 12; x < W; x += 32) {
-    heightCtx.beginPath();
-    heightCtx.arc(x, H * 0.40, 4, 0, Math.PI * 2);
-    heightCtx.fill();
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Body brushed texture
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 1;
+  for (let x = 0; x < W; x += 4) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, H * 0.35);
+    normalCtx.stroke();
   }
 
-  return createTextureSet(colorCanvas, heightCanvas);
+  // Flange bolts
+  normalCtx.fillStyle = '#c0c0c0';
+  for (let x = 16; x < W; x += 32) {
+    normalCtx.beginPath();
+    normalCtx.arc(x, H * 0.38, 5, 0, Math.PI * 2);
+    normalCtx.fill();
+  }
+
+  // Cooling channels
+  normalCtx.strokeStyle = '#606060';
+  normalCtx.lineWidth = 3;
+  for (let x = 8; x < W; x += 16) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, H * 0.41);
+    normalCtx.lineTo(x, H * 0.95);
+    normalCtx.stroke();
+  }
+
+  // Nozzle seams
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 6;
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.41);
+  normalCtx.lineTo(W, H * 0.41);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.95);
+  normalCtx.lineTo(W, H * 0.95);
+  normalCtx.stroke();
+
+  // === ROUGHNESS MAP ===
+  roughCtx.fillStyle = '#505050'; // Polished metal body
+  roughCtx.fillRect(0, 0, W, H * 0.35);
+
+  roughCtx.fillStyle = '#606060'; // Flange
+  roughCtx.fillRect(0, H * 0.35, W, H * 0.06);
+
+  roughCtx.fillStyle = '#808080'; // Copper nozzle - somewhat rough
+  roughCtx.fillRect(0, H * 0.41, W, H * 0.54);
+
+  roughCtx.fillStyle = '#b0b0b0'; // Soot - very rough
+  roughCtx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  roughCtx.fillStyle = '#404040'; // Inconel rim - smoother
+  roughCtx.fillRect(0, H * 0.95, W, H * 0.05);
+
+  // === METALNESS MAP ===
+  metalCtx.fillStyle = '#e0e0e0'; // All metallic
+  metalCtx.fillRect(0, 0, W, H);
+
+  // Slightly less metallic where soot covers
+  metalCtx.fillStyle = '#808080';
+  metalCtx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  // Flange shadow
+  aoCtx.strokeStyle = '#606060';
+  aoCtx.lineWidth = 12;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.35);
+  aoCtx.lineTo(W, H * 0.35);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.41);
+  aoCtx.lineTo(W, H * 0.41);
+  aoCtx.stroke();
+
+  // Cooling channel shadows
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 4;
+  for (let x = 8; x < W; x += 16) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, H * 0.41);
+    aoCtx.lineTo(x, H * 0.95);
+    aoCtx.stroke();
+  }
+
+  // Nozzle exit rim
+  aoCtx.strokeStyle = '#707070';
+  aoCtx.lineWidth = 10;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.95);
+  aoCtx.lineTo(W, H * 0.95);
+  aoCtx.stroke();
+
+  addFilmGrain(colorCtx, W, H, 0.01);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
 
 export function generateParachuteTexture(): TextureSet {
   const W = 1024, H = 1024;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
-  const [heightCanvas, heightCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
 
-  // white/off-white alternating panels
-  for (let py = 0; py < H; py++) {
-    const band = Math.floor(py / 32) % 2 === 0;
-    const v = band ? 240 : 225;
-    colorCtx.fillStyle = `rgb(${v}, ${v + 2}, ${v + 5})`;
-    colorCtx.fillRect(0, py, W, 1);
+  const rng = seededRandomFast(98765);
+
+  // === COLOR MAP ===
+  // White nylon fabric with slight warmth
+  colorCtx.fillStyle = '#fafaf5';
+  colorCtx.fillRect(0, 0, W, H);
+
+  // Subtle fabric texture variation
+  for (let i = 0; i < 5000; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 1 + rng() * 2;
+    const brightness = 245 + rng() * 10;
+    colorCtx.fillStyle = `rgb(${brightness},${brightness},${brightness - 2})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r, 0, Math.PI * 2);
+    colorCtx.fill();
   }
 
-  // stitching lines
-  colorCtx.strokeStyle = '#c0c0c8';
+  // Radial gore seams (parachute panels)
+  colorCtx.strokeStyle = 'rgba(180,180,190,0.4)';
   colorCtx.lineWidth = 2;
-  for (let y = 0; y < H; y += 32) {
-    colorCtx.setLineDash([4, 8]);
+  const goreCount = 12;
+  for (let i = 0; i < goreCount; i++) {
+    const angle = (i / goreCount) * Math.PI * 2;
+    colorCtx.beginPath();
+    colorCtx.moveTo(W / 2, H / 2);
+    colorCtx.lineTo(
+      W / 2 + Math.cos(angle) * W * 0.7,
+      H / 2 + Math.sin(angle) * H * 0.7
+    );
+    colorCtx.stroke();
+  }
+
+  // Horizontal ring seams (reefing lines)
+  colorCtx.strokeStyle = 'rgba(160,160,170,0.3)';
+  colorCtx.lineWidth = 1;
+  colorCtx.setLineDash([8, 16]);
+  for (let r = 50; r < Math.min(W, H) * 0.45; r += 60) {
+    colorCtx.beginPath();
+    colorCtx.arc(W / 2, H / 2, r, 0, Math.PI * 2);
+    colorCtx.stroke();
+  }
+  colorCtx.setLineDash([]);
+
+  // Center vent (if applicable)
+  colorCtx.fillStyle = '#e8e8e0';
+  colorCtx.beginPath();
+  colorCtx.arc(W / 2, H / 2, 15, 0, Math.PI * 2);
+  colorCtx.fill();
+  colorCtx.strokeStyle = '#c0c0b8';
+  colorCtx.lineWidth = 2;
+  colorCtx.stroke();
+
+  // Reinforcement tapes (cross pattern)
+  colorCtx.strokeStyle = 'rgba(200,200,210,0.5)';
+  colorCtx.lineWidth = 4;
+  colorCtx.beginPath();
+  colorCtx.moveTo(W / 2 - 30, 0);
+  colorCtx.lineTo(W / 2 - 30, H);
+  colorCtx.stroke();
+  colorCtx.beginPath();
+  colorCtx.moveTo(W / 2 + 30, 0);
+  colorCtx.lineTo(W / 2 + 30, H);
+  colorCtx.stroke();
+  colorCtx.beginPath();
+  colorCtx.moveTo(0, H / 2 - 30);
+  colorCtx.lineTo(W, H / 2 - 30);
+  colorCtx.stroke();
+  colorCtx.beginPath();
+  colorCtx.moveTo(0, H / 2 + 30);
+  colorCtx.lineTo(W, H / 2 + 30);
+  colorCtx.stroke();
+
+  // Suspension line attachment points (around edge)
+  colorCtx.fillStyle = '#d0d0c8';
+  for (let i = 0; i < 24; i++) {
+    const angle = (i / 24) * Math.PI * 2;
+    const x = W / 2 + Math.cos(angle) * W * 0.45;
+    const y = H / 2 + Math.sin(angle) * H * 0.45;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, 8, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Fabric weave pattern
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 1;
+  for (let i = 0; i < W; i += 6) {
+    normalCtx.beginPath(); normalCtx.moveTo(i, 0); normalCtx.lineTo(i, H); normalCtx.stroke();
+    normalCtx.beginPath(); normalCtx.moveTo(0, i); normalCtx.lineTo(W, i); normalCtx.stroke();
+  }
+
+  // Gore seams
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 3;
+  for (let i = 0; i < goreCount; i++) {
+    const angle = (i / goreCount) * Math.PI * 2;
+    normalCtx.beginPath();
+    normalCtx.moveTo(W / 2, H / 2);
+    normalCtx.lineTo(
+      W / 2 + Math.cos(angle) * W * 0.7,
+      H / 2 + Math.sin(angle) * H * 0.7
+    );
+    normalCtx.stroke();
+  }
+
+  // Ring seams
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 2;
+  normalCtx.setLineDash([10, 20]);
+  for (let r = 50; r < Math.min(W, H) * 0.45; r += 60) {
+    normalCtx.beginPath();
+    normalCtx.arc(W / 2, H / 2, r, 0, Math.PI * 2);
+    normalCtx.stroke();
+  }
+  normalCtx.setLineDash([]);
+
+  // Reinforcement tapes
+  normalCtx.strokeStyle = '#c0c0c0';
+  normalCtx.lineWidth = 6;
+  normalCtx.beginPath();
+  normalCtx.moveTo(W / 2 - 30, 0);
+  normalCtx.lineTo(W / 2 - 30, H);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(W / 2 + 30, 0);
+  normalCtx.lineTo(W / 2 + 30, H);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H / 2 - 30);
+  normalCtx.lineTo(W, H / 2 - 30);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H / 2 + 30);
+  normalCtx.lineTo(W, H / 2 + 30);
+  normalCtx.stroke();
+
+  // === ROUGHNESS MAP ===
+  // Fabric is quite rough
+  roughCtx.fillStyle = '#d0d0d0';
+  roughCtx.fillRect(0, 0, W, H);
+
+  // Seams slightly smoother (thread)
+  roughCtx.strokeStyle = '#b0b0b0';
+  roughCtx.lineWidth = 4;
+  for (let i = 0; i < goreCount; i++) {
+    const angle = (i / goreCount) * Math.PI * 2;
+    roughCtx.beginPath();
+    roughCtx.moveTo(W / 2, H / 2);
+    roughCtx.lineTo(
+      W / 2 + Math.cos(angle) * W * 0.7,
+      H / 2 + Math.sin(angle) * H * 0.7
+    );
+    roughCtx.stroke();
+  }
+
+  // Center vent smooth
+  roughCtx.fillStyle = '#808080';
+  roughCtx.beginPath();
+  roughCtx.arc(W / 2, H / 2, 20, 0, Math.PI * 2);
+  roughCtx.fill();
+
+  // Reinforcement tapes
+  roughCtx.fillStyle = '#a0a0a0';
+  roughCtx.fillRect(W / 2 - 32, 0, 4, H);
+  roughCtx.fillRect(W / 2 + 28, 0, 4, H);
+  roughCtx.fillRect(0, H / 2 - 32, W, 4);
+  roughCtx.fillRect(0, H / 2 + 28, W, 4);
+
+  // === METALNESS MAP ===
+  // Fabric is non-metallic
+  metalCtx.fillStyle = '#000000';
+  metalCtx.fillRect(0, 0, W, H);
+
+  // Metal D-rings at attachment points
+  metalCtx.fillStyle = '#e0e0e0';
+  for (let i = 0; i < 24; i++) {
+    const angle = (i / 24) * Math.PI * 2;
+    const x = W / 2 + Math.cos(angle) * W * 0.45;
+    const y = H / 2 + Math.sin(angle) * H * 0.45;
+    metalCtx.beginPath();
+    metalCtx.arc(x, y, 10, 0, Math.PI * 2);
+    metalCtx.fill();
+  }
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  // Seam shadows
+  aoCtx.strokeStyle = '#a0a0a0';
+  aoCtx.lineWidth = 8;
+  for (let i = 0; i < goreCount; i++) {
+    const angle = (i / goreCount) * Math.PI * 2;
+    aoCtx.beginPath();
+    aoCtx.moveTo(W / 2, H / 2);
+    aoCtx.lineTo(
+      W / 2 + Math.cos(angle) * W * 0.7,
+      H / 2 + Math.sin(angle) * H * 0.7
+    );
+    aoCtx.stroke();
+  }
+
+  // Ring shadows
+  aoCtx.strokeStyle = '#b0b0b0';
+  aoCtx.lineWidth = 4;
+  aoCtx.setLineDash([10, 20]);
+  for (let r = 50; r < Math.min(W, H) * 0.45; r += 60) {
+    aoCtx.beginPath();
+    aoCtx.arc(W / 2, H / 2, r, 0, Math.PI * 2);
+    aoCtx.stroke();
+  }
+  aoCtx.setLineDash([])
+
+  // Tape shadows
+  aoCtx.strokeStyle = '#909090';
+  aoCtx.lineWidth = 10;
+  aoCtx.beginPath();
+  aoCtx.moveTo(W / 2 - 30, 0);
+  aoCtx.lineTo(W / 2 - 30, H);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(W / 2 + 30, 0);
+  aoCtx.lineTo(W / 2 + 30, H);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H / 2 - 30);
+  aoCtx.lineTo(W, H / 2 - 30);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H / 2 + 30);
+  aoCtx.lineTo(W, H / 2 + 30);
+  aoCtx.stroke();
+
+  addFilmGrain(colorCtx, W, H, 0.025);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+export function generateLegsTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
+
+  const rng = seededRandomFast(11111);
+
+  // === COLOR MAP ===
+  // Dark olive/military green or grey landing legs
+  colorCtx.fillStyle = '#3a3d30';
+  colorCtx.fillRect(0, 0, W, H);
+
+  // Brushed metal texture on struts
+  for (let i = 0; i < 100; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const len = 10 + rng() * 50;
+    colorCtx.strokeStyle = `rgba(255,255,255,${0.02 + rng() * 0.03})`;
+    colorCtx.lineWidth = 0.5;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x, y + len);
+    colorCtx.stroke();
+  }
+
+  // Hydraulic cylinder bands (chrome/silver)
+  colorCtx.fillStyle = '#8a8a8e';
+  for (let y = 50; y < H; y += 200) {
+    colorCtx.fillRect(0, y, W, 15);
+    colorCtx.fillStyle = '#6a6a6e';
+    colorCtx.fillRect(0, y + 15, W, 2);
+    colorCtx.fillStyle = '#8a8a8e';
+  }
+
+  // Foot pads - darker with texture
+  colorCtx.fillStyle = '#2a2d22';
+  colorCtx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  // Foot pad texture (honeycomb or grid)
+  colorCtx.strokeStyle = '#4a4d42';
+  colorCtx.lineWidth = 1;
+  for (let x = 0; x < W; x += 32) {
+    colorCtx.beginPath(); colorCtx.moveTo(x, H * 0.85); colorCtx.lineTo(x, H); colorCtx.stroke();
+  }
+  for (let y = H * 0.85; y < H; y += 32) {
     colorCtx.beginPath(); colorCtx.moveTo(0, y); colorCtx.lineTo(W, y); colorCtx.stroke();
-    colorCtx.setLineDash([]);
   }
+
+  // Warning stripes on foot (yellow/black)
+  colorCtx.fillStyle = '#222';
+  for (let x = 0; x < W; x += 40) {
+    colorCtx.fillRect(x, H * 0.85, 20, H * 0.15);
+  }
+  colorCtx.fillStyle = '#ffcc00';
+  for (let x = 20; x < W; x += 40) {
+    colorCtx.fillRect(x, H * 0.85, 20, H * 0.15);
+  }
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Strut ridges
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 2;
+  for (let x = 0; x < W; x += 64) {
+    normalCtx.beginPath(); normalCtx.moveTo(x, 0); normalCtx.lineTo(x, H * 0.85); normalCtx.stroke();
+  }
+
+  // Hydraulic bands
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 6;
+  for (let y = 50; y < H; y += 200) {
+    normalCtx.beginPath(); normalCtx.moveTo(0, y); normalCtx.lineTo(W, y); normalCtx.stroke();
+  }
+
+  // Foot pad grid
+  normalCtx.strokeStyle = '#606060';
+  normalCtx.lineWidth = 3;
   for (let x = 0; x < W; x += 32) {
-    colorCtx.setLineDash([4, 8]);
-    colorCtx.beginPath(); colorCtx.moveTo(x, 0); colorCtx.lineTo(x, H); colorCtx.stroke();
-    colorCtx.setLineDash([]);
+    normalCtx.beginPath(); normalCtx.moveTo(x, H * 0.85); normalCtx.lineTo(x, H); normalCtx.stroke();
+  }
+  for (let y = H * 0.85; y < H; y += 32) {
+    normalCtx.beginPath(); normalCtx.moveTo(0, y); normalCtx.lineTo(W, y); normalCtx.stroke();
   }
 
-  // center cross reinforcement
-  colorCtx.strokeStyle = '#a0a0aa';
-  colorCtx.lineWidth = 3;
-  colorCtx.beginPath(); colorCtx.moveTo(W / 2 - 20, 0); colorCtx.lineTo(W / 2 - 20, H); colorCtx.stroke();
-  colorCtx.beginPath(); colorCtx.moveTo(W / 2 + 20, 0); colorCtx.lineTo(W / 2 + 20, H); colorCtx.stroke();
+  // === ROUGHNESS MAP ===
+  roughCtx.fillStyle = '#707070'; // Painted metal
+  roughCtx.fillRect(0, 0, W, H * 0.85);
 
-  // height map
-  heightCtx.fillStyle = '#808080';
-  heightCtx.fillRect(0, 0, W, H);
-
-  // fabric weave
-  heightCtx.strokeStyle = '#909090';
-  heightCtx.lineWidth = 1;
-  for (let i = 0; i < W; i += 8) {
-    heightCtx.beginPath(); heightCtx.moveTo(i, 0); heightCtx.lineTo(i, H); heightCtx.stroke();
-    heightCtx.beginPath(); heightCtx.moveTo(0, i); heightCtx.lineTo(W, i); heightCtx.stroke();
+  roughCtx.fillStyle = '#909090'; // Hydraulic bands - smoother
+  for (let y = 50; y < H; y += 200) {
+    roughCtx.fillRect(0, y, W, 17);
   }
 
-  // seam stitching for normal map
-  heightCtx.strokeStyle = '#c0c0c0';
-  heightCtx.lineWidth = 3;
-  heightCtx.setLineDash([6, 8]);
+  roughCtx.fillStyle = '#b0b0b0'; // Foot pads - rougher
+  roughCtx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  // === METALNESS MAP ===
+  metalCtx.fillStyle = '#303030'; // Painted = low metal
+  metalCtx.fillRect(0, 0, W, H);
+
+  // Hydraulic chrome parts
+  metalCtx.fillStyle = '#e0e0e0';
+  for (let y = 50; y < H; y += 200) {
+    metalCtx.fillRect(0, y, W, 17);
+  }
+
+  // Foot pad metal brackets
+  metalCtx.fillStyle = '#a0a0a0';
+  metalCtx.fillRect(0, H * 0.85, W, H * 0.15);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 8;
+  for (let x = 0; x < W; x += 64) {
+    aoCtx.beginPath(); aoCtx.moveTo(x, 0); aoCtx.lineTo(x, H * 0.85); aoCtx.stroke();
+  }
+
+  aoCtx.strokeStyle = '#909090';
+  aoCtx.lineWidth = 10;
+  for (let y = 50; y < H; y += 200) {
+    aoCtx.beginPath(); aoCtx.moveTo(0, y); aoCtx.lineTo(W, y); aoCtx.stroke();
+  }
+
+  addFilmGrain(colorCtx, W, H, 0.02);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+export function generateDecouplerTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
+
+  const rng = seededRandomFast(22222);
+
+  // === COLOR MAP ===
+  // Dark gunmetal grey
+  colorCtx.fillStyle = '#4a4a4e';
+  colorCtx.fillRect(0, 0, W, H);
+
+  // Subtle brushed texture
+  for (let i = 0; i < 150; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const len = 5 + rng() * 30;
+    colorCtx.strokeStyle = `rgba(255,255,255,${0.02 + rng() * 0.03})`;
+    colorCtx.lineWidth = 0.5;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x, y + len);
+    colorCtx.stroke();
+  }
+
+  // Separation ring (brighter metal)
+  colorCtx.fillStyle = '#7a7a7e';
+  colorCtx.fillRect(0, H * 0.35, W, H * 0.30);
+
+  // Bolt pattern on ring
+  colorCtx.fillStyle = '#3a3a3e';
+  for (let x = 24; x < W; x += 48) {
+    colorCtx.beginPath();
+    colorCtx.arc(x, H * 0.5, 6, 0, Math.PI * 2);
+    colorCtx.fill();
+    colorCtx.strokeStyle = '#6a6a6e';
+    colorCtx.lineWidth = 1;
+    colorCtx.stroke();
+  }
+
+  // Pyro charge indicators (small red/yellow dots)
+  colorCtx.fillStyle = '#cc3300';
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x = W * 0.5 + Math.cos(angle) * W * 0.35;
+    const y = H * 0.5 + Math.sin(angle) * H * 0.35;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, 8, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+
+  // Top and bottom flanges
+  colorCtx.fillStyle = '#5a5a5e';
+  colorCtx.fillRect(0, 0, W, H * 0.08);
+  colorCtx.fillRect(0, H * 0.92, W, H * 0.08);
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Separation ring ridge
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 10;
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.35);
+  normalCtx.lineTo(W, H * 0.35);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.65);
+  normalCtx.lineTo(W, H * 0.65);
+  normalCtx.stroke();
+
+  // Bolts
+  normalCtx.fillStyle = '#c0c0c0';
+  for (let x = 24; x < W; x += 48) {
+    normalCtx.beginPath();
+    normalCtx.arc(x, H * 0.5, 6, 0, Math.PI * 2);
+    normalCtx.fill();
+  }
+
+  // Flanges
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 8;
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.08);
+  normalCtx.lineTo(W, H * 0.08);
+  normalCtx.stroke();
+  normalCtx.beginPath();
+  normalCtx.moveTo(0, H * 0.92);
+  normalCtx.lineTo(W, H * 0.92);
+  normalCtx.stroke();
+
+  // === ROUGHNESS MAP ===
+  roughCtx.fillStyle = '#606060'; // Machined metal
+  roughCtx.fillRect(0, 0, W, H);
+
+  // Separation ring - smoother (precision ground)
+  roughCtx.fillStyle = '#404040';
+  roughCtx.fillRect(0, H * 0.35, W, H * 0.30);
+
+  // Flanges
+  roughCtx.fillStyle = '#505050';
+  roughCtx.fillRect(0, 0, W, H * 0.08);
+  roughCtx.fillRect(0, H * 0.92, W, H * 0.08);
+
+  // === METALNESS MAP ===
+  metalCtx.fillStyle = '#d0d0d0'; // All metal
+  metalCtx.fillRect(0, 0, W, H);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  aoCtx.strokeStyle = '#707070';
+  aoCtx.lineWidth = 12;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.35);
+  aoCtx.lineTo(W, H * 0.35);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.65);
+  aoCtx.lineTo(W, H * 0.65);
+  aoCtx.stroke();
+
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 10;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.08);
+  aoCtx.lineTo(W, H * 0.08);
+  aoCtx.stroke();
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.92);
+  aoCtx.lineTo(W, H * 0.92);
+  aoCtx.stroke();
+
+  addFilmGrain(colorCtx, W, H, 0.015);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+export function generateHeatshieldTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
+
+  const rng = seededRandomFast(33333);
+
+  // === COLOR MAP ===
+  // Dark ablative material (PICA/XIRCA/Shuttle tile style)
+  colorCtx.fillStyle = '#1a1a1c';
+  colorCtx.fillRect(0, 0, W, H);
+
+  // Ablative texture - charred carbon phenolics
+  for (let i = 0; i < 3000; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 1 + rng() * 4;
+    const brightness = 20 + rng() * 50;
+    const hueShift = rng() * 20 - 10;
+    colorCtx.fillStyle = `rgb(${brightness + hueShift},${brightness},${brightness - hueShift})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+
+  // Charring streaks (reentry plasma flow)
+  colorCtx.strokeStyle = 'rgba(40,20,10,0.3)';
+  colorCtx.lineWidth = 1 + rng() * 2;
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H * 0.3;
+    const len = 50 + rng() * 200;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x + (rng() - 0.5) * 40, y + len);
+    colorCtx.stroke();
+  }
+
+  // Tile gap pattern (if tiled heatshield like Shuttle)
+  colorCtx.strokeStyle = '#0a0a0c';
+  colorCtx.lineWidth = 2;
+  for (let x = 0; x < W; x += 64) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, 0);
+    colorCtx.lineTo(x, H);
+    colorCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 64) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+  }
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Ablative surface roughness
+  for (let i = 0; i < 500; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 2 + rng() * 5;
+    normalCtx.fillStyle = `rgb(${128 + rng() * 30},${128 + rng() * 30},${128 + rng() * 30})`;
+    normalCtx.beginPath();
+    normalCtx.arc(x, y, r, 0, Math.PI * 2);
+    normalCtx.fill();
+  }
+
+  // Tile gaps
+  normalCtx.strokeStyle = '#404040';
+  normalCtx.lineWidth = 6;
+  for (let x = 0; x < W; x += 64) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, H);
+    normalCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 64) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
+  }
+
+  // === ROUGHNESS MAP ===
+  // Ablative = extremely rough
+  roughCtx.fillStyle = '#f0f0f0';
+  roughCtx.fillRect(0, 0, W, H);
+
+  // Tile gaps even rougher
+  roughCtx.fillStyle = '#ffffff';
+  roughCtx.strokeStyle = '#ffffff';
+  roughCtx.lineWidth = 8;
+  for (let x = 0; x < W; x += 64) {
+    roughCtx.beginPath();
+    roughCtx.moveTo(x, 0);
+    roughCtx.lineTo(x, H);
+    roughCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 64) {
+    roughCtx.beginPath();
+    roughCtx.moveTo(0, y);
+    roughCtx.lineTo(W, y);
+    roughCtx.stroke();
+  }
+
+  // === METALNESS MAP ===
+  // Ablative is non-metallic
+  metalCtx.fillStyle = '#000000';
+  metalCtx.fillRect(0, 0, W, H);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  aoCtx.strokeStyle = '#303030';
+  aoCtx.lineWidth = 10;
+  for (let x = 0; x < W; x += 64) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, 0);
+    aoCtx.lineTo(x, H);
+    aoCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 64) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(0, y);
+    aoCtx.lineTo(W, y);
+    aoCtx.stroke();
+  }
+
+  addFilmGrain(colorCtx, W, H, 0.03);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+export function generateGoldTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
+
+  const rng = seededRandomFast(44444);
+
+  // === COLOR MAP ===
+  // Gold/mylar foil or gold-anodized aluminum
+  // Base gold gradient
+  const goldGrad = colorCtx.createLinearGradient(0, 0, 0, H);
+  if (goldGrad) {
+    goldGrad.addColorStop(0, '#d4a843');
+    goldGrad.addColorStop(0.3, '#c8963a');
+    goldGrad.addColorStop(0.5, '#b8862a');
+    goldGrad.addColorStop(0.7, '#c8963a');
+    goldGrad.addColorStop(1, '#d4a843');
+    colorCtx.fillStyle = goldGrad;
+    colorCtx.fillRect(0, 0, W, H);
+  }
+
+  // Mylar crinkle texture (if foil)
+  for (let i = 0; i < 200; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const w = 20 + rng() * 80;
+    const h = 10 + rng() * 40;
+    colorCtx.fillStyle = `rgba(255,255,255,${0.03 + rng() * 0.05})`;
+    colorCtx.fillRect(x, y, w, h);
+    colorCtx.fillStyle = `rgba(0,0,0,${0.02 + rng() * 0.03})`;
+    colorCtx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.5, h * 0.5);
+  }
+
+  // Anodized banding (if solid gold anodized)
+  colorCtx.strokeStyle = 'rgba(180,140,40,0.3)';
+  colorCtx.lineWidth = 1;
+  for (let y = 0; y < H; y += 40) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+  }
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Crinkle ridges
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 1;
+  for (let i = 0; i < 300; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 10 + rng() * 50;
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, y);
+    normalCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    normalCtx.stroke();
+  }
+
+  // Anodized bands
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 2;
+  for (let y = 0; y < H; y += 40) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
+  }
+
+  // === ROUGHNESS MAP ===
+  // Gold foil = somewhat rough, anodized = smoother
+  roughCtx.fillStyle = '#707070';
+  roughCtx.fillRect(0, 0, W, H);
+
+  // Crinkles slightly rougher
+  roughCtx.fillStyle = '#909090';
+  for (let i = 0; i < 200; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const w = 20 + rng() * 80;
+    const h = 10 + rng() * 40;
+    roughCtx.fillRect(x, y, w, h);
+  }
+
+  // === METALNESS MAP ===
+  // Gold is highly metallic
+  metalCtx.fillStyle = '#f0f0f0';
+  metalCtx.fillRect(0, 0, W, H);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  // Crinkle shadows
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 3;
+  for (let i = 0; i < 300; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 10 + rng() * 50;
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, y);
+    aoCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    aoCtx.stroke();
+  }
+
+  addFilmGrain(colorCtx, W, H, 0.01);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+export function generateFabricTexture(): TextureSet {
+  const W = 1024, H = 1024;
+  const [colorCanvas, colorCtx] = createCanvas(W, H);
+  const [normalCanvas, normalCtx] = createCanvas(W, H);
+  const [roughCanvas, roughCtx] = createCanvas(W, H);
+  const [metalCanvas, metalCtx] = createCanvas(W, H);
+  const [aoCanvas, aoCtx] = createCanvas(W, H);
+
+  const rng = seededRandomFast(55555);
+
+  // === COLOR MAP ===
+  // White/off-white nylon/polyester fabric
+  colorCtx.fillStyle = '#f5f5f0';
+  colorCtx.fillRect(0, 0, W, H);
+
+  // Warp/weft threads
+  colorCtx.strokeStyle = 'rgba(200,200,190,0.15)';
+  colorCtx.lineWidth = 1;
+  for (let x = 0; x < W; x += 4) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, 0);
+    colorCtx.lineTo(x, H);
+    colorCtx.stroke();
+  }
+  colorCtx.strokeStyle = 'rgba(200,200,190,0.1)';
+  for (let y = 0; y < H; y += 4) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+  }
+
+  // Panel seams (every 8th thread thicker)
+  colorCtx.strokeStyle = 'rgba(160,160,150,0.3)';
+  colorCtx.lineWidth = 2;
+  for (let x = 0; x < W; x += 32) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, 0);
+    colorCtx.lineTo(x, H);
+    colorCtx.stroke();
+  }
   for (let y = 0; y < H; y += 32) {
-    heightCtx.beginPath(); heightCtx.moveTo(0, y); heightCtx.lineTo(W, y); heightCtx.stroke();
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
   }
+
+  // Stitching lines (dashed)
+  colorCtx.strokeStyle = 'rgba(120,120,110,0.4)';
+  colorCtx.lineWidth = 1;
+  colorCtx.setLineDash([8, 16]);
+  for (let x = 16; x < W; x += 64) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, 0);
+    colorCtx.lineTo(x, H);
+    colorCtx.stroke();
+  }
+  for (let y = 16; y < H; y += 64) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+  }
+  colorCtx.setLineDash([]);
+
+  // === NORMAL MAP ===
+  normalCtx.fillStyle = '#808080';
+  normalCtx.fillRect(0, 0, W, H);
+
+  // Weave pattern
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 1;
+  for (let x = 0; x < W; x += 8) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, H);
+    normalCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 8) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
+  }
+
+  // Panel seams
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 4;
   for (let x = 0; x < W; x += 32) {
-    heightCtx.beginPath(); heightCtx.moveTo(x, 0); heightCtx.lineTo(x, H); heightCtx.stroke();
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, H);
+    normalCtx.stroke();
   }
-  heightCtx.setLineDash([]);
+  for (let y = 0; y < H; y += 32) {
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(W, y);
+    normalCtx.stroke();
+  }
 
-  // center cross for normal map
-  heightCtx.fillStyle = '#b0b0b0';
-  heightCtx.fillRect(W / 2 - 22, 0, 4, H);
-  heightCtx.fillRect(W / 2 + 18, 0, 4, H);
+  // === ROUGHNESS MAP ===
+  roughCtx.fillStyle = '#c0c0c0'; // Fabric is rough
+  roughCtx.fillRect(0, 0, W, H);
 
-  return createTextureSet(colorCanvas, heightCanvas);
+  // Seams slightly different
+  roughCtx.fillStyle = '#e0e0e0';
+  roughCtx.strokeStyle = '#e0e0e0';
+  roughCtx.lineWidth = 6;
+  for (let x = 0; x < W; x += 32) {
+    roughCtx.beginPath();
+    roughCtx.moveTo(x, 0);
+    roughCtx.lineTo(x, H);
+    roughCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 32) {
+    roughCtx.beginPath();
+    roughCtx.moveTo(0, y);
+    roughCtx.lineTo(W, y);
+    roughCtx.stroke();
+  }
+
+  // === METALNESS MAP ===
+  // Fabric is non-metallic
+  metalCtx.fillStyle = '#000000';
+  metalCtx.fillRect(0, 0, W, H);
+
+  // === AO MAP ===
+  aoCtx.fillStyle = '#ffffff';
+  aoCtx.fillRect(0, 0, W, H);
+
+  aoCtx.strokeStyle = '#a0a0a0';
+  aoCtx.lineWidth = 6;
+  for (let x = 0; x < W; x += 32) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, 0);
+    aoCtx.lineTo(x, H);
+    aoCtx.stroke();
+  }
+  for (let y = 0; y < H; y += 32) {
+    aoCtx.beginPath();
+    aoCtx.moveTo(0, y);
+    aoCtx.lineTo(W, y);
+    aoCtx.stroke();
+  }
+
+  addFilmGrain(colorCtx, W, H, 0.02);
+
+  return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }

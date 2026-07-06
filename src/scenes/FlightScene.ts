@@ -121,15 +121,19 @@ export class FlightScene {
     (window as any).__soiMeshes = soiMeshes;
 
     this.engineFlame = new EngineFlame();
-    this.engineFlame.getMesh().position.set(0, -0.001, 0);
+    // Position flame at the actual engine nozzle (bottom center of rocket mesh)
+    this.positionFlameAtNozzle();
     this.rocketGroup.add(this.engineFlame.getMesh());
 
     this.chase = new ChaseCamera(sceneMgr.camera);
     this.chase.enableOrbit(this.renderer.domElement);
+
+    // Position camera perpendicular to rocket (side view)
     const vx = this.state.position[0] * VISUAL_SCALE;
     const vy = this.state.position[1] * VISUAL_SCALE;
     const vz = this.state.position[2] * VISUAL_SCALE;
-    sceneMgr.camera.position.set(vx, vy + 0.02, vz + 0.05);
+    const camDist = 0.15;
+    sceneMgr.camera.position.set(vx + camDist, vy, vz);
     sceneMgr.camera.lookAt(vx, vy, vz);
     this.controls = new Controls(this.state);
 
@@ -139,7 +143,6 @@ export class FlightScene {
     this.hud.onAction = (action) => {
       if (action === 'stage') this.performStage();
       else if (action === 'parachute') this.toggleParachute();
-      else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') {
         mapActive = !mapActive;
         mapEl.style.display = mapActive ? 'block' : 'none';
@@ -372,48 +375,24 @@ export class FlightScene {
 
     if (this.controls.getStageRequested()) this.performStage();
 
-    // SAS toggle
-    if (this.controls.consumeSasToggle()) this.cycleSasMode();
-    this.hud.setSasMode(this.controls.sasMode);
-
     // Current forward direction (rocket local +Y in world space)
     const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
 
-    // Apply manual rotation or SAS
+    // Manual rotation - yaw first (global), then pitch (local)
     const rotSpeed = 2.5;
     const pitchInput = this.controls.getPitch();
     const yawInput = this.controls.getYaw();
 
-    if (this.controls.sasMode === 'off' || pitchInput !== 0 || yawInput !== 0) {
-      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitchInput * rotSpeed * baseDt);
-      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yawInput * rotSpeed * baseDt);
-      this.rocketQuat.multiply(qPitch).multiply(qYaw);
-      this.rocketQuat.normalize();
-    } else if (this.controls.sasMode === 'prograde' || this.controls.sasMode === 'retrograde') {
-      const velMag = Math.sqrt(
-        this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-      );
-      let tDir: [number, number, number] = [0, 1, 0];
-      if (velMag > 0.5) {
-        tDir = this.controls.sasMode === 'prograde'
-          ? [this.state.velocity[0] / velMag, this.state.velocity[1] / velMag, this.state.velocity[2] / velMag]
-          : [-this.state.velocity[0] / velMag, -this.state.velocity[1] / velMag, -this.state.velocity[2] / velMag];
-      } else if (this.controls.sasMode === 'retrograde') {
-        tDir = [0, -1, 0];
-      }
-
-      const upRef = new THREE.Vector3(0, 1, 0);
-      const tVec = new THREE.Vector3(tDir[0], tDir[1], tDir[2]);
-      if (tVec.dot(upRef) < -0.999) tVec.set(0.001, -1, 0.001).normalize();
-      const qTarget = new THREE.Quaternion().setFromUnitVectors(upRef, tVec);
-      const slerpT = Math.min(1, 8 * baseDt);
-      this.rocketQuat.slerp(qTarget, slerpT);
-      this.rocketQuat.normalize();
-    }
+    // Yaw around world Z (global), pitch around local X
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yawInput * rotSpeed * baseDt);
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitchInput * rotSpeed * baseDt);
+    
+    // Apply yaw first (global), then pitch (local)
+    this.rocketQuat.multiply(qYaw).multiply(qPitch);
+    this.rocketQuat.normalize();
 
     // Apply rotation to mesh
-    const eulerOut = new THREE.Euler().setFromQuaternion(this.rocketQuat, 'YXZ');
-    this.rocketGroup.rotation.set(eulerOut.x, eulerOut.y, eulerOut.z);
+    this.rocketGroup.quaternion.copy(this.rocketQuat);
 
     // Thrust direction from quaternion
     const fwd = getFwd();
@@ -470,21 +449,6 @@ export class FlightScene {
       nearestDist = r;
       nearestBody = refBody;
       this.sanitize(this.state.velocity);
-
-      // Auto-throttle for retrograde landing
-      if (this.controls.sasMode === 'retrograde') {
-        const velMag = Math.sqrt(
-          this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-        );
-        if (nearestBody && (nearestBody as any).radius) {
-          const alt = nearestDist - (nearestBody as any).radius;
-          if (alt < 5000 && velMag > 5) {
-            this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.3);
-          } else if (alt < 500 && velMag < 3) {
-            this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
-          }
-        }
-      }
 
       // Aerodynamic drag
       const speed = Math.sqrt(
@@ -620,14 +584,6 @@ export class FlightScene {
     );
   }
 
-  private cycleSasMode(): void {
-    const modes: ('off' | 'prograde' | 'retrograde')[] = ['off', 'prograde', 'retrograde'];
-    const idx = modes.indexOf(this.controls.sasMode);
-    this.controls.sasMode = modes[(idx + 1) % modes.length]!;
-    this.hud.setSasMode(this.controls.sasMode);
-    toast.show(`SAS: ${this.controls.sasMode === 'off' ? 'OFF' : this.controls.sasMode === 'prograde' ? 'PROGRADE' : 'RETROGRADE'}`);
-  }
-
   private updateRocketMesh(): void {
     const earth = this.system.bodyByName('earth') as any;
     if (earth) this.rocketGroup.position.set(0, (earth.radius + 100) * VISUAL_SCALE, 0);
@@ -712,6 +668,20 @@ export class FlightScene {
       return false;
     };
     return walk(this.rocket.assembly.roots);
+  }
+
+  private positionFlameAtNozzle(): void {
+    // Compute the bottom-most point of the rocket mesh in local space
+    let minY = Infinity;
+    this.rocketGroup.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const box = new THREE.Box3().setFromObject(obj);
+        if (box.min.y < minY) minY = box.min.y;
+      }
+    });
+    // Position flame at the bottom center, slightly below the mesh
+    const flameY = minY === Infinity ? -0.35 : minY - 0.02;
+    this.engineFlame.getMesh().position.set(0, flameY, 0);
   }
 
   dispose(): void {

@@ -1,6 +1,18 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Part } from './Part';
 import { PART_SCALE } from '../config/constants';
+import {
+  generateTankTexture,
+  generateCapsuleTexture,
+  generateEngineTexture,
+  generateLegsTexture,
+  generateDecouplerTexture,
+  generateHeatshieldTexture,
+  generateGoldTexture,
+  generateFabricTexture,
+  type TextureSet,
+} from '../effects/ProceduralTextures';
 
 const SIZE_DIMS = {
   S: { radius: 0.5 * PART_SCALE, height: 0.7 * PART_SCALE },
@@ -12,19 +24,164 @@ const SIZE_DIMS = {
 const PI = Math.PI;
 const SEG = 32;
 
-const CL_BODY = 0xE8E8E8;
-const CL_BODY_DARK = 0xC0C4C8;
-const CL_TANK = 0xD0D4D8;
-const CL_ENGINE = 0x334455;
-const CL_ENGINE_DARK = 0x1A222A;
-const CL_GOLD = 0xF2D496;
-const CL_BLUE = 0x0077D1;
-const CL_RED = 0xDD4444;
-const CL_WINDOW = 0x1A5988;
-const CL_GLOW = 0x3399FF;
+// GLTF loader
+export const gltfLoader = new GLTFLoader();
+export const gltfCache = new Map<string, THREE.Group>();
 
-function mat(color: number, roughness = 0.5, metalness = 0.3, side?: THREE.Side): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness, ...(side ? { side } : {}) });
+export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
+  if (gltfCache.has(url)) {
+    return gltfCache.get(url)!.clone();
+  }
+  const gltf = await gltfLoader.loadAsync(url);
+  const group = gltf.scene;
+  // Do NOT apply scale here - it will be applied in buildPartMesh
+  // group.scale.setScalar(scale);
+  
+  // Debug: log model structure
+  console.log('=== GLTF Model Loaded:', url, '===');
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      console.log('Mesh:', obj.name, 'geometry:', obj.geometry.type);
+      if (obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          console.log('  Material:', mat.type, 'color:', mat.color?.getHexString(), 'map:', !!mat.map);
+        }
+      }
+    }
+  });
+  
+  // Ensure materials are properly configured
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+      
+      // Ensure material is properly configured for PBR
+      if (obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial) {
+            mat.roughness = Math.max(0.1, mat.roughness ?? 0.5);
+            mat.metalness = Math.max(0, mat.metalness ?? 0);
+            mat.needsUpdate = true;
+          } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
+            // Upgrade to MeshStandardMaterial for PBR
+            const newMat = new THREE.MeshStandardMaterial({
+              color: (mat as THREE.MeshBasicMaterial).color ?? 0xffffff,
+              map: (mat as THREE.MeshBasicMaterial).map,
+              normalMap: (mat as any).normalMap,
+              roughnessMap: (mat as any).roughnessMap,
+              metalnessMap: (mat as any).metalnessMap,
+              aoMap: (mat as any).aoMap,
+              roughness: 0.5,
+              metalness: 0.1,
+            });
+            obj.material = newMat;
+          }
+        }
+      } else {
+        // No material - apply default PBR material
+        obj.material = new THREE.MeshStandardMaterial({
+          color: 0xcccccc,
+          roughness: 0.5,
+          metalness: 0.1,
+        });
+      }
+    }
+  });
+  
+  gltfCache.set(url, group);
+  return group.clone();
+}
+
+// Cache for generated texture sets
+const textureCache = new Map<string, TextureSet>();
+
+function getTextureSet(key: string, generator: () => TextureSet): TextureSet {
+  if (!textureCache.has(key)) {
+    textureCache.set(key, generator());
+  }
+  return textureCache.get(key)!;
+}
+
+function createMaterialFromTextureSet(
+  texSet: TextureSet,
+  overrides: Partial<THREE.MeshStandardMaterialParameters> = {}
+): THREE.MeshStandardMaterial {
+  const params: THREE.MeshStandardMaterialParameters = {
+    map: texSet.color,
+    normalMap: texSet.normal,
+    roughnessMap: texSet.roughness,
+    metalnessMap: texSet.metalness,
+    roughness: 1.0,
+    metalness: 1.0,
+    ...overrides,
+  };
+  if (texSet.ao) {
+    params.aoMap = texSet.ao;
+    params.aoMapIntensity = 1.0;
+  }
+  if (texSet.emissive) {
+    params.emissiveMap = texSet.emissive;
+  }
+  const mat = new THREE.MeshStandardMaterial(params);
+  return mat;
+}
+
+function applyCylindricalUV(geometry: THREE.BufferGeometry, heightScale = 1.0): void {
+  const pos = geometry.attributes.position;
+  if (!pos) return;
+  let uv = geometry.attributes.uv;
+  if (!uv) {
+    uv = new THREE.BufferAttribute(new Float32Array(pos.count * 2), 2);
+  }
+  
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    
+    // Cylindrical projection: U = angle around Y, V = height
+    const angle = Math.atan2(x, z);
+    const u = (angle + Math.PI) / (2 * Math.PI);
+    const v = (y + 1) * 0.5 * heightScale; // Normalize to 0-1 range approximately
+    
+    uv.setXY(i, u, v);
+  }
+  
+  geometry.setAttribute('uv', uv);
+  uv.needsUpdate = true;
+
+  // Add UV2 for AO map support
+  if (!geometry.attributes.uv2) {
+    geometry.setAttribute('uv2', uv.clone());
+  }
+}
+
+export async function buildPartMeshAsync(part: Part): Promise<THREE.Group> {
+  const g = new THREE.Group();
+  g.name = part.id;
+  
+  // Handle GLTF models
+  if (part.gltfUrl) {
+    const scale = part.gltfScale ?? 1;
+    const gltfGroup = await loadGLTF(part.gltfUrl, scale);
+    g.add(gltfGroup);
+    return g;
+  }
+
+  const d = SIZE_DIMS[part.size];
+  switch (part.kind) {
+    case 'capsule': buildCapsule(g, d, part.id); break;
+    case 'tank': buildTank(g, d, part.size); break;
+    case 'engine': buildEngine(g, d, part.size); break;
+    case 'parachute': buildParachute(g, d); break;
+    case 'legs': buildLegs(g, d); break;
+    case 'decoupler': buildDecoupler(g, d); break;
+    case 'heatshield': buildHeatshield(g, d); break;
+  }
+  return g;
 }
 
 export function buildPartMesh(part: Part): THREE.Group {
@@ -33,11 +190,48 @@ export function buildPartMesh(part: Part): THREE.Group {
   const d = SIZE_DIMS[part.size];
   switch (part.kind) {
     case 'capsule': buildCapsule(g, d, part.id); break;
-    case 'tank': buildTank(g, d); break;
-    case 'engine': buildEngine(g, d); break;
+    case 'tank': buildTank(g, d, part.size); break;
+    case 'engine': buildEngine(g, d, part.size); break;
     case 'parachute': buildParachute(g, d); break;
     case 'legs': buildLegs(g, d); break;
     case 'decoupler': buildDecoupler(g, d); break;
+    case 'heatshield': buildHeatshield(g, d); break;
+case 'gltf': {
+      // Use cached GLTF model if available
+      if (part.gltfUrl && gltfCache.has(part.gltfUrl)) {
+        const scale = part.gltfScale ?? 1;
+        const gltfGroup = gltfCache.get(part.gltfUrl)!.clone();
+        gltfGroup.scale.setScalar(scale);
+        
+        // Center the model
+        const box = new THREE.Box3().setFromObject(gltfGroup);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        gltfGroup.position.sub(center);
+        
+        gltfGroup.traverse((obj) => {
+          if (obj instanceof THREE.Mesh) {
+            const name = obj.name.toLowerCase();
+            const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster');
+            
+            // Create fresh material for each mesh
+            obj.material = new THREE.MeshStandardMaterial({
+              color: isEngine ? 0x666666 : 0xcccccc,
+              roughness: isEngine ? 0.3 : 0.4,
+              metalness: isEngine ? 0.8 : 0.1,
+              emissive: 0x000000,
+              emissiveIntensity: 0,
+            });
+            
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+          }
+        });
+        
+        g.add(gltfGroup);
+      }
+      break;
+    }
   }
   return g;
 }
@@ -45,24 +239,40 @@ export function buildPartMesh(part: Part): THREE.Group {
 function buildCapsule(group: THREE.Group, d: { radius: number; height: number }, id: string) {
   const r = d.radius, h = d.height;
   const isMk1 = id.includes('mk1');
-  const stripeColor = isMk1 ? CL_RED : CL_BLUE;
 
-  const bodyMat = mat(CL_BODY, 0.4, 0.3);
-  const goldMat = mat(CL_GOLD, 0.3, 0.6);
+  const tex = getTextureSet(`capsule_${isMk1 ? 'mk1' : 'mk2'}`, generateCapsuleTexture);
+  const bodyMat = createMaterialFromTextureSet(tex);
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 0.6, SEG), bodyMat);
+  // Gold accents for stripes and base
+  const goldTex = getTextureSet('gold', generateGoldTexture);
+  const goldMat = createMaterialFromTextureSet(goldTex);
+
+  // Main body cylinder
+  const bodyGeom = new THREE.CylinderGeometry(r, r, h * 0.6, SEG);
+  applyCylindricalUV(bodyGeom);
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
   body.position.y = h * 0.05;
   group.add(body);
 
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(r, SEG, SEG, 0, PI * 2, 0, PI / 2), bodyMat);
+  // Nose cone (hemisphere)
+  const noseGeom = new THREE.SphereGeometry(r, SEG, SEG, 0, PI * 2, 0, PI / 2);
+  applyCylindricalUV(noseGeom, 0.5);
+  const nose = new THREE.Mesh(noseGeom, bodyMat);
   nose.position.y = h * 0.35;
   group.add(nose);
 
+  // Tip
   const tip = new THREE.Mesh(new THREE.SphereGeometry(r * 0.08, 12, 8), goldMat);
   tip.position.y = h * 0.35 + r * 0.5;
   group.add(tip);
 
-  const stripeMat = mat(stripeColor, 0.4, 0.3);
+  // Stripe bands (painted stripes on capsule body)
+  const stripeColor = isMk1 ? 0xDD4444 : 0x0077D1;
+  const stripeMat = new THREE.MeshStandardMaterial({
+    color: stripeColor,
+    roughness: 0.6,
+    metalness: 0.1,
+  });
   const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.05, SEG), stripeMat);
   band.position.y = h * 0.05;
   group.add(band);
@@ -71,84 +281,127 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
   band2.position.y = -h * 0.15;
   group.add(band2);
 
+  // Base ring
   const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.3, r * 0.95, h * 0.15, SEG), goldMat);
   base.position.y = -h * 0.3 - h * 0.075;
   group.add(base);
 
-  const winMat = mat(CL_WINDOW, 0.15, 0.6);
+  // Window
+  const winMat = createMaterialFromTextureSet(tex, {
+    color: 0x1A5988,
+    roughness: 0.1,
+    metalness: 0.8,
+    transparent: true,
+    opacity: 0.3,
+  });
   const win = new THREE.Mesh(new THREE.CircleGeometry(r * 0.2, 16), winMat);
   win.position.set(r + 0.001, h * 0.18, 0);
   win.rotation.y = -PI / 2;
   group.add(win);
 
-  const glowM = new THREE.MeshBasicMaterial({ color: CL_GLOW, transparent: true, opacity: 0.6 });
+  // Window glow ring
+  const glowM = new THREE.MeshBasicMaterial({ color: 0x3399FF, transparent: true, opacity: 0.6 });
   const glowRing = new THREE.Mesh(new THREE.RingGeometry(r * 0.2, r * 0.24, 16), glowM);
   glowRing.position.set(r + 0.001, h * 0.18, 0);
   glowRing.rotation.y = -PI / 2;
   group.add(glowRing);
 }
 
-function buildTank(group: THREE.Group, d: { radius: number; height: number }) {
+function buildTank(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
 
-  const bodyMat = mat(CL_TANK, 0.5, 0.2);
-  const goldMat = mat(CL_GOLD, 0.3, 0.6);
-  const ringMat = mat(CL_BODY_DARK, 0.6, 0.3);
+  const tex = getTextureSet(`tank_${size}`, () => generateTankTexture(size));
+  const bodyMat = createMaterialFromTextureSet(tex);
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, SEG), bodyMat);
+  // Gold bands
+  const goldTex = getTextureSet('gold', generateGoldTexture);
+  const goldMat = createMaterialFromTextureSet(goldTex);
+
+  const bodyGeom = new THREE.CylinderGeometry(r, r, h, SEG);
+  applyCylindricalUV(bodyGeom);
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
   group.add(body);
 
   const bh = h * 0.03;
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG), goldMat);
+  const bandGeom = new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG);
+  applyCylindricalUV(bandGeom);
+  const band = new THREE.Mesh(bandGeom, goldMat);
   band.position.y = h / 2 - bh / 2;
   group.add(band);
 
-  const bandB = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG), goldMat);
+  const bandB = new THREE.Mesh(bandGeom, goldMat);
   bandB.position.y = -h / 2 + bh / 2;
   group.add(bandB);
 
   for (let i = 0; i < 3; i++) {
-    const ridge = new THREE.Mesh(new THREE.TorusGeometry(r * 1.01, bh * 1.5, 6, SEG), ringMat);
+    const ridgeGeom = new THREE.TorusGeometry(r * 1.01, bh * 1.5, 6, SEG);
+    applyCylindricalUV(ridgeGeom);
+    const ridge = new THREE.Mesh(ridgeGeom, goldMat);
     ridge.position.y = -h / 2 + h * 0.2 * (i + 1);
     ridge.rotation.x = PI / 2;
     group.add(ridge);
   }
 
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.02, bh * 1.2, 6, SEG), ringMat);
+  const ringGeom = new THREE.TorusGeometry(r * 1.02, bh * 1.2, 6, SEG);
+  applyCylindricalUV(ringGeom);
+  const ring = new THREE.Mesh(ringGeom, goldMat);
   ring.position.y = 0;
   ring.rotation.x = PI / 2;
   group.add(ring);
 }
 
-function buildEngine(group: THREE.Group, d: { radius: number; height: number }) {
+function buildEngine(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
 
-  const bodyMat = mat(CL_ENGINE, 0.3, 0.7);
-  const goldMat = mat(CL_GOLD, 0.3, 0.6);
-  const darkMat = mat(CL_ENGINE_DARK, 0.5, 0.4);
-  const rimMat = mat(CL_BLUE, 0.15, 0.8);
+  const tex = getTextureSet(`engine_${size}`, generateEngineTexture);
+  const engineMat = createMaterialFromTextureSet(tex);
 
-  const upper = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.4, r * 0.6, h * 0.25, SEG), bodyMat);
+  // Gold for flange
+  const goldTex = getTextureSet('gold', generateGoldTexture);
+  const goldMat = createMaterialFromTextureSet(goldTex);
+
+  // Engine upper body
+  const upperGeom = new THREE.CylinderGeometry(r * 1.4, r * 0.6, h * 0.25, SEG);
+  applyCylindricalUV(upperGeom);
+  const upper = new THREE.Mesh(upperGeom, engineMat);
   upper.position.y = h * 0.35;
   group.add(upper);
 
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 0.5, h * 0.06, SEG), goldMat);
+  // Mid flange ring
+  const ringGeom = new THREE.CylinderGeometry(r * 0.6, r * 0.5, h * 0.06, SEG);
+  applyCylindricalUV(ringGeom);
+  const ring = new THREE.Mesh(ringGeom, goldMat);
   ring.position.y = h * 0.12;
-  group.add(ring);
+  group.add(ring)
 
-  const bellOuter = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.85, h * 0.4, SEG), bodyMat);
+  // Nozzle outer
+  const bellOuterGeom = new THREE.CylinderGeometry(r * 0.5, r * 0.85, h * 0.4, SEG);
+  applyCylindricalUV(bellOuterGeom, 1.5);
+  const bellOuter = new THREE.Mesh(bellOuterGeom, engineMat);
   bellOuter.position.y = -h * 0.12;
   group.add(bellOuter);
 
-  const bellInner = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.35, r * 0.7, h * 0.38, SEG), darkMat);
+  // Nozzle inner (throat)
+  const darkMat = createMaterialFromTextureSet(tex, {
+    color: 0x1A222A,
+    roughness: 0.7,
+    metalness: 0.5,
+  });
+  const bellInnerGeom = new THREE.CylinderGeometry(r * 0.35, r * 0.7, h * 0.38, SEG);
+  applyCylindricalUV(bellInnerGeom, 1.5);
+  const bellInner = new THREE.Mesh(bellInnerGeom, darkMat);
   bellInner.position.y = -h * 0.12;
   group.add(bellInner);
 
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.88, r * 0.88, h * 0.03, SEG), rimMat);
+  // Nozzle exit rim
+  const rimGeom = new THREE.CylinderGeometry(r * 0.88, r * 0.88, h * 0.03, SEG);
+  applyCylindricalUV(rimGeom);
+  const rim = new THREE.Mesh(rimGeom, goldMat);
   rim.position.y = -h * 0.12 - h * 0.2 - h * 0.015;
   group.add(rim);
 
-  const glowM = new THREE.MeshBasicMaterial({ color: CL_GLOW, transparent: true, opacity: 0.4 });
+  // Engine glow
+  const glowM = new THREE.MeshBasicMaterial({ color: 0xFF8800, transparent: true, opacity: 0.4 });
   const inner = new THREE.Mesh(new THREE.RingGeometry(0, r * 0.3, SEG), glowM);
   inner.position.y = -h * 0.12 - h * 0.2 - h * 0.02;
   inner.rotation.x = -PI / 2;
@@ -158,19 +411,36 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }) 
 function buildParachute(group: THREE.Group, d: { radius: number; height: number }) {
   const r = d.radius, h = d.height;
 
-  const packMat = mat(0x8899AA, 0.5, 0.2);
-  const goldMat = mat(CL_GOLD, 0.3, 0.6);
+  const fabricTex = getTextureSet('fabric', generateFabricTexture);
+  const goldTex = getTextureSet('gold', generateGoldTexture);
+  const goldMat = createMaterialFromTextureSet(goldTex);
 
-  const pack = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.35, r * 0.35, h * 0.18, 12), packMat);
+  const packMat = createMaterialFromTextureSet(fabricTex, {
+    color: 0x8899AA,
+    roughness: 0.5,
+    metalness: 0.1,
+  });
+
+  const packGeom = new THREE.CylinderGeometry(r * 0.35, r * 0.35, h * 0.18, 12);
+  applyCylindricalUV(packGeom);
+  const pack = new THREE.Mesh(packGeom, packMat);
   pack.position.y = h * 0.55;
   group.add(pack);
 
-  const lidMat = mat(0x6A7A8A, 0.4, 0.3);
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.37, r * 0.37, h * 0.03, 12), lidMat);
+  const lidMat = createMaterialFromTextureSet(fabricTex, {
+    color: 0x6A7A8A,
+    roughness: 0.4,
+    metalness: 0.2,
+  });
+  const lidGeom = new THREE.CylinderGeometry(r * 0.37, r * 0.37, h * 0.03, 12);
+  applyCylindricalUV(lidGeom);
+  const lid = new THREE.Mesh(lidGeom, lidMat);
   lid.position.y = h * 0.55 + h * 0.09;
   group.add(lid);
 
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.37, r * 0.37, h * 0.02, 12), goldMat);
+  const bandGeom = new THREE.CylinderGeometry(r * 0.37, r * 0.37, h * 0.02, 12);
+  applyCylindricalUV(bandGeom);
+  const band = new THREE.Mesh(bandGeom, goldMat);
   band.position.y = h * 0.55 - h * 0.09;
   group.add(band);
 }
@@ -180,30 +450,47 @@ export function buildDeployedParachute(d: { radius: number; height: number }): T
   const r = d.radius, h = d.height;
   const SEG_P = 24;
 
-  const canopyMat = mat(0x8899AA, 0.7, 0.05, THREE.DoubleSide);
-  const canopy = new THREE.Mesh(new THREE.SphereGeometry(r * 1.8, SEG_P, SEG_P, 0, PI * 2, 0, PI * 0.5), canopyMat);
+  const fabricTex = getTextureSet('fabric', generateFabricTexture);
+  const canopyMat = createMaterialFromTextureSet(fabricTex, {
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.95,
+  });
+  const canopyGeom = new THREE.SphereGeometry(r * 1.8, SEG_P, SEG_P, 0, PI * 2, 0, PI * 0.5);
+  applyCylindricalUV(canopyGeom, 0.5);
+  const canopy = new THREE.Mesh(canopyGeom, canopyMat);
   canopy.position.y = h * 0.3;
   canopy.rotation.x = PI;
   g.add(canopy);
 
-  const stripeMat = mat(CL_RED, 0.7, 0.05, THREE.DoubleSide);
+  // Gore stripes
+  const stripeMat = createMaterialFromTextureSet(fabricTex, {
+    color: 0xDD4444,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+  });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * PI * 2;
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(r * 0.03, h * 0.7, r * 0.015), stripeMat);
+    const stripeGeom = new THREE.BoxGeometry(r * 0.03, h * 0.7, r * 0.015);
+    const stripe = new THREE.Mesh(stripeGeom, stripeMat);
     stripe.position.set(Math.cos(a) * r * 0.9, h * 0.4, Math.sin(a) * r * 0.9);
     stripe.rotation.x = PI;
     stripe.lookAt(0, h * 0.8, 0);
     g.add(stripe);
   }
 
-  const strutMat = mat(0x6A7A8A, 0.5, 0.4);
+  const strutMat = createMaterialFromTextureSet(fabricTex, {
+    color: 0x6A7A8A,
+    roughness: 0.5,
+    metalness: 0.4,
+  });
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * PI * 2 + PI / 4;
     for (let j = 0; j < 3; j++) {
-      const strut = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.006, 0.006, h * 0.15, 4),
-        strutMat
-      );
+      const strutGeom = new THREE.CylinderGeometry(0.006, 0.006, h * 0.15, 4);
+      applyCylindricalUV(strutGeom);
+      const strut = new THREE.Mesh(strutGeom, strutMat);
       const angle = a + (j - 1) * 0.3;
       strut.position.set(
         Math.cos(angle) * r * 1.5,
@@ -218,16 +505,21 @@ export function buildDeployedParachute(d: { radius: number; height: number }): T
 
 function buildLegs(group: THREE.Group, d: { radius: number; height: number }) {
   const r = d.radius, h = d.height;
-  const legMat = mat(0x445566, 0.4, 0.5);
-  const footMat = mat(0x667788, 0.6, 0.3);
+
+  const tex = getTextureSet('legs', generateLegsTexture);
+  const legMat = createMaterialFromTextureSet(tex);
+  const footMat = createMaterialFromTextureSet(tex, {
+    color: 0x2a2d22,
+    roughness: 0.8,
+    metalness: 0.2,
+  });
 
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * PI * 2 + PI / 4;
 
-    const leg = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.01, 0.007, h * 0.35, 6),
-      legMat
-    );
+    const legGeom = new THREE.CylinderGeometry(0.01, 0.007, h * 0.35, 6);
+    applyCylindricalUV(legGeom);
+    const leg = new THREE.Mesh(legGeom, legMat);
     const legX = Math.cos(a) * r * 0.65;
     const legZ = Math.sin(a) * r * 0.65;
     leg.position.set(legX, -h / 2 - h * 0.175, legZ);
@@ -235,10 +527,9 @@ function buildLegs(group: THREE.Group, d: { radius: number; height: number }) {
     leg.rotation.x = Math.sin(a) * 0.3;
     group.add(leg);
 
-    const foot = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.025, 0.008, 6),
-      footMat
-    );
+    const footGeom = new THREE.CylinderGeometry(0.02, 0.025, 0.008, 6);
+    applyCylindricalUV(footGeom);
+    const foot = new THREE.Mesh(footGeom, footMat);
     foot.position.set(Math.cos(a) * r * 0.95, -h / 2 - h * 0.35, Math.sin(a) * r * 0.95);
     group.add(foot);
   }
@@ -247,17 +538,47 @@ function buildLegs(group: THREE.Group, d: { radius: number; height: number }) {
 function buildDecoupler(group: THREE.Group, d: { radius: number; height: number }) {
   const r = d.radius, h = d.height;
 
-  const bodyMat = mat(0x6A7A8A, 0.3, 0.5);
-  const goldMat = mat(CL_GOLD, 0.3, 0.6);
+  const tex = getTextureSet('decoupler', generateDecouplerTexture);
+  const bodyMat = createMaterialFromTextureSet(tex);
 
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.05, r * 0.92, h * 0.12, SEG), bodyMat);
+  const goldTex = getTextureSet('gold', generateGoldTexture);
+  const goldMat = createMaterialFromTextureSet(goldTex);
+
+  const ringGeom = new THREE.CylinderGeometry(r * 1.05, r * 0.92, h * 0.12, SEG);
+  applyCylindricalUV(ringGeom);
+  const ring = new THREE.Mesh(ringGeom, bodyMat);
   group.add(ring);
 
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.08, r * 1.08, h * 0.04, SEG), goldMat);
+  const bandGeom = new THREE.CylinderGeometry(r * 1.08, r * 1.08, h * 0.04, SEG);
+  applyCylindricalUV(bandGeom);
+  const band = new THREE.Mesh(bandGeom, goldMat);
   band.position.y = h * 0.06;
   group.add(band);
 
-  const bottom = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.04, SEG), bodyMat);
+  const bottomGeom = new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.04, SEG);
+  applyCylindricalUV(bottomGeom);
+  const bottom = new THREE.Mesh(bottomGeom, bodyMat);
   bottom.position.y = -h * 0.06;
   group.add(bottom);
+}
+
+function buildHeatshield(group: THREE.Group, d: { radius: number; height: number }) {
+  const r = d.radius, h = d.height;
+
+  const tex = getTextureSet('heatshield', generateHeatshieldTexture);
+  const mat = createMaterialFromTextureSet(tex);
+
+  // Ablative heatshield - convex dish shape
+  const shieldGeom = new THREE.CylinderGeometry(r * 1.2, r * 0.8, h * 0.2, SEG, 1, true);
+  applyCylindricalUV(shieldGeom, 0.5);
+  const shield = new THREE.Mesh(shieldGeom, mat);
+  shield.position.y = -h * 0.1;
+  group.add(shield);
+
+  // Backing structure
+  const backGeom = new THREE.CylinderGeometry(r * 0.8, r * 0.8, h * 0.08, SEG);
+  applyCylindricalUV(backGeom);
+  const backing = new THREE.Mesh(backGeom, mat);
+  backing.position.y = -h * 0.2;
+  group.add(backing);
 }

@@ -68,7 +68,6 @@ export class MainMenuScene {
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">↑ / ↓</td><td>Pitch (nose up / down)</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">← / →</td><td>Yaw (turn left / right)</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">Space</td><td>Stage (separate decoupler)</td></tr>
-          <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">T</td><td>Cycle SAS (OFF → PRO → RETRO)</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">Q / E</td><td>Time warp slower / faster</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">P</td><td>Toggle parachute</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">M / Tab</td><td>Map view</td></tr>
@@ -76,14 +75,6 @@ export class MainMenuScene {
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">Mouse drag</td><td>Orbit camera (on 3D view)</td></tr>
           <tr><td style="color:var(--text-muted);padding:4px 16px 4px 0;">Scroll</td><td>Zoom camera</td></tr>
         </table>
-        <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(244,245,242,0.1);">
-          <h3 style="color:var(--accent-blue-bright);font-size:14px;letter-spacing:0.05em;margin-bottom:8px;">SAS GUIDE</h3>
-          <ul style="font-size:12px;color:var(--text-primary);padding-left:16px;">
-            <li><strong>PROGRADE</strong> — aligns rocket with velocity vector (for orbital burn)</li>
-            <li><strong>RETROGRADE</strong> — aligns rocket opposite velocity (for landing / de-orbit)</li>
-            <li><b>How to land:</b> Enable RETRO, throttle against velocity, deploy chute at ~1 km</li>
-          </ul>
-        </div>
         <button class="btn btn--primary" style="margin-top:24px;width:100%;padding:10px;" id="help-close">CLOSE</button>
       </div>
     `;

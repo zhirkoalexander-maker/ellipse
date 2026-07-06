@@ -19,7 +19,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'S',
     mass: 200,
-    fuelCapacity: 3000,
+    fuelCapacity: 4500,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -29,7 +29,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'M',
     mass: 600,
-    fuelCapacity: 30000,
+    fuelCapacity: 45000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -39,7 +39,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'L',
     mass: 1200,
-    fuelCapacity: 60000,
+    fuelCapacity: 90000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -49,7 +49,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'XL',
     mass: 2500,
-    fuelCapacity: 150000,
+    fuelCapacity: 225000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -112,6 +112,34 @@ export const PART_CATALOG: Part[] = [
     mass: 80,
     dragCoeff: 0.1
   },
+  // Heat shields
+  {
+    id: 'heatshield_s',
+    name: 'Heat Shield S (Ablative)',
+    kind: 'heatshield',
+    size: 'S',
+    mass: 50,
+    heatCapacity: 50000,
+    dragCoeff: 1.2
+  },
+  {
+    id: 'heatshield_m',
+    name: 'Heat Shield M (Ablative)',
+    kind: 'heatshield',
+    size: 'M',
+    mass: 150,
+    heatCapacity: 150000,
+    dragCoeff: 1.2
+  },
+  {
+    id: 'heatshield_l',
+    name: 'Heat Shield L (Ablative)',
+    kind: 'heatshield',
+    size: 'L',
+    mass: 400,
+    heatCapacity: 400000,
+    dragCoeff: 1.2
+  },
   // Decoupler
   {
     id: 'decoupler_1',
@@ -120,6 +148,95 @@ export const PART_CATALOG: Part[] = [
     size: 'M',
     mass: 100,
     dragCoeff: 0.3
+  },
+  // GLTF Models (realistic scales: GLTF in meters → game units)
+  // Saturn V: 110m → scale 0.0001
+  // Ares I: 94m → scale 0.000117
+  // Apollo LM: 7m → scale 0.001
+  // Atlas 6: 29m → scale 0.001
+  // Atlas 173  // Atlas 9: 29m → scale 0.001
+  // Crawler: 40m → scale 0.001
+  // Agena: 7m → scale 0.001
+  // Apollo Soyuz: 12m → scale 0.001
+  {
+    id: 'agena_target',
+    name: 'Agena Target Vehicle',
+    kind: 'gltf',
+    size: 'M',
+    mass: 1500,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/agena.glb',
+    gltfScale: 0.001
+  },
+  {
+    id: 'apollo_soyuz',
+    name: 'Apollo Soyuz',
+    kind: 'gltf',
+    size: 'L',
+    mass: 5000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/apollo_soyuz.glb',
+    gltfScale: 0.001
+  },
+  {
+    id: 'saturn_v',
+    name: 'Saturn V',
+    kind: 'gltf',
+    size: 'XL',
+    mass: 3000000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/saturn_v.glb',
+    gltfScale: 0.0001
+  },
+  {
+    id: 'ares_1',
+    name: 'Ares I',
+    kind: 'gltf',
+    size: 'XL',
+    mass: 2000000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/ares_1.glb',
+    gltfScale: 0.000117
+  },
+  {
+    id: 'apollo_lunar_module',
+    name: 'Apollo Lunar Module',
+    kind: 'gltf',
+    size: 'L',
+    mass: 15000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/apollo_lunar_module.glb',
+    gltfScale: 0.001
+  },
+  {
+    id: 'atlas_6',
+    name: 'Atlas 6 (Friendship 7)',
+    kind: 'gltf',
+    size: 'L',
+    mass: 120000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/atlas_6.glb',
+    gltfScale: 0.001
+  },
+  {
+    id: 'atlas_9',
+    name: 'Atlas 9 (Faith 7)',
+    kind: 'gltf',
+    size: 'L',
+    mass: 120000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/atlas_9.glb',
+    gltfScale: 0.001
+  },
+  {
+    id: 'crawler',
+    name: 'Crawler Transporter',
+    kind: 'gltf',
+    size: 'XL',
+    mass: 2700000,
+    dragCoeff: 0.3,
+    gltfUrl: '/models/crawler.glb',
+    gltfScale: 0.001
   }
 ];
 

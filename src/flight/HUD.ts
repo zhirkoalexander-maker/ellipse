@@ -1,6 +1,5 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
-import type { SASMode } from './Controls';
 
 export class HUD {
   private root: HTMLDivElement;
@@ -13,7 +12,8 @@ export class HUD {
   private fuelPct!: HTMLSpanElement;
   private throtFill!: HTMLSpanElement;
   private throtPct!: HTMLSpanElement;
-  private sasLabel!: HTMLSpanElement;
+  private heatFill!: HTMLSpanElement;
+  private heatPct!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -31,11 +31,18 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
       <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
       <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
-      <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value"><span class="sas-val" style="color:var(--accent-blue);">OFF</span></span></div>
       <div class="separator"></div>
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
         <div class="hud-row"><span class="hud-label">Fuel</span><span class="text-data-sm fuel-pct">0%</span></div>
         <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--fuel fuel-fill" style="width:0%;"></span></span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+        <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
+        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--heat heat-fill" style="width:0%;background:#44FF44;"></span></span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+        <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
+        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--heat heat-fill" style="width:0%;"></span></span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
         <div class="hud-row"><span class="hud-label">Throttle</span><span class="text-data-sm throt-pct">0%</span></div>
@@ -46,9 +53,8 @@ export class HUD {
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
         <button class="btn btn--action" data-action="map">MAP</button>
-        <button class="btn btn--action" data-action="sas">SAS</button>
       </div>
-      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | T SAS | Esc Pause</div>
+      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | Space Stage | Esc Pause</div>
     `;
     parent.appendChild(this.root);
 
@@ -61,8 +67,10 @@ export class HUD {
     this.fuelPct = this.root.querySelector('.fuel-pct')!;
     this.throtFill = this.root.querySelector('.throt-fill')!;
     this.throtPct = this.root.querySelector('.throt-pct')!;
-    this.sasLabel = this.root.querySelector('.sas-val')!;
-
+    this.heatFill = this.root.querySelector('.heat-fill')!;
+    this.heatPct = this.root.querySelector('.heat-pct')!;
+    this.heatFill = this.root.querySelector('.heat-fill')!;
+    this.heatPct = this.root.querySelector('.heat-pct')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -89,12 +97,6 @@ export class HUD {
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
-  }
-
-  setSasMode(mode: SASMode): void {
-    const colors: Record<SASMode, string> = { off: 'var(--text-muted)', prograde: '#44FF44', retrograde: '#FF4444' };
-    this.sasLabel.textContent = mode === 'off' ? 'OFF' : mode === 'prograde' ? 'PRO' : 'RETRO';
-    this.sasLabel.style.color = colors[mode];
   }
 
   setPaused(paused: boolean): void {
@@ -203,7 +205,7 @@ export class HUD {
     ctx.stroke();
   }
 
-  update(state: FlightState, system: System): void {
+  update(state: FlightState, system: System, heat: number = 0): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
@@ -226,6 +228,9 @@ export class HUD {
       ? (state.rocket.totalFuelMass() / maxFuelMass) * 100
       : 0;
 
+    // Heat: clamp to 0-100% (100000 = 100% critical)
+    const heatPct = Math.min(100, (heat / 100000) * 100);
+
     this.speedVal.textContent = speed.toFixed(1);
     if (nearestAlt > 1000) {
       this.altVal.textContent = (nearestAlt / 1000).toFixed(2);
@@ -239,6 +244,9 @@ export class HUD {
     this.fuelFill.style.width = `${Math.min(100, fuelPct)}%`;
     this.throtPct.textContent = `${(state.throttle * 100).toFixed(0)}%`;
     this.throtFill.style.width = `${state.throttle * 100}%`;
+    this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
+    this.heatFill.style.width = `${heatPct}%`;
+    this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
   }
 
   unmount(): void {
