@@ -158,9 +158,17 @@ export class FlightScene {
     let mapDragStart: { x: number; y: number } | null = null;
 
     const mapEl = document.createElement('div');
-    mapEl.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(6,8,20,0.92);display:none;';
+    mapEl.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(6,8,20,0.95);display:none;';
     const mapCanvas = document.createElement('canvas');
     mapCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+    mapEl.appendChild(mapCanvas);
+    document.body.appendChild(mapEl);
+
+    // Map UI overlay
+    const mapUI = document.createElement('div');
+    mapUI.style.cssText = 'position:absolute;top:16px;left:16px;z-index:10;color:#EACD9E;font-family:monospace;font-size:12px;pointer-events:none;';
+    mapUI.innerHTML = '<div id="map-zoom">ZOOM: 10.0x</div><div id="map-center">CENTER: ROCKET</div><div id="map-legend" style="margin-top:8px;font-size:10px;opacity:0.7;">SCROLL: zoom | DRAG: pan | M/TAB: close</div>';
+    mapEl.appendChild(mapUI);
     mapEl.appendChild(mapCanvas);
     document.body.appendChild(mapEl);
 
@@ -200,8 +208,18 @@ export class FlightScene {
 
       ctx.fillStyle = '#060814'; ctx.fillRect(0, 0, w, h);
 
+      // Draw grid lines
+      ctx.strokeStyle = 'rgba(100,100,150,0.08)';
+      ctx.lineWidth = 1;
+      const gridSize = 50 * mapZoom;
       const cx = w / 2 + mapPanX;
       const cy = h / 2 + mapPanY;
+      for (let x = cx % gridSize; x < w; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = cy % gridSize; y < h; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
 
       // Use VISUAL_SCALE for map distances to match visual scale
       let maxRelD = 1;
