@@ -132,7 +132,7 @@ export class FlightScene {
     const vx = this.state.position[0] * VISUAL_SCALE;
     const vy = this.state.position[1] * VISUAL_SCALE;
     const vz = this.state.position[2] * VISUAL_SCALE;
-    const camDist = 0.15;
+    const camDist = 0.08;
     sceneMgr.camera.position.set(vx + camDist, vy, vz);
     sceneMgr.camera.lookAt(vx, vy, vz);
     this.controls = new Controls(this.state);
@@ -152,7 +152,7 @@ export class FlightScene {
     this.hud.mount();
 
     let mapActive = false;
-    let mapZoom = 1.0;
+    let mapZoom = 10.0;
     let mapPanX = 0;
     let mapPanY = 0;
     let mapDragStart: { x: number; y: number } | null = null;
@@ -684,7 +684,7 @@ export class FlightScene {
   }
 
   private positionFlameAtNozzle(): void {
-    // Compute the bottom-most point of the rocket mesh in local space
+    // Find the lowest point of all rocket meshes (engine nozzle)
     let minY = Infinity;
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
@@ -695,6 +695,8 @@ export class FlightScene {
     // Position flame at the bottom center, slightly below the mesh
     const flameY = minY === Infinity ? -0.35 : minY - 0.02;
     this.engineFlame.getMesh().position.set(0, flameY, 0);
+    // Ensure flame is always pointing downward
+    this.engineFlame.getMesh().rotation.set(0, 0, 0);
   }
 
   dispose(): void {
