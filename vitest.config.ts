@@ -5,11 +5,13 @@ export default defineConfig({
     globals: false,
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
-    pool: 'forks',
+    pool: 'threads',
     poolOptions: {
-      forks: {
-        singleFork: true
+      threads: {
+        singleThread: true
       }
-    }
+    },
+    maxConcurrency: 1,
+    fileParallelism: false
   }
 });

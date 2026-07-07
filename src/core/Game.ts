@@ -37,27 +37,27 @@ export class Game {
     this.sceneMgr = new SceneManager();
     this.achievements = new Achievements();
 
-    this.system = new System();
+this.system = new System();
     // Sun at center with reduced mass for compressed system
     const sunMass = 2e26;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
-    // Realistic solar system distances (scaled by ORBIT_SCALE = 1e-9)
-    // Mercury: 57.9e9 m → 5.79e1 m
-    this.system.add(new Mercury([5.79e10, 0, 0], [0, 0, 47400]));
-    // Venus: 108e9 m → 1.08e2 m
-    this.system.add(new Venus([1.082e11, 0, 0], [0, 0, 35000]));
-    // Earth: 149.6e9 m → 1.496e2 m
-    const earthPos: [number, number, number] = [1.496e11, 0, 0];
+    // Half realistic distances (scaled by ORBIT_SCALE = 1e-9)
+    // Mercury: 57.9e9 m → 28.95e1 m
+    this.system.add(new Mercury([2.895e10, 0, 0], [0, 0, 47400]));
+    // Venus: 108e9 m → 5.4e1 m
+    this.system.add(new Venus([5.41e10, 0, 0], [0, 0, 35000]));
+    // Earth: 149.6e9 m → 7.48e1 m
+    const earthPos: [number, number, number] = [7.48e10, 0, 0];
     const earthVel: [number, number, number] = [0, 0, 29780];
     this.system.add(new Earth(earthPos, earthVel));
-    // Moon: 3.844e8 m from Earth
-    const moonPos: [number, number, number] = [earthPos[0] + 3.844e8, 0, 0];
+    // Moon: 3.844e8 m from Earth → 1.92e8 m
+    const moonPos: [number, number, number] = [earthPos[0] + 1.922e8, 0, 0];
     const moonVel: [number, number, number] = [0, 0, earthVel[2] + 1020];
     this.system.add(new Moon(moonPos, moonVel));
-    // Mars: 2.279e11 m
-    this.system.add(new Mars([2.279e11, 0, 0], [0, 0, 24000]));
-    // Jupiter at 7.78e11 m (optional, far)
-    // this.system.add(new Jupiter([7.78e11, 0, 0], [0, 0, 13000]));
+    // Mars: 2.279e11 m → 1.139e2 m
+    this.system.add(new Mars([1.1395e11, 0, 0], [0, 0, 24000]));
+    // Jupiter at 7.78e11 m → 3.89e2 m (optional, far)
+    // this.system.add(new Jupiter([3.89e11, 0, 0], [0, 0, 13000]));
 
     document.getElementById('app')!.appendChild(this.renderer.domElement);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
