@@ -85,8 +85,8 @@ export class FlightScene {
       ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
       return new THREE.CanvasTexture(c);
     };
-    const planetColors: Record<string, string> = { moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa' };
-    const planetSizes: Record<string, number> = { moon: 8, venus: 12, mars: 10, mercury: 8 };
+    const planetColors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa' };
+    const planetSizes: Record<string, number> = { sun: 12, earth: 8, moon: 4, venus: 4, mars: 4, mercury: 3 };
     const spriteMeshes: THREE.Sprite[] = [];
     for (const body of system.bodies) {
       if (body.name === 'earth' || body.name === 'sun') continue;
@@ -203,17 +203,18 @@ export class FlightScene {
       const cx = w / 2 + mapPanX;
       const cy = h / 2 + mapPanY;
 
-      let maxRelD = 1e8;
+      // Use VISUAL_SCALE for map distances to match visual scale
+      let maxRelD = 1;
       for (const b of this.system.bodies) {
-        const dx = b.position[0] - this.state.position[0];
-        const dz = b.position[2] - this.state.position[2];
+        const dx = (b.position[0] - this.state.position[0]) * VISUAL_SCALE;
+        const dz = (b.position[2] - this.state.position[2]) * VISUAL_SCALE;
         const d = Math.sqrt(dx * dx + dz * dz);
         if (d > maxRelD) maxRelD = d;
       }
       const s = Math.min(w, h) * 0.4 / maxRelD * mapZoom;
 
       const colors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa' };
-      const sizes: Record<string, number> = { sun: 10, earth: 6, moon: 2, venus: 3, mars: 3, mercury: 3 };
+      const sizes: Record<string, number> = { sun: 12, earth: 8, moon: 4, venus: 4, mars: 4, mercury: 3 };
 
       for (const b of this.system.bodies) {
         const bx = cx + (b.position[0] - this.state.position[0]) * s;
@@ -242,8 +243,8 @@ export class FlightScene {
       if (refBody && refBody.mass > 0) {
         if (refBody.name !== 'sun') {
           const sun = this.system.bodyByName('sun')!;
-          const dSx = refBody.position[0] - sun.position[0];
-          const dSz = refBody.position[2] - sun.position[2];
+          const dSx = (refBody.position[0] - sun.position[0]) * VISUAL_SCALE;
+          const dSz = (refBody.position[2] - sun.position[2]) * VISUAL_SCALE;
           const distToSun = Math.sqrt(dSx * dSx + dSz * dSz);
           const soiR = distToSun * Math.pow(refBody.mass / sun.mass, 0.4);
           ctx.beginPath();
@@ -255,9 +256,9 @@ export class FlightScene {
           ctx.setLineDash([]);
         }
         const relPos: [number, number, number] = [
-          this.state.position[0] - refBody.position[0],
-          this.state.position[1] - refBody.position[1],
-          this.state.position[2] - refBody.position[2],
+          (this.state.position[0] - refBody.position[0]) * VISUAL_SCALE,
+          (this.state.position[1] - refBody.position[1]) * VISUAL_SCALE,
+          (this.state.position[2] - refBody.position[2]) * VISUAL_SCALE,
         ];
         const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
         if (prediction.points.length > 1) {
@@ -537,6 +538,18 @@ export class FlightScene {
         if (body.name === 'earth' || body.name === 'sun') continue;
         if (si < sprites.length) {
           sprites[si]!.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
+          si++;
+        }
+      }
+    }
+
+    const soiMeshes = (window as any).__soiMeshes as THREE.LineSegments[] | undefined;
+    if (soiMeshes) {
+      let si = 0;
+      for (const body of this.system.bodies) {
+        if (body.mass <= 0 || body.name === 'earth') continue;
+        if (si < soiMeshes.length) {
+          soiMeshes[si]!.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
           si++;
         }
       }
