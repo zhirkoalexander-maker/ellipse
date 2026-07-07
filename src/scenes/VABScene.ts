@@ -30,16 +30,18 @@ export class VABScene {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0d1a);
-    this.scene.add(new THREE.AmbientLight(0x444466, 0.3));
-    const dir = new THREE.DirectionalLight(0xFFFFFF, 2.0);
+    this.scene.add(new THREE.AmbientLight(0x444466, 0.5));
+    const dir = new THREE.DirectionalLight(0xFFFFFF, 3.0);
     dir.position.set(2, 4, 3);
     this.scene.add(dir);
-    const fill = new THREE.DirectionalLight(0x8888cc, 0.6);
+    const fill = new THREE.DirectionalLight(0x8888cc, 1.0);
     fill.position.set(-2, 1, -1);
     this.scene.add(fill);
+    const hemi = new THREE.HemisphereLight(0x8888cc, 0x444466, 0.8);
+    this.scene.add(hemi);
 
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.0001, 10);
-    const camDist = PART_SCALE * 4;
+    const camDist = PART_SCALE * 2;
     this.camera.position.set(0, camDist * 0.3, camDist);
     this.camera.lookAt(0, 0, 0);
 
@@ -200,6 +202,16 @@ export class VABScene {
       }
       
       const mesh = this.assembly.toMesh();
+      // Ensure GLTF models are visible
+      mesh.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.visible = true;
+          obj.material.transparent = false;
+          obj.material.opacity = 1;
+          obj.material.depthWrite = true;
+          obj.material.depthTest = true;
+        }
+      });
       this.rocketGroup.add(mesh);
     }
   }
