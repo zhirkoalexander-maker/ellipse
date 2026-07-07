@@ -1,10 +1,10 @@
 /** Gravitational constant (m³/(kg·s²)) */
 export const G = 6.67430e-11;
 
-/** Orbit compression factor (1:10⁹) */
+/** Orbit compression factor (1:10⁹) - realistic distances */
 export const ORBIT_SCALE = 1e-9;
 
-/** Visual planet size multiplier (×15000) */
+/** Visual planet size multiplier - realistic sizes (Earth radius 6.37e6 * VISUAL_SCALE) */
 export const VISUAL_PLANET_MULT = 15000;
 
 /** Fixed physics timestep (s) */
