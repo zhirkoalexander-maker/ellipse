@@ -702,17 +702,48 @@ export class FlightScene {
   }
 
   private positionFlameAtNozzle(): void {
-    // Find the lowest point of all rocket meshes (engine nozzle)
-    let minY = Infinity;
+    // Find nozzle attachment points from GLTF models
+    const nozzlePoints: THREE.Vector3[] = [];
+    
     this.rocketGroup.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        const box = new THREE.Box3().setFromObject(obj);
-        if (box.min.y < minY) minY = box.min.y;
+      if (obj instanceof THREE.Group || obj instanceof THREE.Object3D) {
+        const userData = (obj as any).userData;
+        if (userData.nozzlePoints && Array.isArray(userData.nozzlePoints)) {
+          for (const point of userData.nozzlePoints) {
+            // Convert to world space
+            const worldPoint = point.clone();
+            obj.getWorldPosition(worldPoint);
+            nozzlePoints.push(worldPoint);
+          }
+        }
       }
     });
-    // Position flame at the bottom center, slightly below the mesh
-    const flameY = minY === Infinity ? -0.35 : minY - 0.02;
-    this.engineFlame.getMesh().position.set(0, flameY, 0);
+    
+    if (nozzlePoints.length > 0) {
+      // Use the lowest nozzle point (lowest Y)
+      let minY = Infinity;
+      let nozzlePos = new THREE.Vector3(0, -0.35, 0);
+      for (const point of nozzlePoints) {
+        if (point.y < minY) {
+          minY = point.y;
+          nozzlePos.copy(point);
+        }
+      }
+      // Position flame at the nozzle
+      this.engineFlame.getMesh().position.copy(nozzlePos);
+      this.engineFlame.getMesh().position.y -= 0.05; // Slightly below nozzle
+    } else {
+      // Fallback: find lowest point of all rocket meshes
+      let minY = Infinity;
+      this.rocketGroup.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          const box = new THREE.Box3().setFromObject(obj);
+          if (box.min.y < minY) minY = box.min.y;
+        }
+      });
+      const flameY = minY === Infinity ? -0.35 : minY - 0.02;
+      this.engineFlame.getMesh().position.set(0, flameY, 0);
+    }
     // Ensure flame is always pointing downward
     this.engineFlame.getMesh().rotation.set(0, 0, 0);
   }
