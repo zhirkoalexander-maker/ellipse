@@ -23,6 +23,25 @@ export class HUD {
     this.root = document.createElement('div');
     this.root.className = 'hud-panel';
     this.root.style.cssText = 'position:fixed;top:16px;left:16px;z-index:100;min-width:180px;';
+
+    // Pause menu overlay (3 bars at top right)
+    this.pauseOverlay = document.createElement('div');
+    this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(6,8,20,0.85);display:none;flex-direction:column;align-items:flex-end;padding:20px;gap:12px;';
+    this.pauseOverlay.innerHTML = `
+      <div style="width:280px;display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:left;">▶ RESUME</button>
+        <button class="btn btn--secondary pause-btn" data-action="menu" style="width:100%;padding:14px;font-size:16px;text-align:left;">🏠 MENU</button>
+        <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:left;">🔄 RESTART</button>
+      </div>
+    `;
+    document.body.appendChild(this.pauseOverlay);
+
+    // Bind pause menu buttons
+    this.pauseOverlay.querySelectorAll('.pause-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (this.onAction) this.onAction((e.target as HTMLElement).dataset.action!);
+      });
+    });
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -87,11 +106,6 @@ export class HUD {
     parent.appendChild(navballContainer);
     this.navballCanvas = canvas;
     this.navballCtx = canvas.getContext('2d')!;
-
-    this.pauseOverlay = document.createElement('div');
-    this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(6,8,20,0.6);display:none;align-items:center;justify-content:center;font-size:48px;color:#F4F5F2;font-family:var(--font-display,monospace);';
-    this.pauseOverlay.textContent = 'PAUSED';
-    parent.appendChild(this.pauseOverlay);
   }
 
   setWarpLabel(label: string): void {
@@ -101,6 +115,9 @@ export class HUD {
 
   setPaused(paused: boolean): void {
     this.pauseOverlay.style.display = paused ? 'flex' : 'none';
+    // Update zoom label visibility when paused
+    const warpEl = this.root.querySelector('.warp-val') as HTMLElement | null;
+    if (warpEl) warpEl.style.opacity = paused ? '0.5' : '1';
   }
 
   setNavballData(

@@ -12,7 +12,7 @@ import { HUD } from '../flight/HUD';
 import { applyThrust } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
-import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE } from '../config/constants';
+import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { buildDeployedParachute } from '../parts/PartBuilder';
@@ -54,12 +54,17 @@ export class FlightScene {
 
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
+    // Spawn at 200km altitude with orbital velocity
+    const altitude = 200000; // 200km
+    const orbitalVel = Math.sqrt((G * EARTH_MASS) / (earthR + altitude));
     const spawnPos: [number, number, number] = [
       earth.position[0],
-      earth.position[1] + earthR + 0.5,
+      earth.position[1] + earthR + altitude,
       earth.position[2],
     ];
-    this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
+    // Initial orbital velocity (tangential to Earth)
+    const spawnVel: [number, number, number] = [orbitalVel, 0, 0];
+    this.state = new FlightState(rocket, system, spawnPos, spawnVel);
 
     this.rocketGroup = rocket.assembly.toMesh();
     this.updateRocketMesh();
