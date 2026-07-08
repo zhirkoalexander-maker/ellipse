@@ -209,24 +209,45 @@ case 'gltf': {
         box.getCenter(center);
         gltfGroup.position.sub(center);
         
+        // Find nozzle/engine attachment points
+        const nozzlePoints: THREE.Vector3[] = [];
+        const engineMeshes: THREE.Mesh[] = [];
+        
         gltfGroup.traverse((obj) => {
           if (obj instanceof THREE.Mesh) {
             const name = obj.name.toLowerCase();
-            const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster');
+            const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || 
+                             name.includes('motor') || name.includes('combustion');
             
             // Create fresh material for each mesh
+            const isEnginePart = isEngine || obj.position.y < -0.1; // Lower parts likely engines
             obj.material = new THREE.MeshStandardMaterial({
-              color: isEngine ? 0x666666 : 0xcccccc,
-              roughness: isEngine ? 0.3 : 0.4,
-              metalness: isEngine ? 0.8 : 0.1,
+              color: isEnginePart ? 0x666666 : 0xcccccc,
+              roughness: isEnginePart ? 0.3 : 0.4,
+              metalness: isEnginePart ? 0.8 : 0.1,
               emissive: 0x000000,
               emissiveIntensity: 0,
             });
+            
+            // Collect engine/nozzle positions for flame attachment
+            if (isEnginePart) {
+              const box = new THREE.Box3().setFromObject(obj);
+              const center = new THREE.Vector3();
+              box.getCenter(center);
+              // Convert to local coordinates relative to gltfGroup
+              const localPos = center.clone().sub(gltfGroup.position);
+              nozzlePoints.push(localPos);
+              engineMeshes.push(obj);
+            }
             
             obj.castShadow = true;
             obj.receiveShadow = true;
           }
         });
+        
+        // Store nozzle attachment points on the group for later use
+        (gltfGroup as any).userData.nozzlePoints = nozzlePoints;
+        (gltfGroup as any).userData.engineMeshes = engineMeshes;
         
         g.add(gltfGroup);
       }
