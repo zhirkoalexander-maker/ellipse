@@ -25,6 +25,10 @@ export class Controls {
   update(dt: number): void {
     if (this.keys.has('w')) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
     if (this.keys.has('s')) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
+    // Auto-throttle for testing - start at 50% if no input
+    if (!this.keys.has('w') && !this.keys.has('s') && this.state.throttle < 0.5) {
+      this.state.throttle = Math.min(0.5, this.state.throttle + dt * 0.3);
+    }
   }
 
   getPitch(): number {

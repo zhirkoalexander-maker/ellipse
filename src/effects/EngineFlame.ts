@@ -23,8 +23,8 @@ function createSpriteTexture(): THREE.Texture {
   }
 }
 
-const FLAME_SCALE = PART_SCALE / 0.36;
-const PARTICLE_COUNT = 200;
+const FLAME_SCALE = PART_SCALE / 0.08;
+const PARTICLE_COUNT = 300;
 
 export class EngineFlame {
   private particles: THREE.Points;
@@ -56,14 +56,14 @@ export class EngineFlame {
     geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: FLAME_SCALE * 0.3,
+      size: FLAME_SCALE * 0.8,
       map: this.spriteTex,
       vertexColors: true,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      opacity: 0.8,
+      opacity: 1.0,
     });
 
     this.particles = new THREE.Points(geometry, material);
@@ -87,22 +87,22 @@ export class EngineFlame {
 
   update(dt: number): void {
     if (this.active) {
-      const spawnCount = 4 + Math.floor(Math.random() * 2);
+      const spawnCount = 8 + Math.floor(Math.random() * 4);
       for (let i = 0; i < spawnCount; i++) {
         const idx = this.nextIndex;
         this.nextIndex = (this.nextIndex + 1) % PARTICLE_COUNT;
 
-        const spread = 0.05 + Math.random() * 0.1;
+        const spread = 0.15 + Math.random() * 0.2;
         this.positions[idx * 3] = (Math.random() - 0.5) * spread * FLAME_SCALE;
-        this.positions[idx * 3 + 1] = -(Math.random() * 0.02) * FLAME_SCALE;
+        this.positions[idx * 3 + 1] = -(Math.random() * 0.08) * FLAME_SCALE;
         this.positions[idx * 3 + 2] = (Math.random() - 0.5) * spread * FLAME_SCALE;
 
-        const speed = 2 + Math.random() * 3;
-        this.velocities[idx * 3] = (Math.random() - 0.5) * 0.3 * FLAME_SCALE;
+        const speed = 5 + Math.random() * 8;
+        this.velocities[idx * 3] = (Math.random() - 0.5) * 0.5 * FLAME_SCALE;
         this.velocities[idx * 3 + 1] = -(speed * FLAME_SCALE);
-        this.velocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.3 * FLAME_SCALE;
+        this.velocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.5 * FLAME_SCALE;
 
-        this.lifetimes[idx] = 0.2 + Math.random() * 0.3;
+        this.lifetimes[idx] = 0.3 + Math.random() * 0.4;
         this.ages[idx] = 0;
       }
     }
