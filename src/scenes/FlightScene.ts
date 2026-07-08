@@ -54,10 +54,10 @@ export class FlightScene {
 
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
-    // Spawn ON the surface at equator (simple, no falling off)
+    // Spawn at 1km altitude to clear visual mesh (rocket visual height ~3km in physics)
     const spawnPos: [number, number, number] = [
       earth.position[0],
-      earth.position[1] + earthR + 1.0,
+      earth.position[1] + earthR + 1000,
       earth.position[2],
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
