@@ -246,17 +246,40 @@ export class FlightScene {
         ctx.fillText(b.name.toUpperCase(), bx + 10, by + 4);
       }
 
-      const velX = this.state.velocity[0] || 0;
-      const velZ = this.state.velocity[2] || 1;
-      const velA = Math.atan2(velZ, velX);
-      const rkSize = 8;
+      // Draw rocket position on map
+      const rocketX = cx;
+      const rocketY = cy;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(velA) * rkSize, cy - Math.sin(velA) * rkSize);
-      ctx.lineTo(cx + Math.cos(velA + 2.5) * rkSize * 0.6, cy - Math.sin(velA + 2.5) * rkSize * 0.6);
-      ctx.lineTo(cx + Math.cos(velA - 2.5) * rkSize * 0.6, cy - Math.sin(velA - 2.5) * rkSize * 0.6);
-      ctx.closePath();
-      ctx.fillStyle = '#EACD9E'; ctx.fill();
+      ctx.arc(rocketX, rocketY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#EACD9E';
+      ctx.fill();
+      ctx.strokeStyle = '#EACD9E';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Draw rocket direction arrow
+      const velX = this.state.velocity[0] || 0;
+      const velZ = this.state.velocity[2] || 0;
+      const velMag = Math.sqrt(velX * velX + velZ * velZ);
+      if (velMag > 0.1) {
+        const velAngle = Math.atan2(velZ, velX);
+        const arrowLen = 15;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(velAngle) * 8, cy - Math.sin(velAngle) * 8);
+        ctx.lineTo(cx + Math.cos(velAngle) * (8 + arrowLen), cy - Math.sin(velAngle) * (8 + arrowLen));
+        ctx.strokeStyle = '#EACD9E';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Arrow head
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(velAngle) * (8 + arrowLen), cy - Math.sin(velAngle) * (8 + arrowLen));
+        ctx.lineTo(cx + Math.cos(velAngle + 0.5) * (8 + arrowLen - 5), cy - Math.sin(velAngle + 0.5) * (8 + arrowLen - 5));
+        ctx.lineTo(cx + Math.cos(velAngle - 0.5) * (8 + arrowLen - 5), cy - Math.sin(velAngle - 0.5) * (8 + arrowLen - 5));
+        ctx.closePath();
+        ctx.fillStyle = '#EACD9E';
+        ctx.fill();
+      }
 
+      // Draw trajectory endpoint if prediction available
       const refBody = getReferenceBody(this.state.position, this.system);
       if (refBody && refBody.mass > 0) {
         if (refBody.name !== 'sun') {
