@@ -54,11 +54,14 @@ export class FlightScene {
 
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
-    // Spawn at 1km altitude to clear visual mesh (rocket visual height ~3km in physics)
+    const padHeight = 2;
+    // Kennedy Space Center: 28.5°N, 80.5°W
+    const lat = 28.5 * Math.PI / 180;
+    const lon = -80.5 * Math.PI / 180;
     const spawnPos: [number, number, number] = [
-      earth.position[0],
-      earth.position[1] + earthR + 1000,
-      earth.position[2],
+      earth.position[0] + Math.cos(lat) * Math.cos(lon) * (earthR + padHeight / 2 + 0.5),
+      earth.position[1] + Math.sin(lat) * (earthR + padHeight / 2 + 0.5),
+      earth.position[2] + Math.cos(lat) * Math.sin(lon) * (earthR + padHeight / 2 + 0.5),
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
 
