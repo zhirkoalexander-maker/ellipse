@@ -54,17 +54,13 @@ export class FlightScene {
 
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
-    // Spawn at 200km altitude with orbital velocity
-    const altitude = 200000; // 200km
-    const orbitalVel = Math.sqrt((G * EARTH_MASS) / (earthR + altitude));
+    // Spawn ON the surface at equator (simple, no falling off)
     const spawnPos: [number, number, number] = [
       earth.position[0],
-      earth.position[1] + earthR + altitude,
+      earth.position[1] + earthR + 1.0,
       earth.position[2],
     ];
-    // Initial orbital velocity (tangential to Earth)
-    const spawnVel: [number, number, number] = [orbitalVel, 0, 0];
-    this.state = new FlightState(rocket, system, spawnPos, spawnVel);
+    this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
 
     this.rocketGroup = rocket.assembly.toMesh();
     this.updateRocketMesh();
@@ -480,21 +476,27 @@ export class FlightScene {
 
     let nearestBody: any = null;
     let nearestDist = Infinity;
+    
+    // Always compute nearest body for collision checks
+    const nearRef = getReferenceBody(this.state.position, this.system);
+    const ndx = nearRef.position[0] - this.state.position[0];
+    const ndy = nearRef.position[1] - this.state.position[1];
+    const ndz = nearRef.position[2] - this.state.position[2];
+    nearestDist = Math.sqrt(ndx*ndx + ndy*ndy + ndz*ndz);
+    nearestBody = nearRef;
+    
     if (!this.grounded) {
-      const refBody = getReferenceBody(this.state.position, this.system);
-      const dx = refBody.position[0] - this.state.position[0];
-      const dy = refBody.position[1] - this.state.position[1];
-      const dz = refBody.position[2] - this.state.position[2];
-      const r2 = dx*dx + dy*dy + dz*dz;
-      const r = Math.sqrt(r2);
+      const dx = ndx;
+      const dy = ndy;
+      const dz = ndz;
+      const r = nearestDist;
+      const r2 = r * r;
       if (r > 1 && r2 > 0) {
-        const f = (G * refBody.mass) / r2;
+        const f = (G * nearRef.mass) / r2;
         this.state.velocity[0] += f * dx / r * _dt;
         this.state.velocity[1] += f * dy / r * _dt;
         this.state.velocity[2] += f * dz / r * _dt;
       }
-      nearestDist = r;
-      nearestBody = refBody;
       this.sanitize(this.state.velocity);
 
       // Aerodynamic drag
@@ -730,49 +732,17 @@ export class FlightScene {
   }
 
   private positionFlameAtNozzle(): void {
-    // Find nozzle attachment points from GLTF models
-    const nozzlePoints: THREE.Vector3[] = [];
-    
+    // Find the lowest point of all rocket meshes (engine nozzle)
+    let minY = Infinity;
     this.rocketGroup.traverse((obj) => {
-      if (obj instanceof THREE.Group || obj instanceof THREE.Object3D) {
-        const userData = (obj as any).userData;
-        if (userData.nozzlePoints && Array.isArray(userData.nozzlePoints)) {
-          for (const point of userData.nozzlePoints) {
-            // Convert to world space
-            const worldPoint = point.clone();
-            obj.getWorldPosition(worldPoint);
-            nozzlePoints.push(worldPoint);
-          }
-        }
+      if (obj instanceof THREE.Mesh) {
+        const box = new THREE.Box3().setFromObject(obj);
+        if (box.min.y < minY) minY = box.min.y;
       }
     });
-    
-    if (nozzlePoints.length > 0) {
-      // Use the lowest nozzle point (lowest Y)
-      let minY = Infinity;
-      let nozzlePos = new THREE.Vector3(0, -0.35, 0);
-      for (const point of nozzlePoints) {
-        if (point.y < minY) {
-          minY = point.y;
-          nozzlePos.copy(point);
-        }
-      }
-      // Position flame at the nozzle
-      this.engineFlame.getMesh().position.copy(nozzlePos);
-      this.engineFlame.getMesh().position.y -= 0.05; // Slightly below nozzle
-    } else {
-      // Fallback: find lowest point of all rocket meshes
-      let minY = Infinity;
-      this.rocketGroup.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
-          const box = new THREE.Box3().setFromObject(obj);
-          if (box.min.y < minY) minY = box.min.y;
-        }
-      });
-      const flameY = minY === Infinity ? -0.35 : minY - 0.02;
-      this.engineFlame.getMesh().position.set(0, flameY, 0);
-    }
-    // Ensure flame is always pointing downward
+    // Position flame at the bottom center, in local space
+    const flameY = minY === Infinity ? -0.1 : minY - 0.01;
+    this.engineFlame.getMesh().position.set(0, flameY, 0);
     this.engineFlame.getMesh().rotation.set(0, 0, 0);
   }
 
