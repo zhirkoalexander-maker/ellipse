@@ -18,3 +18,6 @@ export const EARTH_MASS = 5.972e24;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
+
+/** Rocket visual scale multiplier for flight scene (compensates PART_SCALE vs VISUAL_SCALE) */
+export const ROCKET_VISUAL_SCALE = 1000;

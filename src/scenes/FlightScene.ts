@@ -12,7 +12,7 @@ import { HUD } from '../flight/HUD';
 import { applyThrust } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
-import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS } from '../config/constants';
+import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { buildDeployedParachute } from '../parts/PartBuilder';
@@ -66,6 +66,7 @@ export class FlightScene {
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
 
     this.rocketGroup = rocket.assembly.toMesh();
+    this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
     this.updateRocketMesh();
 
     sceneMgr.scene.add(this.rocketGroup);
