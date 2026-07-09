@@ -138,7 +138,11 @@ this.system = new System();
     const dt = 1 / 60;
     this.sceneMgr.update(dt);
     this.flight?.update(dt);
-    this.renderer.three.render(this.sceneMgr.scene, this.sceneMgr.camera);
+    if (this.vab) {
+      this.renderer.three.render(this.vab.scene, this.vab.camera);
+    } else {
+      this.renderer.three.render(this.sceneMgr.scene, this.sceneMgr.camera);
+    }
     requestAnimationFrame(() => this.loop());
   }
 }
