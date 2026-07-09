@@ -153,6 +153,16 @@ export class FlightScene {
         mapEl.style.display = mapActive ? 'block' : 'none';
         if (mapActive) requestAnimationFrame(drawMap);
       }
+      else if (action === 'resume') {
+        this.paused = false;
+        this.hud.setPaused(false);
+      }
+      else if (action === 'menu') {
+        window.location.reload();
+      }
+      else if (action === 'restart') {
+        window.location.reload();
+      }
     };
     this.hud.mount();
 
