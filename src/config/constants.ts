@@ -4,8 +4,8 @@ export const G = 6.67430e-11;
 /** Orbit compression factor (1:10⁹) - realistic distances */
 export const ORBIT_SCALE = 1e-9;
 
-/** Visual planet size multiplier - realistic sizes (Earth radius 6.37e6 * VISUAL_SCALE) */
-export const VISUAL_PLANET_MULT = 15000;
+/** Visual planet size multiplier (×37500 = 15000 * 2.5) */
+export const VISUAL_PLANET_MULT = 37500;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
@@ -13,8 +13,8 @@ export const FIXED_DT = 1 / 60;
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
 
-/** Earth mass (kg) — tuned for ~9.8 m/s² surface gravity */
-export const EARTH_MASS = 5.972e24;
+/** Earth mass (kg) — stronger gravity for gameplay */
+export const EARTH_MASS = 1.5e25;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
