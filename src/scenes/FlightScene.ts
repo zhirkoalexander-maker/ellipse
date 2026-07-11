@@ -667,7 +667,9 @@ export class FlightScene {
         if (d < surfaceR - 1) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         } else if (d < surfaceR + 5 && d > 0.001) {
-          const tiltDeg = Math.acos(Math.min(1, Math.abs((0 * dx + 1 * dy + 0 * dz) / d))) * 180 / Math.PI;
+          const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
+          const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+          const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
           const speedLimit = this.parachuteDeployed ? 15 : 10;
           const tiltLimit = hasLegs ? 30 : 20;
