@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 1500,           // kN
+    thrust: 117,           // kN (gives TWR ≈ 2.0 for stock rocket)
     isp: 350,             // s
     fuelType: 'LFO'
   },
