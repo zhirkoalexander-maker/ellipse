@@ -50,8 +50,8 @@ export class Sun extends Body {
   constructor(position: Vec3, velocity: Vec3, mass = 2e26) {
     super('sun', mass, position, velocity);
 
-    // Small visible sphere — not engulfing the solar system
-    this.visualRadius = 15;
+    // Visible sphere — visible when approaching
+    this.visualRadius = 100;
 
     const geom = new THREE.SphereGeometry(this.visualRadius, 32, 16);
     const mat = new THREE.ShaderMaterial({
@@ -88,7 +88,7 @@ export class Sun extends Body {
       opacity: 1,
     });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(200, 200, 1);
+    sprite.scale.set(250000, 250000, 1);
     this.mesh.add(sprite);
 
     this.sunMaterial = mat;

@@ -129,6 +129,13 @@ this.system = new System();
     }
     const r = new Rocket(a);
     this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements);
+    this.flight.onCrashAction = (action) => {
+      if (action === 'menu') {
+        this.showMainMenu();
+      } else {
+        this.showFlight(rocket);
+      }
+    };
   }
 
   private unmountCurrent(): void {
