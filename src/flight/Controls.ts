@@ -1,10 +1,12 @@
 import type { FlightState } from './FlightState';
+import { TouchControls } from './TouchControls';
 
 export class Controls {
   private keys: Set<string> = new Set();
   private stagePressed = false;
   private pauseToggle = false;
   readonly state: FlightState;
+  touch: TouchControls | null = null;
 
   constructor(state: FlightState) {
     this.state = state;
@@ -22,29 +24,44 @@ export class Controls {
     });
   }
 
+  enableTouch(): void {
+    if (!this.touch) {
+      this.touch = new TouchControls();
+    }
+    this.touch.show();
+  }
+
+  disableTouch(): void {
+    if (this.touch) {
+      this.touch.hide();
+    }
+  }
+
   update(dt: number): void {
-    if (this.keys.has('w')) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
-    if (this.keys.has('s')) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
+    const up = this.touch?.getThrottleUp() || this.keys.has('w');
+    const down = this.touch?.getThrottleDown() || this.keys.has('s');
+    if (up) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
+    if (down) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
   }
 
   getPitch(): number {
     let v = 0;
-    if (this.keys.has('arrowup')) v = 1;
-    if (this.keys.has('arrowdown')) v = -1;
+    if (this.keys.has('arrowup') || this.touch?.getPitch() === 1) v = 1;
+    if (this.keys.has('arrowdown') || this.touch?.getPitch() === -1) v = -1;
     return v;
   }
 
   getYaw(): number {
     let v = 0;
-    if (this.keys.has('arrowleft')) v = 1;
-    if (this.keys.has('arrowright')) v = -1;
+    if (this.keys.has('arrowleft') || this.touch?.getYaw() === 1) v = 1;
+    if (this.keys.has('arrowright') || this.touch?.getYaw() === -1) v = -1;
     return v;
   }
 
   getRoll(): number {
     let v = 0;
-    if (this.keys.has('a')) v = 1;
-    if (this.keys.has('d')) v = -1;
+    if (this.keys.has('a') || this.touch?.getRoll() === 1) v = 1;
+    if (this.keys.has('d') || this.touch?.getRoll() === -1) v = -1;
     return v;
   }
 
@@ -52,7 +69,7 @@ export class Controls {
   getZoomOut(): boolean { return this.keys.has('x'); }
 
   getStageRequested(): boolean {
-    const was = this.stagePressed;
+    const was = this.stagePressed || !!this.touch?.getStageRequested();
     this.stagePressed = false;
     return was;
   }
@@ -61,5 +78,10 @@ export class Controls {
     const was = this.pauseToggle;
     this.pauseToggle = false;
     return was;
+  }
+
+  dispose(): void {
+    this.touch?.dispose();
+    this.touch = null;
   }
 }
