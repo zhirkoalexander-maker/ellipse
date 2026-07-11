@@ -680,7 +680,7 @@ export class FlightScene {
             this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
           } else if (tiltDeg > tiltLimit) {
             this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-          } else if (isFinite(vertSpeed)) {
+          } else if (isFinite(vertSpeed) && vertSpeed < 1) {
             this.state.velocity = [0, 0, 0];
             this.grounded = true;
             this.groundedDir = [dx / d, dy / d, dz / d];
