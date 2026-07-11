@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
 import { generateEarthBumpMap } from '../effects/ProceduralTextures';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -14,11 +14,11 @@ function generateEarthTextureFallback(): THREE.CanvasTexture {
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // Deep ocean
+  // Deep ocean (brighter, more vibrant)
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, '#2a4a7a');
-  grad.addColorStop(0.5, '#2a5d8b');
-  grad.addColorStop(1, '#1f4878');
+  grad.addColorStop(0, '#1a3a6a');
+  grad.addColorStop(0.5, '#2a6daa');
+  grad.addColorStop(1, '#1a4a8a');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
@@ -99,6 +99,18 @@ export class Earth extends Planet {
 
     const fallbackTex = generateEarthTextureFallback();
     mat.map = fallbackTex;
+    mat.needsUpdate = true;
+
+    this.loadHighResTexture().catch(() => {});
+  }
+
+  private async loadHighResTexture(): Promise<void> {
+    const loader = new THREE.TextureLoader();
+    const tex = await loader.loadAsync(assetUrl('/textures/earth_daymap.jpg'));
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const mat = this.mesh.material as THREE.MeshStandardMaterial;
+    mat.map = tex;
     mat.needsUpdate = true;
   }
 
