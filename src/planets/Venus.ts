@@ -44,6 +44,15 @@ const fbm3D = (x: number, y: number, z: number, octaves: number) => {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export class Venus extends Planet {
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    const volcanoes = fbm3D(nx * 6 + 50, ny * 6 + 100, nz * 6 + 150, 4);
+    const plains = fbm3D(nx * 15 + 200, ny * 15 + 300, nz * 15 + 400, 3);
+    const elev = volcanoes * 0.6 + plains * 0.4;
+    const maxDisp = this.visualRadius * 0.015;
+    if (elev > 0.35) return ((elev - 0.35) / 0.65) ** 2 * maxDisp;
+    return -(0.35 - elev) / 0.35 * maxDisp * 0.05;
+  }
+
   atmosphereGlow: AtmosphereGlow;
 
   constructor(position: Vec3, velocity: Vec3) {

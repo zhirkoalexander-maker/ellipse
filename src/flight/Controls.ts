@@ -36,10 +36,20 @@ export class Controls {
 
   getYaw(): number {
     let v = 0;
-    if (this.keys.has('arrowleft')) v = -1;
-    if (this.keys.has('arrowright')) v = 1;
+    if (this.keys.has('arrowleft')) v = 1;
+    if (this.keys.has('arrowright')) v = -1;
     return v;
   }
+
+  getRoll(): number {
+    let v = 0;
+    if (this.keys.has('a')) v = 1;
+    if (this.keys.has('d')) v = -1;
+    return v;
+  }
+
+  getZoomIn(): boolean { return this.keys.has('z'); }
+  getZoomOut(): boolean { return this.keys.has('x'); }
 
   getStageRequested(): boolean {
     const was = this.stagePressed;

@@ -40,14 +40,14 @@ describe('Controls', () => {
   });
 
   describe('yaw', () => {
-    it('returns -1 for arrow left', () => {
+    it('returns 1 for arrow left', () => {
       emitKey('ArrowLeft', 'keydown');
-      expect(controls.getYaw()).toBe(-1);
+      expect(controls.getYaw()).toBe(1);
     });
 
-    it('returns 1 for arrow right', () => {
+    it('returns -1 for arrow right', () => {
       emitKey('ArrowRight', 'keydown');
-      expect(controls.getYaw()).toBe(1);
+      expect(controls.getYaw()).toBe(-1);
     });
   });
 

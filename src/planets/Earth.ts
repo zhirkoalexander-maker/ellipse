@@ -24,17 +24,49 @@ export class Earth extends Planet {
 
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
-    this.mesh.rotation.z = 23.5 * Math.PI / 180;
 
-    this.atmosphereGlow = new AtmosphereGlow(visualR);
+    this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 0.7);
     this.mesh.add(this.atmosphereGlow.getMesh());
 
-    this.loadTexturesAndDisplace(visualR);
+    // Generate procedural terrain (synchronous)
+    this.generateTerrain(visualR);
+
+    // Load texture (async — color map only)
+    this.loadTexture();
   }
 
-  private async loadTexturesAndDisplace(visualR: number) {
-    const loader = new THREE.TextureLoader();
+  /** Procedural terrain height in VISUAL units at a given unit direction from center. */
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    const elev = (Math.sin(nx * 4.5) * 0.5 + Math.cos(ny * 3.2) * 0.3 + Math.sin(nz * 2.1 + nx * 1.5) * 0.2
+      + Math.sin(nx * 8.1 + ny * 3.7) * 0.15) * 0.4 + 0.5;
+    const maxDisp = this.visualRadius * 0.015;
+    const oceanDepth = this.visualRadius * 0.005;
+    if (elev > 0.4) {
+      return ((elev - 0.4) / 0.6) ** 2 * maxDisp;
+    }
+    return -(0.4 - elev) / 0.4 * oceanDepth;
+  }
 
+  private generateTerrain(visualR: number): void {
+    const g = this.mesh.geometry as THREE.SphereGeometry;
+    const posAttr = g.attributes.position!;
+    const vert = new THREE.Vector3();
+
+    for (let i = 0; i < posAttr.count; i++) {
+      vert.fromBufferAttribute(posAttr, i);
+      const nx = vert.x / visualR;
+      const ny = vert.y / visualR;
+      const nz = vert.z / visualR;
+      const disp = this.getTerrainHeightVisual(nx, ny, nz);
+      vert.setLength(visualR + disp);
+      posAttr.setXYZ(i, vert.x, vert.y, vert.z);
+    }
+    posAttr.needsUpdate = true;
+    g.computeVertexNormals();
+  }
+
+  private async loadTexture() {
+    const loader = new THREE.TextureLoader();
     const [dayTex] = await Promise.all([
       loader.loadAsync('/textures/earth_daymap.jpg'),
     ]);
@@ -42,89 +74,46 @@ export class Earth extends Planet {
     dayTex.colorSpace = THREE.SRGBColorSpace;
     dayTex.anisotropy = 8;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = dayTex.image.width;
-    canvas.height = dayTex.image.height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(dayTex.image, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = imageData.data;
-
-    const g = this.mesh.geometry as THREE.SphereGeometry;
-    const posAttr = g.attributes.position!;
-    const uvAttr = g.attributes.uv!;
-    const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.025;
-    const seaLevel = 0.35;
-
-    for (let i = 0; i < posAttr.count; i++) {
-      vert.fromBufferAttribute(posAttr, i);
-      const u = uvAttr.getX(i);
-      const v = uvAttr.getY(i);
-      const px = Math.floor(u * (canvas.width - 1));
-      const py = Math.floor((1 - v) * (canvas.height - 1));
-      const idx = (py * canvas.width + px) * 4;
-      const r = pixels[idx]! / 255;
-
-      let disp = 0;
-      if (r < seaLevel) {
-        disp = -(seaLevel - r) / seaLevel * visualR * 0.002;
-      } else {
-        disp = ((r - seaLevel) / (1 - seaLevel)) * maxDisp;
-      }
-
-      vert.setLength(visualR + disp);
-      posAttr.setXYZ(i, vert.x, vert.y, vert.z);
-    }
-    posAttr.needsUpdate = true;
-    g.computeVertexNormals();
-
-    // Store height data for terrain collision
-    this.setHeightData(pixels, canvas.width, canvas.height);
-
     const mat = this.mesh.material as THREE.MeshStandardMaterial;
     mat.map = dayTex;
     mat.needsUpdate = true;
 
-    const waterGeom = new THREE.SphereGeometry(visualR * 0.998, 48, 24);
+    // Subtle ocean tint
+    const waterGeom = new THREE.SphereGeometry(this.visualRadius * 0.998, 48, 24);
     const waterMat = new THREE.MeshStandardMaterial({
       color: 0x0a2848,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.06,
       roughness: 0.1,
       metalness: 0.0,
     });
     this.mesh.add(new THREE.Mesh(waterGeom, waterMat));
+
+    this.addClouds(this.visualRadius);
   }
 
-  private generateFallback(visualR: number) {
-    const geom = this.mesh.geometry as THREE.SphereGeometry;
-    const posAttr = geom.attributes.position!;
-    const uvAttr = geom.attributes.uv!;
-    const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.02;
-
-    for (let i = 0; i < posAttr.count; i++) {
-      vert.fromBufferAttribute(posAttr, i);
-      const u = uvAttr.getX(i);
-      const v = uvAttr.getY(i);
-      const lat = (0.5 - v) * Math.PI;
-      const lon = u * Math.PI * 2 - Math.PI;
-      const nx = Math.cos(lat) * Math.cos(lon);
-      const ny = Math.sin(lat);
-      const nz = Math.cos(lat) * Math.sin(lon);
-      const elev = (Math.sin(nx * 4.5) * 0.5 + Math.cos(ny * 3.2) * 0.3 + Math.sin(nz * 2.1) * 0.2) * 0.5 + 0.5;
-      let disp = 0;
-      if (elev > 0.4) disp = ((elev - 0.4) / 0.6) ** 2 * maxDisp;
-      else disp = -(0.4 - elev) / 0.4 * maxDisp * 0.1;
-      vert.setLength(visualR + disp);
-      posAttr.setXYZ(i, vert.x, vert.y, vert.z);
+  private addClouds(visualR: number): void {
+    const cloudGeom = new THREE.SphereGeometry(visualR * 1.008, 48, 24);
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.25,
+      roughness: 0.9,
+      metalness: 0.0,
+      depthWrite: false,
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
+    const cPos = cloudGeom.attributes.position!;
+    for (let i = 0; i < cPos.count; i++) {
+      const x = cPos.getX(i), y = cPos.getY(i), z = cPos.getZ(i);
+      const n = Math.sin(x * 3.7 + y * 2.1) * 0.3 + Math.cos(y * 4.3 + z * 1.8) * 0.3
+        + Math.sin(z * 5.1 + x * 2.9) * 0.2 + Math.sin(x * 8.3 + y * 6.7 + z * 4.1) * 0.15;
+      const disp = (n * 0.5 + 0.5) * visualR * 0.006;
+      const len = Math.sqrt(x*x + y*y + z*z);
+      cPos.setXYZ(i, x / len * (visualR * 1.008 + disp), y / len * (visualR * 1.008 + disp), z / len * (visualR * 1.008 + disp));
     }
-    posAttr.needsUpdate = true;
-    geom.computeVertexNormals();
-
-    const mat = this.mesh.material as THREE.MeshStandardMaterial;
-    mat.color.setHex(0x1a3050);
-    mat.needsUpdate = true;
+    cPos.needsUpdate = true;
+    cloudGeom.computeVertexNormals();
+    this.mesh.add(cloudMesh);
   }
 }

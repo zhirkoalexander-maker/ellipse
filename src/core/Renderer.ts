@@ -10,7 +10,7 @@ export class Renderer {
     this.three.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.three.setClearColor(0x000011, 1);
     this.three.toneMapping = THREE.ACESFilmicToneMapping;
-    this.three.toneMappingExposure = 1.2;
+    this.three.toneMappingExposure = 1.5;
   }
 
   setSize(width: number, height: number): void {

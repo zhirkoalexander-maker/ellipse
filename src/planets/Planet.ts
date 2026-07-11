@@ -8,7 +8,6 @@ export class Planet extends Body {
   radius: number;
   visualRadius: number;
   mesh: THREE.Mesh;
-  private heightData?: { pixels: Uint8ClampedArray; width: number; height: number };
 
   constructor(name: string, mass: number, position: Vec3, velocity: Vec3, radius: number) {
     super(name, mass, position, velocity);
@@ -20,6 +19,11 @@ export class Planet extends Body {
     this.mesh.position.set(position[0] * VISUAL_SCALE, position[1] * VISUAL_SCALE, position[2] * VISUAL_SCALE);
   }
 
+  /** Override in subclasses to add terrain displacement. Returns height in VISUAL units. */
+  protected getTerrainHeightVisual(_nx: number, _ny: number, _nz: number): number {
+    return 0;
+  }
+
   syncMesh(): void {
     this.mesh.position.set(
       this.position[0] * VISUAL_SCALE,
@@ -28,51 +32,20 @@ export class Planet extends Body {
     );
   }
 
-  /** Store heightmap data for terrain collision sampling */
-  setHeightData(pixels: Uint8ClampedArray, width: number, height: number): void {
-    this.heightData = { pixels, width, height };
-  }
-
-  /** Get surface radius at world position (including displacement). Returns visual radius + displacement. */
+  /** Get surface radius at world position (physics space), accounting for terrain displacement. */
   getSurfaceRadiusAt(worldPos: Vec3): number {
-    if (!this.heightData) return this.visualRadius;
-
-    // Convert world pos to local sphere coordinates
-    const localX = worldPos[0] - this.position[0] * VISUAL_SCALE;
-    const localY = worldPos[1] - this.position[1] * VISUAL_SCALE;
-    const localZ = worldPos[2] - this.position[2] * VISUAL_SCALE;
+    const localX = worldPos[0] - this.position[0];
+    const localY = worldPos[1] - this.position[1];
+    const localZ = worldPos[2] - this.position[2];
     const len = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
-    if (len === 0) return this.visualRadius;
+    if (len === 0) return this.radius;
 
-    // Spherical coordinates
     const nx = localX / len;
     const ny = localY / len;
     const nz = localZ / len;
 
-    // UV from normal (same as displacement code)
-    const u = 0.5 + Math.atan2(nz, nx) / (2 * Math.PI);
-    const v = 0.5 - Math.asin(Math.max(-1, Math.min(1, ny))) / Math.PI;
-
-    const { pixels, width, height } = this.heightData;
-    const px = Math.floor(u * (width - 1));
-    const py = Math.floor(v * (height - 1));
-    const idx = (py * width + px) * 4;
-
-    // Use R channel as height (0-1)
-    const h = pixels[idx]! / 255;
-
-    // Same displacement formula as in planet constructors
-    const seaLevel = 0.35;
-    const maxDisp = this.visualRadius * 0.025;
-    const oceanDepth = this.visualRadius * 0.004;
-
-    let disp = 0;
-    if (h < seaLevel) {
-      disp = -(seaLevel - h) / seaLevel * oceanDepth;
-    } else {
-      disp = (h - seaLevel) / (1 - seaLevel) * maxDisp;
-    }
-
-    return this.visualRadius + disp;
+    const dispVisual = this.getTerrainHeightVisual(nx, ny, nz);
+    const dispPhysics = dispVisual / VISUAL_SCALE;
+    return this.radius + dispPhysics;
   }
 }

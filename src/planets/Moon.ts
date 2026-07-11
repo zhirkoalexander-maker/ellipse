@@ -43,6 +43,15 @@ const fbm3D = (x: number, y: number, z: number, octaves: number) => {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export class Moon extends Planet {
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    const craters = fbm3D(nx * 8 + 100, ny * 8 + 200, nz * 8 + 300, 4);
+    const micro = fbm3D(nx * 30 + 400, ny * 30 + 500, nz * 30 + 600, 3);
+    const elev = craters * 0.7 + micro * 0.3;
+    const maxDisp = this.visualRadius * 0.04;
+    if (elev > 0.45) return ((elev - 0.45) / 0.55) ** 2 * maxDisp;
+    return -(0.45 - elev) / 0.45 * maxDisp * 0.15;
+  }
+
   constructor(position: Vec3, velocity: Vec3) {
     super('moon', 2.2e23, position, velocity, 1.737e6);
 

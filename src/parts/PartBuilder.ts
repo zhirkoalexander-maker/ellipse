@@ -22,7 +22,7 @@ const SIZE_DIMS = {
 };
 
 const PI = Math.PI;
-const SEG = 32;
+const SEG = 64;
 
 // GLTF loader
 export const gltfLoader = new GLTFLoader();
