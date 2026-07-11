@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS } from '../config/constants';
 import { generateEarthBumpMap } from '../effects/ProceduralTextures';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -85,7 +85,6 @@ export class Earth extends Planet {
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x4488cc,
       roughness: 0.9,
       metalness: 0.0,
       bumpMap: generateEarthBumpMap(),
@@ -98,13 +97,9 @@ export class Earth extends Planet {
     // Terrain displacement (synchronous, before texture)
     this.generateTerrain(visualR);
 
-    // High-res fallback texture (synchronous, always works)
     const fallbackTex = generateEarthTextureFallback();
     mat.map = fallbackTex;
     mat.needsUpdate = true;
-
-    // Try loading the real JPG — catches error silently
-    this.loadHighResTexture().catch(() => {});
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
@@ -137,15 +132,5 @@ export class Earth extends Planet {
     }
     posAttr.needsUpdate = true;
     g.computeVertexNormals();
-  }
-
-  private async loadHighResTexture(): Promise<void> {
-    const loader = new THREE.TextureLoader();
-    const tex = await loader.loadAsync(assetUrl('/textures/earth_daymap.jpg'));
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    const mat = this.mesh.material as THREE.MeshStandardMaterial;
-    mat.map = tex;
-    mat.needsUpdate = true;
   }
 }
