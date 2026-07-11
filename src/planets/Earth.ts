@@ -85,8 +85,8 @@ export class Earth extends Planet {
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.85,
+      color: 0x4488cc,
+      roughness: 0.9,
       metalness: 0.0,
       bumpMap: generateEarthBumpMap(),
       bumpScale: 0.5,
