@@ -223,6 +223,11 @@ export class FlightScene {
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir);
     this.controls = new Controls(this.state);
 
+    // Auto-detect touch device
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      this.controls.enableTouch();
+    }
+
     this.sound = new SoundManager();
 
     this.hud = new HUD();
@@ -685,43 +690,41 @@ export class FlightScene {
       // Collision with surface
       const bodyR = nearestBody ? (nearestBody as any).radius ?? 0 : 0;
       const surfaceR = nearestBody ? ((nearestBody as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR) : 0;
-      if (nearestBody && bodyR > 0 && nearestDist < surfaceR + 0.5 && isFinite(nearestDist)) {
+      if (nearestBody && bodyR > 0 && isFinite(nearestDist)) {
         const dx = this.state.position[0] - nearestBody.position[0];
         const dy = this.state.position[1] - nearestBody.position[1];
         const dz = this.state.position[2] - nearestBody.position[2];
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        if (d > 0.001 && isFinite(d)) {
+        // Penetration check — inside the planet = always crash
+        if (d < surfaceR - 1) {
+          this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
+        } else if (d < surfaceR + 0.5 && d > 0.001) {
           const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
-          const upDotBody = (0 * dx + 1 * dy + 0 * dz) / d;
-          const tiltDeg = Math.acos(Math.min(1, Math.abs(upDotBody))) * 180 / Math.PI;
+          const tiltDeg = Math.acos(Math.min(1, Math.abs((0 * dx + 1 * dy + 0 * dz) / d))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
           const speedLimit = this.parachuteDeployed ? 15 : 10;
           const tiltLimit = hasLegs ? 30 : 20;
 
-          const alt = nearestDist - surfaceR;
-          if (alt < 0.5) {
-            if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
-              this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-            } else if (tiltDeg > tiltLimit) {
-              this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-            } else if (isFinite(vertSpeed) && d <= surfaceR + 0.5) {
-              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
-              this.state.velocity = [0, 0, 0];
-              this.grounded = true;
-              this.groundedDir = [dx / d, dy / d, dz / d];
-              // Align rocket with surface normal on landing
-              const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
-              this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-              this.sound.playLand();
-              this.sound.stopEngine();
-              const bodyName = nearestBody.name;
-              toast.show(`Landed on ${bodyName}!`);
-              if (bodyName === 'earth') this.achievements.unlock('land_earth');
-              else if (bodyName === 'moon') this.achievements.unlock('land_moon');
-              else if (bodyName === 'mars') this.achievements.unlock('land_mars');
-              else if (bodyName === 'venus') this.achievements.unlock('land_venus');
-              else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
-            }
+          if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
+            this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
+          } else if (tiltDeg > tiltLimit) {
+            this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
+          } else if (isFinite(vertSpeed)) {
+            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
+            this.state.velocity = [0, 0, 0];
+            this.grounded = true;
+            this.groundedDir = [dx / d, dy / d, dz / d];
+            const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
+            this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
+            this.sound.playLand();
+            this.sound.stopEngine();
+            const bodyName = nearestBody.name;
+            toast.show(`Landed on ${bodyName}!`);
+            if (bodyName === 'earth') this.achievements.unlock('land_earth');
+            else if (bodyName === 'moon') this.achievements.unlock('land_moon');
+            else if (bodyName === 'mars') this.achievements.unlock('land_mars');
+            else if (bodyName === 'venus') this.achievements.unlock('land_venus');
+            else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
           }
         }
       }
@@ -1105,6 +1108,7 @@ export class FlightScene {
       (m.material as THREE.Material).dispose();
     }
     this.explosionMeshes = [];
+    this.controls.dispose();
     this.engineFlame.dispose();
     this.groundSmoke.dispose();
     this.hud.unmount();

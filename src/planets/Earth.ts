@@ -3,6 +3,7 @@ import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
+import { generateEarthTexture } from '../effects/ProceduralTextures';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 64;
@@ -31,7 +32,12 @@ export class Earth extends Planet {
     // Generate procedural terrain (synchronous)
     this.generateTerrain(visualR);
 
-    // Load texture (async — color map only)
+    // Set procedural fallback texture immediately
+    const fallbackTex = generateEarthTexture();
+    mat.map = fallbackTex;
+    mat.needsUpdate = true;
+
+    // Load high-res texture (async — replaces fallback)
     this.loadTexture();
   }
 
