@@ -43,8 +43,9 @@ export class FlightScene {
   private hud: HUD;
   private sound: SoundManager;
   private launched = false;
-  private grounded = false;
+  private grounded = true;
   private groundedDir: [number, number, number] | null = null;
+  private liftoffFrames = 0;
   private engineFlame: EngineFlame;
   private groundSmoke: GroundSmoke;
   private rocketShadow: THREE.Mesh | null = null;
@@ -546,6 +547,7 @@ export class FlightScene {
     if (engineActive && canLiftOff && this.grounded) {
       this.grounded = false;
       this.groundedDir = null;
+      this.liftoffFrames = 5;
       this.launched = true;
       this.achievements.unlock('reach_space');
       this.sound.startEngine();
@@ -614,6 +616,8 @@ export class FlightScene {
       if (outer) (outer.material as THREE.MeshBasicMaterial).opacity = 0;
     }
 
+    if (this.liftoffFrames > 0) this.liftoffFrames--;
+
     if (!this.grounded) {
       const dx = ndx;
       const dy = ndy;
@@ -668,7 +672,7 @@ export class FlightScene {
         // Penetration check — inside the planet = always crash
         if (d < surfaceR - 1) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 5 && d > 0.001) {
+        } else if (d < surfaceR + 5 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
