@@ -43,7 +43,7 @@ export class FlightScene {
   private hud: HUD;
   private sound: SoundManager;
   private launched = false;
-  private grounded = true;
+  private grounded = false;
   private groundedDir: [number, number, number] | null = null;
   private engineFlame: EngineFlame;
   private groundSmoke: GroundSmoke;
