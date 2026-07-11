@@ -27,12 +27,12 @@ void main() {
 }
 `;
 
-const DEFAULT_RADIUS_SCALE = 1.035;
+const DEFAULT_RADIUS_SCALE = 1.04;
 
 export class AtmosphereGlow {
   private mesh: THREE.Mesh;
 
-  constructor(planetRadius: number, color = 0x4fc3f7, intensity = 0.4) {
+  constructor(planetRadius: number, color = 0x4488ff, intensity = 0.7) {
     const radius = planetRadius * DEFAULT_RADIUS_SCALE;
     const geom = new THREE.SphereGeometry(radius, 48, 24);
 
@@ -44,9 +44,9 @@ export class AtmosphereGlow {
         intensity: { value: intensity },
       },
       transparent: true,
-      blending: THREE.NormalBlending,
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);

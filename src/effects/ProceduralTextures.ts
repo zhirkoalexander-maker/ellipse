@@ -384,7 +384,7 @@ export function generateMoonBumpMap(): THREE.CanvasTexture {
 // ── Rocket part textures ─────────────────────────────────────────────────
 
 export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): TextureSet {
-  const W = 1024, H = 1024;
+  const W = 2048, H = 2048;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
   const [normalCanvas, normalCtx] = createCanvas(W, H);
   const [roughCanvas, roughCtx] = createCanvas(W, H);
@@ -393,63 +393,50 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
 
   const rng = seededRandomFast(size.charCodeAt(0) * 1000 + 42);
 
-  // Base colors per size (NASA/SpaceX style)
-  const baseColors: Record<string, { 
-    primary: string; 
-    secondary: string; 
-    accent: string;
-    foam: string;
-    metal: string;
-  }> = {
-    S: { primary: '#f5f5f0', secondary: '#e8e8e0', accent: '#d4a574', foam: '#e8c8a0', metal: '#6a6a70' },
-    M: { primary: '#fafaf5', secondary: '#eeeee8', accent: '#c89568', foam: '#e0c090', metal: '#606068' },
-    L: { primary: '#f0f0eb', secondary: '#e0e0d8', accent: '#b88558', foam: '#d8b888', metal: '#585860' },
-    XL: { primary: '#e8e8e0', secondary: '#d8d8d0', accent: '#a87848', foam: '#d0b080', metal: '#505058' },
-  };
-  const c = baseColors[size]!;
+  const isSmall = size === 'S';
+  const isLarge = size === 'L' || size === 'XL';
 
   // === COLOR MAP ===
-  // Base white/grey with slight variation
-  colorCtx.fillStyle = c.primary;
+  // Light grey base (like real rocket tanks)
+  colorCtx.fillStyle = '#ecece8';
   colorCtx.fillRect(0, 0, W, H);
 
-  // Add subtle vertical gradient (top darker - interstage, bottom lighter)
+  // Subtle vertical gradient
   const grad = colorCtx.createLinearGradient(0, 0, 0, H);
   if (grad) {
-    grad.addColorStop(0, 'rgba(30,30,35,0.08)');
-    grad.addColorStop(0.15, 'rgba(0,0,0,0)');
-    grad.addColorStop(0.85, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(30,30,35,0.06)');
+    grad.addColorStop(0, 'rgba(0,0,0,0.04)');
+    grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.03)');
     colorCtx.fillStyle = grad;
     colorCtx.fillRect(0, 0, W, H);
   }
 
-  // Horizontal panel seams (weld lines)
-  const panelHeight = H / (size === 'S' ? 8 : size === 'M' ? 12 : size === 'L' ? 16 : 20);
-  colorCtx.strokeStyle = c.secondary;
-  colorCtx.lineWidth = 2;
-  for (let y = panelHeight; y < H; y += panelHeight) {
+  // Horizontal weld seams
+  const panelCount = isSmall ? 6 : isLarge ? 16 : 10;
+  const panelH = H / panelCount;
+  colorCtx.strokeStyle = '#d0d0ca';
+  colorCtx.lineWidth = 3;
+  for (let y = panelH; y < H; y += panelH) {
     colorCtx.beginPath();
     colorCtx.moveTo(0, y);
     colorCtx.lineTo(W, y);
     colorCtx.stroke();
-    
-    // Weld bead highlight
-    colorCtx.strokeStyle = 'rgba(255,255,255,0.15)';
-    colorCtx.lineWidth = 1;
+    // Weld bead
+    colorCtx.strokeStyle = 'rgba(255,255,255,0.12)';
+    colorCtx.lineWidth = 1.5;
     colorCtx.beginPath();
-    colorCtx.moveTo(0, y - 1);
-    colorCtx.lineTo(W, y - 1);
+    colorCtx.moveTo(0, y - 1.5);
+    colorCtx.lineTo(W, y - 1.5);
     colorCtx.stroke();
-    colorCtx.strokeStyle = c.secondary;
-    colorCtx.lineWidth = 2;
+    colorCtx.strokeStyle = '#d0d0ca';
+    colorCtx.lineWidth = 3;
   }
 
-  // Stringers (vertical structural ribs) - subtle
-  colorCtx.strokeStyle = 'rgba(60,60,70,0.08)';
-  colorCtx.lineWidth = 1;
-  const stringerCount = size === 'S' ? 12 : size === 'M' ? 16 : size === 'L' ? 24 : 32;
-  for (let i = 0; i < stringerCount; i++) {
+  // Vertical stringers
+  const stringerCount = isSmall ? 12 : isLarge ? 28 : 18;
+  colorCtx.strokeStyle = 'rgba(90,90,100,0.06)';
+  colorCtx.lineWidth = 2;
+  for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     colorCtx.beginPath();
     colorCtx.moveTo(x, 0);
@@ -457,40 +444,61 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
     colorCtx.stroke();
   }
 
-  // Insulation foam patches (SpaceX style - orange/brown areas)
-  const foamAreas = size === 'S' ? 3 : size === 'M' ? 5 : size === 'L' ? 8 : 12;
-  for (let i = 0; i < foamAreas; i++) {
-    const x = rng() * W * 0.8 + W * 0.1;
-    const y = rng() * H * 0.7 + H * 0.15;
-    const w = 40 + rng() * 120;
-    const h = 30 + rng() * 80;
-    colorCtx.fillStyle = c.foam;
-    colorCtx.globalAlpha = 0.6 + rng() * 0.3;
+  // Rivets along weld seams
+  colorCtx.fillStyle = '#c8c8c2';
+  for (let y = panelH; y < H; y += panelH) {
+    for (let x = 40; x < W - 40; x += 80) {
+      colorCtx.beginPath();
+      colorCtx.arc(x, y, 5, 0, Math.PI * 2);
+      colorCtx.fill();
+      colorCtx.strokeStyle = '#b0b0aa';
+      colorCtx.lineWidth = 1;
+      colorCtx.stroke();
+    }
+  }
+
+  // Insulation foam patches (SpaceX Falcon 9 style — orange/brown)
+  const foamCount = isSmall ? 4 : isLarge ? 14 : 8;
+  for (let i = 0; i < foamCount; i++) {
+    const x = rng() * W * 0.85 + W * 0.075;
+    const y = rng() * H * 0.75 + H * 0.1;
+    const w = 50 + rng() * 180;
+    const h = 40 + rng() * 120;
+    // Orange-brown foam base
+    colorCtx.fillStyle = `rgb(${200 + rng() * 30}, ${160 + rng() * 20}, ${100 + rng() * 20})`;
+    colorCtx.globalAlpha = 0.7 + rng() * 0.25;
     colorCtx.fillRect(x, y, w, h);
+    // Foam texture dots
+    colorCtx.fillStyle = `rgb(${180 + rng() * 20}, ${140 + rng() * 20}, ${80 + rng() * 20})`;
+    for (let d = 0; d < 20; d++) {
+      colorCtx.beginPath();
+      colorCtx.arc(x + rng() * w, y + rng() * h, 2 + rng() * 5, 0, Math.PI * 2);
+      colorCtx.fill();
+    }
     colorCtx.globalAlpha = 1;
   }
 
-  // Top/bottom domes (metallic)
-  colorCtx.fillStyle = c.metal;
-  colorCtx.fillRect(0, 0, W, H * 0.03);
-  colorCtx.fillRect(0, H * 0.97, W, H * 0.03);
+  // Top/bottom domes
+  colorCtx.fillStyle = '#6a6a70';
+  colorCtx.fillRect(0, 0, W, H * 0.015);
+  colorCtx.fillRect(0, H * 0.985, W, H * 0.015);
 
-  // Vertical seam (single weld line)
-  colorCtx.strokeStyle = 'rgba(80,80,90,0.5)';
-  colorCtx.lineWidth = 3;
+  // Vertical seam
+  colorCtx.strokeStyle = 'rgba(90,90,100,0.35)';
+  colorCtx.lineWidth = 4;
   colorCtx.beginPath();
   colorCtx.moveTo(W * 0.5, 0);
   colorCtx.lineTo(W * 0.5, H);
   colorCtx.stroke();
 
-  // === NORMAL MAP (height) ===
+  // === NORMAL MAP ===
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
-  // Panel seams as ridges
-  normalCtx.strokeStyle = '#b0b0b0';
-  normalCtx.lineWidth = 8;
-  for (let y = panelHeight; y < H; y += panelHeight) {
+  // Panel seam ridges
+  normalCtx.strokeStyle = '#b8b8b8';
+  normalCtx.lineWidth = 10;
+  for (let y = panelH; y < H; y += panelH) {
     normalCtx.beginPath();
     normalCtx.moveTo(0, y);
     normalCtx.lineTo(W, y);
@@ -498,9 +506,9 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   // Stringers
-  normalCtx.strokeStyle = '#909090';
-  normalCtx.lineWidth = 3;
-  for (let i = 0; i < stringerCount; i++) {
+  normalCtx.strokeStyle = '#989898';
+  normalCtx.lineWidth = 4;
+  for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     normalCtx.beginPath();
     normalCtx.moveTo(x, 0);
@@ -508,33 +516,24 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
     normalCtx.stroke();
   }
 
-  // Rivets along seams
-  normalCtx.fillStyle = '#e0e0e0';
-  for (let y = panelHeight; y < H; y += panelHeight) {
-    for (let x = 20; x < W; x += 40) {
+  // Rivets
+  normalCtx.fillStyle = '#d0d0d0';
+  for (let y = panelH; y < H; y += panelH) {
+    for (let x = 40; x < W - 40; x += 80) {
       normalCtx.beginPath();
-      normalCtx.arc(x, y, 3, 0, Math.PI * 2);
+      normalCtx.arc(x, y, 6, 0, Math.PI * 2);
       normalCtx.fill();
     }
   }
 
-  // Vertical seam
-  normalCtx.strokeStyle = '#505050';
-  normalCtx.lineWidth = 6;
-  normalCtx.beginPath();
-  normalCtx.moveTo(W * 0.5, 0);
-  normalCtx.lineTo(W * 0.5, H);
-  normalCtx.stroke();
-
   // === ROUGHNESS MAP ===
-  // Base: slightly rough painted metal
   roughCtx.fillStyle = '#a0a0a0';
-  roughCtx.fillRect(0, W, W, H);
+  roughCtx.fillRect(0, 0, W, H);
 
-  // Seams more rough
-  roughCtx.strokeStyle = '#e0e0e0';
-  roughCtx.lineWidth = 10;
-  for (let y = panelHeight; y < H; y += panelHeight) {
+  // Seams rougher
+  roughCtx.strokeStyle = '#d0d0d0';
+  roughCtx.lineWidth = 12;
+  for (let y = panelH; y < H; y += panelH) {
     roughCtx.beginPath();
     roughCtx.moveTo(0, y);
     roughCtx.lineTo(W, y);
@@ -542,49 +541,46 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   // Foam areas very rough
-  for (let i = 0; i < foamAreas; i++) {
-    const x = rng() * W * 0.8 + W * 0.1;
-    const y = rng() * H * 0.7 + H * 0.15;
-    const w = 40 + rng() * 120;
-    const h = 30 + rng() * 80;
-    roughCtx.fillStyle = '#ffffff';
-    roughCtx.globalAlpha = 0.5;
+  for (let i = 0; i < foamCount; i++) {
+    const x = rng() * W * 0.85 + W * 0.075;
+    const y = rng() * H * 0.75 + H * 0.1;
+    const w = 50 + rng() * 180;
+    const h = 40 + rng() * 120;
+    roughCtx.fillStyle = '#e0e0e0';
     roughCtx.fillRect(x, y, w, h);
-    roughCtx.globalAlpha = 1;
   }
 
-  // Metallic domes - smoother
+  // Domes smoother
   roughCtx.fillStyle = '#606060';
-  roughCtx.fillRect(0, 0, W, H * 0.03);
-  roughCtx.fillRect(0, H * 0.97, W, H * 0.03);
+  roughCtx.fillRect(0, 0, W, H * 0.015);
+  roughCtx.fillRect(0, H * 0.985, W, H * 0.015);
 
   // === METALNESS MAP ===
-  metalCtx.fillStyle = '#101010'; // Painted = non-metal
+  metalCtx.fillStyle = '#080808';
   metalCtx.fillRect(0, 0, W, H);
-  
-  // Metallic areas
-  metalCtx.fillStyle = '#e0e0e0';
-  metalCtx.fillRect(0, 0, W, H * 0.03);
-  metalCtx.fillRect(0, H * 0.97, W, H * 0.03);
-  // Vertical seam metallic
-  metalCtx.fillStyle = '#808080';
+
+  metalCtx.fillStyle = '#d0d0d0';
+  metalCtx.fillRect(0, 0, W, H * 0.015);
+  metalCtx.fillRect(0, H * 0.985, W, H * 0.015);
+  metalCtx.fillStyle = '#707070';
   metalCtx.fillRect(W * 0.49, 0, W * 0.02, H);
 
   // === AO MAP ===
   aoCtx.fillStyle = '#ffffff';
   aoCtx.fillRect(0, 0, W, H);
-  // Darken seams
+
   aoCtx.strokeStyle = '#808080';
-  aoCtx.lineWidth = 12;
-  for (let y = panelHeight; y < H; y += panelHeight) {
+  aoCtx.lineWidth = 14;
+  for (let y = panelH; y < H; y += panelH) {
     aoCtx.beginPath();
     aoCtx.moveTo(0, y);
     aoCtx.lineTo(W, y);
     aoCtx.stroke();
   }
-  aoCtx.strokeStyle = '#a0a0a0';
-  aoCtx.lineWidth = 6;
-  for (let i = 0; i < stringerCount; i++) {
+
+  aoCtx.strokeStyle = '#b0b0b0';
+  aoCtx.lineWidth = 8;
+  for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     aoCtx.beginPath();
     aoCtx.moveTo(x, 0);
@@ -592,14 +588,13 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
     aoCtx.stroke();
   }
 
-  // Add film grain to color
-  addFilmGrain(colorCtx, W, H, 0.015);
+  addFilmGrain(colorCtx, W, H, 0.012);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
 
 export function generateCapsuleTexture(): TextureSet {
-  const W = 1024, H = 1024;
+  const W = 2048, H = 2048;
   const [colorCanvas, colorCtx] = createCanvas(W, H);
   const [normalCanvas, normalCtx] = createCanvas(W, H);
   const [roughCanvas, roughCtx] = createCanvas(W, H);
@@ -609,101 +604,108 @@ export function generateCapsuleTexture(): TextureSet {
   const rng = seededRandomFast(12345);
 
   // === COLOR MAP ===
-  // White capsule body (NASA Apollo/Orion style)
-  colorCtx.fillStyle = '#f8f8f0';
+  // White capsule body (Apollo/Dragon style)
+  colorCtx.fillStyle = '#f5f5ee';
   colorCtx.fillRect(0, 0, W, H * 0.78);
 
-  // Subtle vertical gradient on body
+  // Subtle vertical gradient
   const bodyGrad = colorCtx.createLinearGradient(0, 0, 0, H * 0.78);
   if (bodyGrad) {
-    bodyGrad.addColorStop(0, 'rgba(20,20,25,0.06)');
+    bodyGrad.addColorStop(0, 'rgba(20,20,25,0.05)');
     bodyGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-    bodyGrad.addColorStop(1, 'rgba(20,20,25,0.04)');
+    bodyGrad.addColorStop(1, 'rgba(20,20,25,0.03)');
     colorCtx.fillStyle = bodyGrad;
     colorCtx.fillRect(0, 0, W, H * 0.78);
   }
 
-  // Heat shield - ablative material (dark charcoal with texture)
+  // Panel seam lines on body
+  colorCtx.strokeStyle = 'rgba(180,180,180,0.15)';
+  colorCtx.lineWidth = 2;
+  for (let y = H * 0.08; y < H * 0.75; y += H * 0.07) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(0, y);
+    colorCtx.lineTo(W, y);
+    colorCtx.stroke();
+  }
+
+  // Heat shield (dark ablative)
   colorCtx.fillStyle = '#2a2a2e';
   colorCtx.fillRect(0, H * 0.78, W, H * 0.22);
 
-  // Ablative texture on heat shield
-  for (let i = 0; i < 800; i++) {
+  // Ablative texture dots
+  for (let i = 0; i < 1500; i++) {
     const x = rng() * W;
     const y = H * 0.78 + rng() * H * 0.22;
-    const r = 1 + rng() * 3;
-    const brightness = 30 + rng() * 40;
-    colorCtx.fillStyle = `rgb(${brightness},${brightness},${brightness + 5})`;
+    const r = 1 + rng() * 4;
+    const b = 25 + rng() * 45;
+    colorCtx.fillStyle = `rgb(${b},${b},${b + 3})`;
     colorCtx.beginPath();
     colorCtx.arc(x, y, r, 0, Math.PI * 2);
     colorCtx.fill();
   }
 
-  // Heat shield char marks (darker streaks from reentry)
-  colorCtx.strokeStyle = 'rgba(10,10,12,0.4)';
+  // Reentry char streaks
+  colorCtx.strokeStyle = 'rgba(10,10,12,0.35)';
   colorCtx.lineWidth = 1 + rng() * 2;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 50; i++) {
     const x = rng() * W;
-    const y = H * 0.78 + rng() * H * 0.2;
-    const len = 20 + rng() * 80;
+    const y = H * 0.78 + rng() * H * 0.18;
+    const len = 30 + rng() * 120;
     colorCtx.beginPath();
     colorCtx.moveTo(x, y);
-    colorCtx.lineTo(x + (rng() - 0.5) * 30, y + len);
+    colorCtx.lineTo(x + (rng() - 0.5) * 40, y + len);
     colorCtx.stroke();
   }
 
-  // Separation ring (metallic)
+  // Separation ring
   colorCtx.fillStyle = '#5a5a60';
   colorCtx.fillRect(0, H * 0.77, W, H * 0.015);
   colorCtx.fillStyle = '#8a8a90';
   colorCtx.fillRect(0, H * 0.775, W, H * 0.005);
 
   // NASA-style stripes
-  // Blue stripe
   colorCtx.fillStyle = '#003366';
   colorCtx.fillRect(0, H * 0.20, W, H * 0.035);
-  // Red stripe
   colorCtx.fillStyle = '#b31b1b';
   colorCtx.fillRect(0, H * 0.245, W, H * 0.025);
-  // White pinstripe
-  colorCtx.fillStyle = 'rgba(255,255,255,0.3)';
+  colorCtx.fillStyle = 'rgba(255,255,255,0.25)';
   colorCtx.fillRect(0, H * 0.27, W, H * 0.003);
 
-  // Window (command module style)
-  const winX = W * 0.3, winY = H * 0.12;
-  // Window glass - dark with slight reflection
-  colorCtx.fillStyle = '#0a0a15';
-  colorCtx.beginPath();
-  colorCtx.ellipse(winX, winY, W * 0.045, H * 0.035, 0, 0, Math.PI * 2);
-  colorCtx.fill();
-  // Window frame - metallic
-  colorCtx.strokeStyle = '#9a9a9e';
-  colorCtx.lineWidth = 6;
-  colorCtx.beginPath();
-  colorCtx.ellipse(winX, winY, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
-  colorCtx.stroke();
-  colorCtx.strokeStyle = '#5a5a5e';
-  colorCtx.lineWidth = 3;
-  colorCtx.beginPath();
-  colorCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
-  colorCtx.stroke();
+  // Command module windows (2 windows)
+  const windPositions: [number, number][] = [[W * 0.28, H * 0.12], [W * 0.55, H * 0.14]];
+  for (const [wx, wy] of windPositions) {
+    colorCtx.fillStyle = '#0a0a15';
+    colorCtx.beginPath();
+    colorCtx.ellipse(wx, wy, W * 0.04, H * 0.03, 0, 0, Math.PI * 2);
+    colorCtx.fill();
+    colorCtx.strokeStyle = '#9a9a9e';
+    colorCtx.lineWidth = 5;
+    colorCtx.beginPath();
+    colorCtx.ellipse(wx, wy, W * 0.045, H * 0.035, 0, 0, Math.PI * 2);
+    colorCtx.stroke();
+    colorCtx.strokeStyle = '#5a5a5e';
+    colorCtx.lineWidth = 2;
+    colorCtx.beginPath();
+    colorCtx.ellipse(wx, wy, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+    colorCtx.stroke();
+  }
 
-  // RCS thruster ports (4 quads)
+  // RCS ports
   colorCtx.fillStyle = '#3a3a3e';
   for (let q = 0; q < 4; q++) {
-    const angle = (q / 4) * Math.PI * 2;
-    const x = W * 0.5 + Math.cos(angle) * W * 0.35;
-    const y = H * 0.35 + Math.sin(angle) * H * 0.05;
+    const a = (q / 4) * Math.PI * 2;
+    const x = W * 0.5 + Math.cos(a) * W * 0.38;
+    const y = H * 0.35 + Math.sin(a) * H * 0.05;
     colorCtx.beginPath();
-    colorCtx.arc(x, y, 12, 0, Math.PI * 2);
+    colorCtx.arc(x, y, 14, 0, Math.PI * 2);
     colorCtx.fill();
     colorCtx.strokeStyle = '#5a5a5e';
     colorCtx.lineWidth = 2;
     colorCtx.stroke();
   }
 
-  // Parachute cover (top)
-  colorCtx.fillStyle = '#e8e8e0';
+  // Parachute cover
+  colorCtx.fillStyle = '#e0e0d8';
   colorCtx.fillRect(0, 0, W, H * 0.04);
   colorCtx.strokeStyle = '#a0a0a0';
   colorCtx.lineWidth = 2;
@@ -716,87 +718,83 @@ export function generateCapsuleTexture(): TextureSet {
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
-  // Body panel lines
-  normalCtx.strokeStyle = '#a0a0a0';
-  normalCtx.lineWidth = 4;
-  for (let y = H * 0.1; y < H * 0.75; y += H * 0.08) {
+  normalCtx.strokeStyle = '#a8a8a8';
+  normalCtx.lineWidth = 5;
+  for (let y = H * 0.08; y < H * 0.75; y += H * 0.07) {
     normalCtx.beginPath();
     normalCtx.moveTo(0, y);
     normalCtx.lineTo(W, y);
     normalCtx.stroke();
   }
 
-  // Heat shield ablation pattern
-  normalCtx.strokeStyle = '#606060';
-  normalCtx.lineWidth = 2;
-  for (let x = 0; x < W; x += 32) {
+  normalCtx.strokeStyle = '#585858';
+  normalCtx.lineWidth = 3;
+  for (let x = 0; x < W; x += 48) {
     normalCtx.beginPath();
     normalCtx.moveTo(x, H * 0.78);
     normalCtx.lineTo(x, H);
     normalCtx.stroke();
   }
-  for (let y = H * 0.8; y < H; y += 32) {
+  for (let y = H * 0.8; y < H; y += 48) {
     normalCtx.beginPath();
     normalCtx.moveTo(0, y);
     normalCtx.lineTo(W, y);
     normalCtx.stroke();
   }
 
-  // Separation ring
   normalCtx.strokeStyle = '#c0c0c0';
-  normalCtx.lineWidth = 6;
+  normalCtx.lineWidth = 8;
   normalCtx.beginPath();
   normalCtx.moveTo(0, H * 0.775);
   normalCtx.lineTo(W, H * 0.775);
   normalCtx.stroke();
 
-  // Window frame
-  normalCtx.strokeStyle = '#e0e0e0';
-  normalCtx.lineWidth = 10;
-  normalCtx.beginPath();
-  normalCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
-  normalCtx.stroke();
+  for (const [wx, wy] of windPositions) {
+    normalCtx.strokeStyle = '#d0d0d0';
+    normalCtx.lineWidth = 10;
+    normalCtx.beginPath();
+    normalCtx.ellipse(wx, wy, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+    normalCtx.stroke();
+  }
 
   // === ROUGHNESS MAP ===
-  roughCtx.fillStyle = '#808080'; // Painted body
+  roughCtx.fillStyle = '#808080';
   roughCtx.fillRect(0, 0, W, H * 0.78);
 
-  // Heat shield - very rough (ablative)
-  roughCtx.fillStyle = '#ffffff';
+  roughCtx.fillStyle = '#e0e0e0';
   roughCtx.fillRect(0, H * 0.78, W, H * 0.22);
 
-  // Separation ring - metallic (smoother)
-  roughCtx.fillStyle = '#404040';
+  roughCtx.fillStyle = '#484848';
   roughCtx.fillRect(0, H * 0.77, W, H * 0.015);
 
-  // Window - smooth glass
-  roughCtx.fillStyle = '#101010';
-  roughCtx.beginPath();
-  roughCtx.ellipse(winX, winY, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
-  roughCtx.fill();
+  for (const [wx, wy] of windPositions) {
+    roughCtx.fillStyle = '#181818';
+    roughCtx.beginPath();
+    roughCtx.ellipse(wx, wy, W * 0.045, H * 0.035, 0, 0, Math.PI * 2);
+    roughCtx.fill();
+  }
 
   // === METALNESS MAP ===
-  metalCtx.fillStyle = '#101010'; // Non-metallic paint
+  metalCtx.fillStyle = '#080808';
   metalCtx.fillRect(0, 0, W, H);
 
-  // Metallic areas
-  metalCtx.fillStyle = '#e0e0e0';
-  metalCtx.fillRect(0, H * 0.77, W, H * 0.015); // Separation ring
-  metalCtx.fillRect(0, 0, W, H * 0.04); // Parachute cover
+  metalCtx.fillStyle = '#d0d0d0';
+  metalCtx.fillRect(0, H * 0.77, W, H * 0.015);
+  metalCtx.fillRect(0, 0, W, H * 0.04);
 
-  // Window frame metallic
-  metalCtx.fillStyle = '#c0c0c0';
-  metalCtx.beginPath();
-  metalCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
-  metalCtx.fill();
-
-  // RCS ports metallic
-  for (let q = 0; q < 4; q++) {
-    const angle = (q / 4) * Math.PI * 2;
-    const x = W * 0.5 + Math.cos(angle) * W * 0.35;
-    const y = H * 0.35 + Math.sin(angle) * H * 0.05;
+  for (const [wx, wy] of windPositions) {
+    metalCtx.fillStyle = '#b0b0b0';
     metalCtx.beginPath();
-    metalCtx.arc(x, y, 14, 0, Math.PI * 2);
+    metalCtx.ellipse(wx, wy, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+    metalCtx.fill();
+  }
+
+  for (let q = 0; q < 4; q++) {
+    const a = (q / 4) * Math.PI * 2;
+    const x = W * 0.5 + Math.cos(a) * W * 0.38;
+    const y = H * 0.35 + Math.sin(a) * H * 0.05;
+    metalCtx.beginPath();
+    metalCtx.arc(x, y, 16, 0, Math.PI * 2);
     metalCtx.fill();
   }
 
@@ -804,48 +802,46 @@ export function generateCapsuleTexture(): TextureSet {
   aoCtx.fillStyle = '#ffffff';
   aoCtx.fillRect(0, 0, W, H);
 
-  // Panel lines shadow
   aoCtx.strokeStyle = '#808080';
-  aoCtx.lineWidth = 8;
-  for (let y = H * 0.1; y < H * 0.75; y += H * 0.08) {
+  aoCtx.lineWidth = 10;
+  for (let y = H * 0.08; y < H * 0.75; y += H * 0.07) {
     aoCtx.beginPath();
     aoCtx.moveTo(0, y);
     aoCtx.lineTo(W, y);
     aoCtx.stroke();
   }
 
-  // Heat shield grid
   aoCtx.strokeStyle = '#606060';
-  aoCtx.lineWidth = 4;
-  for (let x = 0; x < W; x += 32) {
+  aoCtx.lineWidth = 6;
+  for (let x = 0; x < W; x += 48) {
     aoCtx.beginPath();
     aoCtx.moveTo(x, H * 0.78);
     aoCtx.lineTo(x, H);
     aoCtx.stroke();
   }
-  for (let y = H * 0.8; y < H; y += 32) {
+  for (let y = H * 0.8; y < H; y += 48) {
     aoCtx.beginPath();
     aoCtx.moveTo(0, y);
     aoCtx.lineTo(W, y);
     aoCtx.stroke();
   }
 
-  // Separation ring
   aoCtx.strokeStyle = '#909090';
-  aoCtx.lineWidth = 10;
+  aoCtx.lineWidth = 12;
   aoCtx.beginPath();
   aoCtx.moveTo(0, H * 0.775);
   aoCtx.lineTo(W, H * 0.775);
   aoCtx.stroke();
 
-  // Window frame
-  aoCtx.strokeStyle = '#707070';
-  aoCtx.lineWidth = 12;
-  aoCtx.beginPath();
-  aoCtx.ellipse(winX, winY, W * 0.055, H * 0.045, 0, 0, Math.PI * 2);
-  aoCtx.stroke();
+  for (const [wx, wy] of windPositions) {
+    aoCtx.strokeStyle = '#707070';
+    aoCtx.lineWidth = 14;
+    aoCtx.beginPath();
+    aoCtx.ellipse(wx, wy, W * 0.05, H * 0.04, 0, 0, Math.PI * 2);
+    aoCtx.stroke();
+  }
 
-  addFilmGrain(colorCtx, W, H, 0.02);
+  addFilmGrain(colorCtx, W, H, 0.018);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }

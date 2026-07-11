@@ -2,6 +2,8 @@
 
 A browser game about building and flying rockets.
 
+[Play in your browser](https://zhirkoalexander-maker.github.io/ellipse/)
+
 Requires Node.js and npm.
 
 ```sh
@@ -9,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000/.
+Open http://localhost:3000/ellipse/.
 
 ```sh
 npm test

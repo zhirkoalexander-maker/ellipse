@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { Renderer } from '../core/Renderer';
 import type { SceneManager } from '../core/SceneManager';
 import type { System } from '../physics/System';
+import type { Vec3 } from '../physics/Body';
+import { Body } from '../physics/Body';
 import type { Rocket } from '../rocket/Rocket';
 import type { AssemblyNode } from '../rocket/Assembly';
 import type { Achievements } from '../core/Achievements';
@@ -9,16 +11,24 @@ import { FlightState } from '../flight/FlightState';
 import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
-import { applyThrust } from '../flight/Thrust';
+import { applyThrust, findFirstEngine } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { buildDeployedParachute } from '../parts/PartBuilder';
+import { totalGravityOn } from '../physics/Gravity';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 import { EngineFlame } from '../effects/EngineFlame';
+import { GroundSmoke } from '../effects/GroundSmoke';
+
+interface Debris {
+  mesh: THREE.Group;
+  body: Body;
+  life: number;
+}
 
 export class FlightScene {
   private renderer: Renderer;
@@ -34,13 +44,21 @@ export class FlightScene {
   private sound: SoundManager;
   private launched = false;
   private grounded = true;
+  private groundedDir: [number, number, number] | null = null;
   private engineFlame: EngineFlame;
+  private groundSmoke: GroundSmoke;
+  private rocketShadow: THREE.Mesh | null = null;
+  private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
+  private angularVel = new THREE.Vector3();
+  private readonly ANGULAR_ACCEL = 8;
+  private readonly ANGULAR_DAMPING = 10;
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
   private crashed = false;
   private paused = false;
+  private debris: Debris[] = [];
   private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
   private warpIndex = 0;
 
@@ -54,20 +72,47 @@ export class FlightScene {
 
     const earth = system.bodyByName('earth')!;
     const earthR = (earth as any).radius ?? 6.371e6;
-    const padHeight = 2;
     // Kennedy Space Center: 28.5°N, 80.5°W
     const lat = 28.5 * Math.PI / 180;
     const lon = -80.5 * Math.PI / 180;
+    const dir: [number, number, number] = [
+      Math.cos(lat) * Math.cos(lon),
+      Math.sin(lat),
+      Math.cos(lat) * Math.sin(lon),
+    ];
+    const dirMag = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
+    const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
+
+    // Compute spawn above displaced surface
+    const surfacePos: [number, number, number] = [
+      earth.position[0] + dirNorm[0] * earthR,
+      earth.position[1] + dirNorm[1] * earthR,
+      earth.position[2] + dirNorm[2] * earthR,
+    ];
+    const surfaceR = (earth as any).getSurfaceRadiusAt?.(surfacePos) ?? earthR;
     const spawnPos: [number, number, number] = [
-      earth.position[0] + Math.cos(lat) * Math.cos(lon) * (earthR + padHeight / 2 + 0.5),
-      earth.position[1] + Math.sin(lat) * (earthR + padHeight / 2 + 0.5),
-      earth.position[2] + Math.cos(lat) * Math.sin(lon) * (earthR + padHeight / 2 + 0.5),
+      earth.position[0] + dirNorm[0] * (surfaceR + 10),
+      earth.position[1] + dirNorm[1] * (surfaceR + 10),
+      earth.position[2] + dirNorm[2] * (surfaceR + 10),
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
+    this.groundedDir = dirNorm;
+
+    // Align rocket with surface normal (90° to ground, pointing away from Earth center)
+    const upDir = new THREE.Vector3(
+      spawnPos[0] - earth.position[0],
+      spawnPos[1] - earth.position[1],
+      spawnPos[2] - earth.position[2]
+    ).normalize();
+    this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), upDir);
 
     this.rocketGroup = rocket.assembly.toMesh();
     this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
-    this.updateRocketMesh();
+    this.rocketGroup.position.set(
+      this.state.position[0] * VISUAL_SCALE,
+      this.state.position[1] * VISUAL_SCALE,
+      this.state.position[2] * VISUAL_SCALE
+    );
 
     sceneMgr.scene.add(this.rocketGroup);
 
@@ -90,8 +135,8 @@ export class FlightScene {
       ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
       return new THREE.CanvasTexture(c);
     };
-    const planetColors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa' };
-    const planetSizes: Record<string, number> = { sun: 12, earth: 8, moon: 4, venus: 4, mars: 4, mercury: 3 };
+    const planetColors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', mercury: '#aaa', venus: '#e8a84c', mars: '#d4733a', jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd' };
+    const planetSizes: Record<string, number> = { sun: 6, earth: 4, moon: 2, mercury: 1.5, venus: 2, mars: 2, jupiter: 5, saturn: 4.5, uranus: 2.5, neptune: 2.5 };
     const spriteMeshes: THREE.Sprite[] = [];
     for (const body of system.bodies) {
       if (body.name === 'earth' || body.name === 'sun') continue;
@@ -126,20 +171,56 @@ export class FlightScene {
     (window as any).__soiMeshes = soiMeshes;
 
     this.engineFlame = new EngineFlame();
-    // Position flame at the actual engine nozzle (bottom center of rocket mesh)
     this.positionFlameAtNozzle();
     this.rocketGroup.add(this.engineFlame.getMesh());
 
-    this.chase = new ChaseCamera(sceneMgr.camera);
-    this.chase.enableOrbit(this.renderer.domElement);
+    this.groundSmoke = new GroundSmoke();
+    this.rocketGroup.add(this.groundSmoke.getMesh());
 
-    // Position camera perpendicular to rocket (side view)
-    const vx = this.state.position[0] * VISUAL_SCALE;
-    const vy = this.state.position[1] * VISUAL_SCALE;
-    const vz = this.state.position[2] * VISUAL_SCALE;
-    const camDist = 0.08;
-    sceneMgr.camera.position.set(vx + camDist, vy, vz);
-    sceneMgr.camera.lookAt(vx, vy, vz);
+    // Rocket shadow (dark circle on ground)
+    const shadowGeom = new THREE.CircleGeometry(0.3 * ROCKET_VISUAL_SCALE, 32);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+    });
+    this.rocketShadow = new THREE.Mesh(shadowGeom, shadowMat);
+    this.rocketShadow.rotation.x = -Math.PI / 2;
+    this.rocketShadow.position.y = -2;
+    this.rocketGroup.add(this.rocketShadow);
+
+    // Reentry glow (orange sphere around rocket)
+    const glowGeom = new THREE.SphereGeometry(0.3, 16, 12);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.reentryGlow = new THREE.Mesh(glowGeom, glowMat);
+    this.rocketGroup.add(this.reentryGlow);
+    // Outer glow
+    const outerGlowGeom = new THREE.SphereGeometry(0.5, 16, 12);
+    const outerGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xff4400,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const outerGlow = new THREE.Mesh(outerGlowGeom, outerGlowMat);
+    outerGlow.name = 'reentry-outer';
+    this.rocketGroup.add(outerGlow);
+
+    const tangent = new THREE.Vector3().crossVectors(upDir, new THREE.Vector3(0, 1, 0)).normalize();
+    const azimuth = Math.atan2(tangent.z, tangent.x);
+
+    this.chase = new ChaseCamera(sceneMgr.camera);
+    this.chase.setAzimuth(azimuth);
+    this.chase.enableOrbit(this.renderer.domElement);
+    this.chase.initialiseAt(this.state, this.rocketQuat, upDir);
     this.controls = new Controls(this.state);
 
     this.sound = new SoundManager();
@@ -167,7 +248,7 @@ export class FlightScene {
     this.hud.mount();
 
     let mapActive = false;
-    let mapZoom = 10.0;
+    let mapZoom = 1.0;
     let mapPanX = 0;
     let mapPanY = 0;
     let mapDragStart: { x: number; y: number } | null = null;
@@ -182,14 +263,14 @@ export class FlightScene {
     // Map UI overlay
     const mapUI = document.createElement('div');
     mapUI.style.cssText = 'position:absolute;top:16px;left:16px;z-index:10;color:#EACD9E;font-family:monospace;font-size:12px;pointer-events:none;';
-    mapUI.innerHTML = '<div id="map-zoom">ZOOM: 10.0x</div><div id="map-center">CENTER: ROCKET</div><div id="map-legend" style="margin-top:8px;font-size:10px;opacity:0.7;">SCROLL: zoom | DRAG: pan | M/TAB: close</div>';
+    mapUI.innerHTML = '<div id="map-zoom">ZOOM: 1x</div><div id="map-center">CENTER: ROCKET</div><div id="map-legend" style="margin-top:8px;font-size:10px;opacity:0.7;">SCROLL: zoom | DRAG: pan | M/TAB: close</div>';
     mapEl.appendChild(mapUI);
     mapEl.appendChild(mapCanvas);
     document.body.appendChild(mapEl);
 
     mapCanvas.addEventListener('wheel', (e) => {
       mapZoom *= e.deltaY > 0 ? 0.9 : 1.1;
-      mapZoom = Math.max(0.2, Math.min(5, mapZoom));
+      mapZoom = Math.max(0.05, Math.min(100, mapZoom));
     });
     mapCanvas.addEventListener('mousedown', (e) => {
       mapDragStart = { x: e.clientX, y: e.clientY };
@@ -226,7 +307,7 @@ export class FlightScene {
       // Draw grid lines
       ctx.strokeStyle = 'rgba(100,100,150,0.08)';
       ctx.lineWidth = 1;
-      const gridSize = 50 * mapZoom;
+      const gridSize = 100 * mapZoom;
       const cx = w / 2 + mapPanX;
       const cy = h / 2 + mapPanY;
       for (let x = cx % gridSize; x < w; x += gridSize) {
@@ -246,8 +327,8 @@ export class FlightScene {
       }
       const s = Math.min(w, h) * 0.4 / maxRelD * mapZoom;
 
-      const colors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa' };
-      const sizes: Record<string, number> = { sun: 12, earth: 8, moon: 4, venus: 4, mars: 4, mercury: 3 };
+      const colors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa', jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd' };
+      const sizes: Record<string, number> = { sun: 6, earth: 4, moon: 2, venus: 2, mars: 2, mercury: 1.5, jupiter: 5, saturn: 4.5, uranus: 2.5, neptune: 2.5 };
 
       for (const b of this.system.bodies) {
         const bx = cx + (b.position[0] - this.state.position[0]) * s;
@@ -430,22 +511,37 @@ export class FlightScene {
 
     this.controls.update(baseDt);
 
-    if (this.controls.getStageRequested()) this.performStage();
+    // Camera zoom
+    if (this.controls.getZoomIn()) this.chase.zoom(0.92);
+    if (this.controls.getZoomOut()) this.chase.zoom(1.08);
+
+    // Disable controls in warp (only allow on x1)
+    const warpActive = this.timeWarp > 1;
+    if (warpActive) {
+      this.state.throttle = 0;
+    }
+    if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
     // Current forward direction (rocket local +Y in world space)
     const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
 
-    // Manual rotation - yaw first (global), then pitch (local)
-    const rotSpeed = 2.5;
-    const pitchInput = this.controls.getPitch();
-    const yawInput = this.controls.getYaw();
+    // Angular velocity with damping (as per ellipse control spec)
+    const pitchInput = warpActive ? 0 : this.controls.getPitch();
+    const yawInput = warpActive ? 0 : this.controls.getYaw();
+    const rollInput = warpActive ? 0 : this.controls.getRoll();
+    this.angularVel.x += pitchInput * this.ANGULAR_ACCEL * baseDt;
+    this.angularVel.y += yawInput * this.ANGULAR_ACCEL * baseDt;
+    this.angularVel.z += rollInput * this.ANGULAR_ACCEL * baseDt;
 
-    // Yaw around world Z (global), pitch around local X
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yawInput * rotSpeed * baseDt);
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitchInput * rotSpeed * baseDt);
+    const damp = Math.exp(-this.ANGULAR_DAMPING * baseDt);
+    this.angularVel.multiplyScalar(damp);
+
+    // Apply rotation: yaw → pitch → roll
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.angularVel.y * baseDt);
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.angularVel.x * baseDt);
+    const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angularVel.z * baseDt);
     
-    // Apply yaw first (global), then pitch (local)
-    this.rocketQuat.multiply(qYaw).multiply(qPitch);
+    this.rocketQuat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
     this.rocketQuat.normalize();
 
     // Apply rotation to mesh
@@ -457,31 +553,48 @@ export class FlightScene {
 
     // Apply thrust
     const engineActive = this.state.throttle > 0;
-    if (engineActive) {
-      applyThrust(this.state, _dt, [tx, ty, tz]);
-      this.sanitize(this.state.velocity);
-      if (this.grounded) {
-        this.grounded = false;
-        this.launched = true;
-        this.achievements.unlock('reach_space');
-        this.sound.startEngine();
+    let canLiftOff = false;
+    if (engineActive && this.grounded) {
+      // Compute if thrust exceeds weight before actually applying thrust
+      const eng = findFirstEngine(this.state.rocket.assembly.roots);
+      if (eng && eng.thrust) {
+        const thrustN = eng.thrust * 1000 * this.state.throttle;
+        const refBody = getReferenceBody(this.state.position, this.system);
+        const dx = this.state.position[0] - refBody.position[0];
+        const dy = this.state.position[1] - refBody.position[1];
+        const dz = this.state.position[2] - refBody.position[2];
+        const r = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+        const localG = (G * refBody.mass) / (r * r);
+        const weight = this.state.rocket.totalMass() * localG;
+        canLiftOff = thrustN > weight * 0.95;
       }
     }
-
-    // Engine sound
-    if (engineActive && !this.grounded) {
-      this.sound.setThrottle(this.state.throttle);
-    } else if (!engineActive) {
-      this.sound.setThrottle(0);
+    if (engineActive && (!this.grounded || canLiftOff)) {
+      applyThrust(this.state, _dt, [tx, ty, tz]);
+      this.sanitize(this.state.velocity);
+    }
+    if (engineActive && canLiftOff && this.grounded) {
+      this.grounded = false;
+      this.groundedDir = null;
+      this.launched = true;
+      this.achievements.unlock('reach_space');
+      this.sound.startEngine();
     }
 
-    // Engine flame
-    if (this.state.throttle > 0) {
+    // Flame and sound always show when engine is active (even if thrust < weight)
+    if (engineActive) {
+      this.sound.setThrottle(this.state.throttle);
       this.engineFlame.start();
     } else {
+      this.sound.setThrottle(0);
       this.engineFlame.stop();
     }
     this.engineFlame.update(baseDt);
+
+    // Ground smoke when engine active and grounded
+    if (engineActive && this.grounded) this.groundSmoke.start();
+    else this.groundSmoke.stop();
+    this.groundSmoke.update(baseDt);
 
     // Integrate position
     this.state.position[0] += this.state.velocity[0] * _dt;
@@ -498,7 +611,37 @@ export class FlightScene {
     const ndz = nearRef.position[2] - this.state.position[2];
     nearestDist = Math.sqrt(ndx*ndx + ndy*ndy + ndz*ndz);
     nearestBody = nearRef;
-    
+
+    // Reentry glow
+    const speed = Math.sqrt(
+      this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+    );
+    if (!this.grounded && nearestBody && (nearestBody as any).radius) {
+      const alt = nearestDist - (nearestBody as any).radius;
+      if (alt > 0 && alt < 120000 && speed > 2000) {
+        const intensity = Math.max(0, 1 - alt / 120000) * Math.min(1, speed / 8000);
+        if (this.reentryGlow) {
+          (this.reentryGlow.material as THREE.MeshBasicMaterial).color.setHSL(0.05, 1, 0.7 * intensity);
+          (this.reentryGlow.material as THREE.MeshBasicMaterial).opacity = 0.4 * intensity;
+          this.reentryGlow.scale.setScalar(1 + intensity * 2);
+          const outer = this.rocketGroup.getObjectByName('reentry-outer') as THREE.Mesh | null;
+          if (outer) {
+            (outer.material as THREE.MeshBasicMaterial).color.setHSL(0.03, 1, 0.4 * intensity);
+            (outer.material as THREE.MeshBasicMaterial).opacity = 0.2 * intensity;
+            outer.scale.setScalar(1 + intensity * 4);
+          }
+        }
+      } else {
+        if (this.reentryGlow) (this.reentryGlow.material as THREE.MeshBasicMaterial).opacity = 0;
+        const outer = this.rocketGroup.getObjectByName('reentry-outer') as THREE.Mesh | null;
+        if (outer) (outer.material as THREE.MeshBasicMaterial).opacity = 0;
+      }
+    } else {
+      if (this.reentryGlow) (this.reentryGlow.material as THREE.MeshBasicMaterial).opacity = 0;
+      const outer = this.rocketGroup.getObjectByName('reentry-outer') as THREE.Mesh | null;
+      if (outer) (outer.material as THREE.MeshBasicMaterial).opacity = 0;
+    }
+
     if (!this.grounded) {
       const dx = ndx;
       const dy = ndy;
@@ -540,8 +683,9 @@ export class FlightScene {
       }
 
       // Collision with surface
-      if (nearestBody && (nearestBody as any).radius && nearestDist < (nearestBody as any).radius + 0.5 && isFinite(nearestDist)) {
-        const bodyR = (nearestBody as any).radius;
+      const bodyR = nearestBody ? (nearestBody as any).radius ?? 0 : 0;
+      const surfaceR = nearestBody ? ((nearestBody as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR) : 0;
+      if (nearestBody && bodyR > 0 && nearestDist < surfaceR + 0.5 && isFinite(nearestDist)) {
         const dx = this.state.position[0] - nearestBody.position[0];
         const dy = this.state.position[1] - nearestBody.position[1];
         const dz = this.state.position[2] - nearestBody.position[2];
@@ -554,16 +698,20 @@ export class FlightScene {
           const speedLimit = this.parachuteDeployed ? 15 : 10;
           const tiltLimit = hasLegs ? 30 : 20;
 
-          const alt = nearestDist - bodyR;
+          const alt = nearestDist - surfaceR;
           if (alt < 0.5) {
             if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
-              this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
+              this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
             } else if (tiltDeg > tiltLimit) {
-              this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, bodyR);
-            } else if (isFinite(vertSpeed) && d <= bodyR + 0.5) {
-              this.state.position = [nearestBody.position[0] + dx / d * (bodyR + 0.5), nearestBody.position[1] + dy / d * (bodyR + 0.5), nearestBody.position[2] + dz / d * (bodyR + 0.5)];
+              this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
+            } else if (isFinite(vertSpeed) && d <= surfaceR + 0.5) {
+              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
               this.state.velocity = [0, 0, 0];
               this.grounded = true;
+              this.groundedDir = [dx / d, dy / d, dz / d];
+              // Align rocket with surface normal on landing
+              const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
+              this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
               this.sound.playLand();
               this.sound.stopEngine();
               const bodyName = nearestBody.name;
@@ -578,19 +726,104 @@ export class FlightScene {
         }
       }
     } else {
-      const earth = this.system.bodyByName('earth')!;
-      const earthR = (earth as any).radius ?? 6.371e6;
-      this.state.position = [earth.position[0], earth.position[1] + earthR + 0.5, earth.position[2]];
       this.state.velocity = [0, 0, 0];
     }
 
-    this.sanitize(this.state.position);
-    this.sanitize(this.state.velocity);
-
     this.system.propagate(_dt, FIXED_DT);
+
+    // Track body surface while grounded (body moves during propagate)
+    if (this.grounded && this.groundedDir) {
+      const refBody = getReferenceBody(this.state.position, this.system);
+      const bodyR = (refBody as any).radius ?? 6.371e6;
+      // Use groundedDir direction (not stale this.state.position) for terrain height lookup
+      const surfPos: [number, number, number] = [
+        refBody.position[0] + this.groundedDir[0],
+        refBody.position[1] + this.groundedDir[1],
+        refBody.position[2] + this.groundedDir[2],
+      ];
+      const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
+      const targetDist = surfaceR + 10;
+      this.state.position[0] = refBody.position[0] + this.groundedDir[0] * targetDist;
+      this.state.position[1] = refBody.position[1] + this.groundedDir[1] * targetDist;
+      this.state.position[2] = refBody.position[2] + this.groundedDir[2] * targetDist;
+    }
+    // Safety net: if grounded rocket somehow escapes, snap back
+    if (this.grounded) {
+      const refBody = getReferenceBody(this.state.position, this.system);
+      const dx = this.state.position[0] - refBody.position[0];
+      const dy = this.state.position[1] - refBody.position[1];
+      const dz = this.state.position[2] - refBody.position[2];
+      const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const bodyR = (refBody as any).radius ?? 6.371e6;
+      if (d > bodyR * 1.1) {
+        this.state.velocity = [0, 0, 0];
+        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 10);
+        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 10);
+        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 10);
+      }
+    }
 
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
+    }
+
+    // Update debris physics
+    if (this.debris.length > 0) {
+      const refBody = getReferenceBody(this.state.position, this.system);
+      for (let i = this.debris.length - 1; i >= 0; i--) {
+        const d = this.debris[i]!;
+        d.life -= baseDt;
+        if (d.life <= 0 || d.body.mass <= 0) {
+          this.sceneMgr.scene.remove(d.mesh);
+          this.debris.splice(i, 1);
+          continue;
+        }
+        // Apply gravity
+        const force = totalGravityOn(d.body, this.system.bodies);
+        d.body.applyForce(force, baseDt);
+        // Update mesh position
+        d.mesh.position.set(
+          d.body.position[0] * VISUAL_SCALE,
+          d.body.position[1] * VISUAL_SCALE,
+          d.body.position[2] * VISUAL_SCALE
+        );
+        // Check ground collision
+        const bdx = d.body.position[0] - refBody.position[0];
+        const bdy = d.body.position[1] - refBody.position[1];
+        const bdz = d.body.position[2] - refBody.position[2];
+        const bd = Math.sqrt(bdx * bdx + bdy * bdy + bdz * bdz);
+        const bodyR = (refBody as any).getSurfaceRadiusAt?.(d.body.position) ?? (refBody as any).radius ?? 6.371e6;
+        if (bd < bodyR) {
+          this.sceneMgr.scene.remove(d.mesh);
+          this.debris.splice(i, 1);
+        }
+      }
+    }
+    // Update explosion particles
+    if (this.explosionMeshes.length > 0) {
+      for (let i = this.explosionMeshes.length - 1; i >= 0; i--) {
+        const m = this.explosionMeshes[i]!;
+        const age = (m as any)._age + baseDt;
+        (m as any)._age = age;
+        const life = (m as any)._life;
+        const t = age / life;
+        if (t >= 1) {
+          this.sceneMgr.scene.remove(m);
+          m.geometry.dispose();
+          (m.material as THREE.Material).dispose();
+          this.explosionMeshes.splice(i, 1);
+          continue;
+        }
+        // Expand
+        const s = 0.2 + t * 2.5;
+        m.scale.setScalar(s);
+        // Fade
+        (m.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t);
+        // Move outward
+        m.position.x += (m as any)._vx * baseDt;
+        m.position.y += (m as any)._vy * baseDt;
+        m.position.z += (m as any)._vz * baseDt;
+      }
     }
 
     const sprites = (window as any).__spriteMeshes as THREE.Sprite[] | undefined;
@@ -617,6 +850,15 @@ export class FlightScene {
       }
     }
 
+    const camRefBody = getReferenceBody(this.state.position, this.system);
+    const cdx = this.state.position[0] - camRefBody.position[0];
+    const cdy = this.state.position[1] - camRefBody.position[1];
+    const cdz = this.state.position[2] - camRefBody.position[2];
+    const cd = Math.sqrt(cdx*cdx + cdy*cdy + cdz*cdz) || 1;
+    const camUp = new THREE.Vector3(cdx / cd, cdy / cd, cdz / cd);
+
+    if (this.rocketShadow) this.rocketShadow.visible = this.grounded && !this.crashed;
+
     if (!this.crashed) {
       this.rocketGroup.position.set(
         this.state.position[0] * VISUAL_SCALE,
@@ -624,8 +866,7 @@ export class FlightScene {
         this.state.position[2] * VISUAL_SCALE
       );
 
-      const rotEuler = new THREE.Euler().setFromQuaternion(this.rocketQuat, 'YXZ');
-      this.chase.follow(this.state, _dt, { x: rotEuler.x, y: rotEuler.y, z: rotEuler.z });
+      this.chase.follow(this.state, baseDt, camUp, warpActive);
 
       if (this.deployedChuteMesh) {
         this.deployedChuteMesh.position.set(
@@ -675,8 +916,63 @@ export class FlightScene {
 
     const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.part.id);
     if (decouplerMesh) {
+      const detachedMeshes: THREE.Object3D[] = [];
       while (decouplerMesh.children.length > 0) {
+        detachedMeshes.push(decouplerMesh.children[0]!);
         decouplerMesh.children[0]!.removeFromParent();
+      }
+
+      // Create debris from detached parts with physics
+      const refBody = getReferenceBody(this.state.position, this.system);
+      const pos = [...this.state.position] as Vec3;
+      // Small downward/outward push
+      const pushDir: Vec3 = [
+        refBody.position[0] - pos[0],
+        refBody.position[1] - pos[1],
+        refBody.position[2] - pos[2],
+      ];
+      const pdm = Math.sqrt(pushDir[0]*pushDir[0] + pushDir[1]*pushDir[1] + pushDir[2]*pushDir[2]) || 1;
+      const sepVel: Vec3 = [
+        this.state.velocity[0] - pushDir[0] / pdm * 0.5,
+        this.state.velocity[1] - pushDir[1] / pdm * 0.5,
+        this.state.velocity[2] - pushDir[2] / pdm * 0.5,
+      ];
+
+      for (const dm of detachedMeshes) {
+        const debrisGroup = new THREE.Group();
+        debrisGroup.add(dm);
+        dm.position.set(0, 0, 0);
+
+        // Apply the rocket's visual position as initial world position
+        const rocketPos = new THREE.Vector3(
+          this.state.position[0] * VISUAL_SCALE,
+          this.state.position[1] * VISUAL_SCALE,
+          this.state.position[2] * VISUAL_SCALE
+        );
+        debrisGroup.position.copy(rocketPos);
+
+        // Slight random offset
+        const offset = new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2
+        );
+        debrisGroup.position.add(offset);
+
+        const scene = this.sceneMgr.scene;
+        scene.add(debrisGroup);
+
+        const debrisBody = new Body('debris', 100, pos, [...sepVel] as Vec3);
+        // Add random tiny velocity offset
+        debrisBody.velocity[0] += (Math.random() - 0.5) * 0.2;
+        debrisBody.velocity[1] += (Math.random() - 0.5) * 0.2;
+        debrisBody.velocity[2] += (Math.random() - 0.5) * 0.2;
+
+        this.debris.push({
+          mesh: debrisGroup,
+          body: debrisBody,
+          life: 30,
+        });
       }
     }
 
@@ -732,6 +1028,43 @@ export class FlightScene {
     ];
     this.state.velocity = [0, 0, 0];
     this.state.throttle = 0;
+
+    // Explosion effect
+    this.spawnExplosion(
+      this.state.position[0] * VISUAL_SCALE,
+      this.state.position[1] * VISUAL_SCALE,
+      this.state.position[2] * VISUAL_SCALE
+    );
+  }
+
+  private explosionMeshes: THREE.Mesh[] = [];
+
+  private spawnExplosion(x: number, y: number, z: number): void {
+    const colors = [0xff6600, 0xff4400, 0xff2200, 0xcc4400, 0x886600];
+    for (let i = 0; i < 6; i++) {
+      const size = 0.3 + Math.random() * 0.5;
+      const geom = new THREE.SphereGeometry(size, 8, 6);
+      const mat = new THREE.MeshBasicMaterial({
+        color: colors[i % colors.length]!,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(
+        x + (Math.random() - 0.5) * 0.5,
+        y + (Math.random() - 0.5) * 0.5,
+        z + (Math.random() - 0.5) * 0.5
+      );
+      (mesh as any)._life = 1.5 + Math.random() * 0.5;
+      (mesh as any)._age = 0;
+      (mesh as any)._vx = (Math.random() - 0.5) * 2;
+      (mesh as any)._vy = (Math.random() - 0.5) * 2;
+      (mesh as any)._vz = (Math.random() - 0.5) * 2;
+      this.sceneMgr.scene.add(mesh);
+      this.explosionMeshes.push(mesh);
+    }
   }
 
   private hasLandingLegs(): boolean {
@@ -762,7 +1095,18 @@ export class FlightScene {
 
   dispose(): void {
     this.sceneMgr.scene.remove(this.rocketGroup);
+    for (const d of this.debris) {
+      this.sceneMgr.scene.remove(d.mesh);
+    }
+    this.debris = [];
+    for (const m of this.explosionMeshes) {
+      this.sceneMgr.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.explosionMeshes = [];
     this.engineFlame.dispose();
+    this.groundSmoke.dispose();
     this.hud.unmount();
     this.sound.dispose();
   }

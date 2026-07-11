@@ -43,6 +43,15 @@ const fbm3D = (x: number, y: number, z: number, octaves: number) => {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export class Mercury extends Planet {
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    const craters = fbm3D(nx * 10 + 500, ny * 10 + 600, nz * 10 + 700, 4);
+    const micro = fbm3D(nx * 40 + 100, ny * 40 + 200, nz * 40 + 300, 3);
+    const elev = craters * 0.8 + micro * 0.2;
+    const maxDisp = this.visualRadius * 0.03;
+    if (elev > 0.4) return ((elev - 0.4) / 0.6) ** 2 * maxDisp;
+    return -(0.4 - elev) / 0.4 * maxDisp * 0.12;
+  }
+
   constructor(position: Vec3, velocity: Vec3) {
     super('mercury', 1e24, position, velocity, 2.440e6);
 

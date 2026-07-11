@@ -24,13 +24,16 @@ export class MainMenuScene {
     const logo = document.createElement('div');
     logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
-      <svg viewBox="0 0 120 40" fill="none" style="width:120px;height:40px;display:block;margin:0 auto var(--space-4);">
-        <ellipse cx="60" cy="20" rx="50" ry="14" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.5" opacity="0.5"/>
-        <ellipse cx="60" cy="20" rx="30" ry="8" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1" opacity="0.3"/>
-        <circle cx="60" cy="20" r="3" fill="var(--accent-gold)"/>
+      <svg viewBox="0 0 120 40" fill="none" style="width:100px;height:36px;display:block;margin:0 auto var(--space-2);">
+        <ellipse cx="60" cy="20" rx="52" ry="16" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.2" opacity="0.4"/>
+        <ellipse cx="60" cy="20" rx="36" ry="10" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.8" opacity="0.25"/>
+        <ellipse cx="60" cy="20" rx="18" ry="5" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.6" opacity="0.15"/>
+        <circle cx="60" cy="20" r="2.5" fill="var(--accent-gold)"/>
+        <line x1="10" y1="20" x2="110" y2="20" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
+        <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
       </svg>
-      <div class="text-display" style="font-size:48px;letter-spacing:0.08em;">STARWELD</div>
-      <div class="text-caption" style="margin-top:var(--space-2);">SPACE FLIGHT SIMULATOR</div>
+      <div class="text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
+      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.15em;">SPACE FLIGHT SIMULATOR</div>
     `;
     this.root.appendChild(logo);
 

@@ -4,12 +4,15 @@ import { MainMenuScene } from '../scenes/MainMenuScene';
 import { VABScene } from '../scenes/VABScene';
 import { FlightScene } from '../scenes/FlightScene';
 import { System } from '../physics/System';
-import { Body } from '../physics/Body';
+import { Mercury } from '../planets/Mercury';
+import { Venus } from '../planets/Venus';
 import { Earth } from '../planets/Earth';
 import { Moon } from '../planets/Moon';
-import { Venus } from '../planets/Venus';
 import { Mars } from '../planets/Mars';
-import { Mercury } from '../planets/Mercury';
+import { Jupiter } from '../planets/Jupiter';
+import { Saturn } from '../planets/Saturn';
+import { Uranus } from '../planets/Uranus';
+import { Neptune } from '../planets/Neptune';
 import { Sun } from '../planets/Sun';
 import { Rocket } from '../rocket/Rocket';
 import { Assembly } from '../rocket/Assembly';
@@ -41,23 +44,29 @@ this.system = new System();
     // Sun at center with reduced mass for compressed system
     const sunMass = 2e26;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
-    // Half realistic distances (scaled by ORBIT_SCALE = 1e-9)
-    // Mercury: 57.9e9 m → 28.95e1 m
-    this.system.add(new Mercury([2.895e10, 0, 0], [0, 0, 47400]));
-    // Venus: 108e9 m → 5.4e1 m
-    this.system.add(new Venus([5.41e10, 0, 0], [0, 0, 35000]));
-    // Earth: 149.6e9 m → 7.48e1 m
-    const earthPos: [number, number, number] = [7.48e10, 0, 0];
-    const earthVel: [number, number, number] = [0, 0, 29780];
+    // Scaled solar system for gameplay (distances ×1e-3 of real, fits in camera far plane)
+    // Mercury at 1.5e8 m
+    this.system.add(new Mercury([1.5e8, 0, 2e7], [0, 0, 47400]));
+    // Venus at 3e8 m
+    this.system.add(new Venus([3e8, 0, -3e7], [0, 0, 30000]));
+    // Earth at 5e8 m (1 AU scaled)
+    const earthPos: [number, number, number] = [5e8, 0, 0];
+    const earthVel: [number, number, number] = [0, 0, 24000];
     this.system.add(new Earth(earthPos, earthVel));
-    // Moon: 3.844e8 m from Earth → 1.92e8 m
-    const moonPos: [number, number, number] = [earthPos[0] + 1.922e8, 0, 0];
+    // Moon at 3.844e8 m from Earth (real Moon distance), orbit inclined
+    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 3.844e8];
     const moonVel: [number, number, number] = [0, 0, earthVel[2] + 1020];
     this.system.add(new Moon(moonPos, moonVel));
-    // Mars: 2.279e11 m → 1.139e2 m
-    this.system.add(new Mars([1.1395e11, 0, 0], [0, 0, 24000]));
-    // Jupiter at 7.78e11 m → 3.89e2 m (optional, far)
-    // this.system.add(new Jupiter([3.89e11, 0, 0], [0, 0, 13000]));
+    // Mars at 7.5e8 m with offset so it's not aligned with Earth
+    this.system.add(new Mars([7.5e8, 5e8, -2e8], [0, 0, 19500]));
+    // Jupiter at 1.5e9 m
+    this.system.add(new Jupiter([1.5e9, -3e8, 1e8], [0, 0, 13000]));
+    // Saturn at 2.8e9 m
+    this.system.add(new Saturn([2.8e9, 2e8, -2e8], [0, 0, 9700]));
+    // Uranus at 5.5e9 m
+    this.system.add(new Uranus([5.5e9, -1e8, 3e8], [0, 0, 6800]));
+    // Neptune at 8.5e9 m
+    this.system.add(new Neptune([8.5e9, 4e8, 0], [0, 0, 5400]));
 
     document.getElementById('app')!.appendChild(this.renderer.domElement);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -109,13 +118,13 @@ this.system = new System();
     this.sceneMgr.scene.add(this.vab.scene);
   }
 
-  private showFlight(rocket?: Rocket): void {
+  private async showFlight(rocket?: Rocket): Promise<void> {
     this.unmountCurrent();
     const a = rocket?.assembly ?? new Assembly();
     if (!rocket) {
       const p = PART_SCALE;
       a.addRoot({ part: findPart('capsule_mk1')!, position: [0, 1.6 * p, 0], rotation: 0, children: [] });
-      a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 0.8 * p, 0], rotation: 0, children: [] });
+      a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, 0.8 * p, 0], rotation: 0, children: [] });
       a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     }
     const r = new Rocket(a);
