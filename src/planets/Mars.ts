@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -61,7 +61,7 @@ export class Mars extends Planet {
     const visualR = this.visualRadius;
 
     const loader = new THREE.TextureLoader();
-    const tex = loader.load('/textures/mars.jpg', (t) => {
+    const tex = loader.load(assetUrl('/textures/mars.jpg'), (t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 4;
     });
