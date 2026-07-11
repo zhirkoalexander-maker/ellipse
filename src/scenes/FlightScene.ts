@@ -641,9 +641,11 @@ export class FlightScene {
           const rho = 1.225 * Math.exp(-alt / 8500);
           const dragForce = 0.5 * rho * speed * speed * CdA;
           const dragAccel = dragForce / mass;
-          const dragDelta = dragAccel * _dt;
+          const dragDelta = dragAccel * baseDt;
           if (dragDelta >= speed) {
-            this.state.velocity = [0, 0, 0];
+            this.state.velocity[0] = 0;
+            this.state.velocity[1] = 0;
+            this.state.velocity[2] = 0;
           } else {
             const f = 1 - dragDelta / speed;
             this.state.velocity[0] *= f;

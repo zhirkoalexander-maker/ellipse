@@ -234,7 +234,7 @@ export function generateEarthTexture(): THREE.CanvasTexture {
 }
 
 export function generateEarthBumpMap(): THREE.CanvasTexture {
-  const W = 512, H = 256;
+  const W = 1024, H = 512;
   const [canvas, ctx] = createCanvas(W, H);
   const imageData = ctx.createImageData(W, H);
   const data = imageData.data;

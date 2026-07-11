@@ -81,7 +81,7 @@ export class Earth extends Planet {
     super('earth', EARTH_MASS, position, velocity, 6.371e6);
 
     const visualR = this.visualRadius;
-    const SEG = 128;
+    const SEG = 200;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const mat = new THREE.MeshStandardMaterial({
@@ -110,7 +110,9 @@ export class Earth extends Planet {
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
     const n1 = Math.sin(nx * 3.0 + ny * 1.8) * 0.5 + Math.cos(ny * 2.5 - nz * 1.3) * 0.3;
     const n2 = Math.sin(nz * 1.8 + nx * 1.2 + ny * 0.6) * 0.2 + Math.sin(nx * 6.0 + ny * 3.0 + nz * 4.0) * 0.15;
-    const elev = ((n1 + n2) * 0.35 + 0.5) * 1.2;
+    const n3 = Math.sin(nx * 12.0 + nz * 8.0) * 0.1 + Math.cos(ny * 10.0 + nx * 5.0) * 0.08;
+    const n4 = Math.sin(nx * 25.0 + ny * 20.0 + nz * 30.0) * 0.05;
+    const elev = ((n1 + n2 + n3 + n4) * 0.3 + 0.5) * 1.2;
     const maxDisp = this.visualRadius * 0.025;
     const oceanDepth = this.visualRadius * 0.005;
     if (elev > 0.4) {
