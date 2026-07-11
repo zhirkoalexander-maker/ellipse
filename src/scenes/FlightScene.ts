@@ -626,9 +626,9 @@ export class FlightScene {
       const r2 = r * r;
       if (r > 1 && r2 > 0) {
         const f = (G * nearRef.mass) / r2;
-        this.state.velocity[0] += f * dx / r * _dt;
-        this.state.velocity[1] += f * dy / r * _dt;
-        this.state.velocity[2] += f * dz / r * _dt;
+        this.state.velocity[0] -= f * dx / r * baseDt;
+        this.state.velocity[1] -= f * dy / r * baseDt;
+        this.state.velocity[2] -= f * dz / r * baseDt;
       }
       this.sanitize(this.state.velocity);
 
