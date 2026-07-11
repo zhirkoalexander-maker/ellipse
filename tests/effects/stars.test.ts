@@ -3,11 +3,15 @@ import * as THREE from 'three';
 import { Stars } from '../../src/effects/Stars';
 
 describe('Stars', () => {
-  it('creates a Mesh with ShaderMaterial', () => {
+  it('creates a Group with sky dome and star points', () => {
     const stars = new Stars();
-    const mesh = stars.getMesh();
-    expect(mesh.type).toBe('Mesh');
-    expect((mesh.material as THREE.ShaderMaterial).type).toBe('ShaderMaterial');
-    expect(mesh.geometry.attributes.position!.count).toBeGreaterThan(0);
+    const group = stars.getMesh();
+    expect(group.type).toBe('Group');
+    expect(group.children.length).toBe(2);
+    const sky = group.children[0] as THREE.Mesh;
+    expect(sky.type).toBe('Mesh');
+    expect((sky.material as THREE.ShaderMaterial).type).toBe('ShaderMaterial');
+    const points = group.children[1] as THREE.Points;
+    expect(points.type).toBe('Points');
   });
 });

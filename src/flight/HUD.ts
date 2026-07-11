@@ -5,6 +5,7 @@ export class HUD {
   private root: HTMLDivElement;
   private speedVal!: HTMLSpanElement;
   private speedUnit!: HTMLSpanElement;
+  private vsVal!: HTMLSpanElement;
   private altVal!: HTMLSpanElement;
   private altUnit!: HTMLSpanElement;
   private angleVal!: HTMLSpanElement;
@@ -47,6 +48,7 @@ export class HUD {
   mount(parent: HTMLElement = document.body): void {
     this.root.innerHTML = `
       <div class="hud-row"><span class="hud-label">Velocity</span><span class="hud-value"><span class="speed-val">0</span> <span class="speed-unit" style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
+      <div class="hud-row"><span class="hud-label">V/S</span><span class="hud-value"><span class="vs-val" style="color:#44FF44;">0</span> <span style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
       <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
       <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
       <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
@@ -54,10 +56,6 @@ export class HUD {
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
         <div class="hud-row"><span class="hud-label">Fuel</span><span class="text-data-sm fuel-pct">0%</span></div>
         <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--fuel fuel-fill" style="width:0%;"></span></span></div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
-        <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
-        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--heat heat-fill" style="width:0%;background:#44FF44;"></span></span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
         <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
@@ -79,6 +77,7 @@ export class HUD {
 
     this.speedVal = this.root.querySelector('.speed-val')!;
     this.speedUnit = this.root.querySelector('.speed-unit')!;
+    this.vsVal = this.root.querySelector('.vs-val')!;
     this.altVal = this.root.querySelector('.alt-val')!;
     this.altUnit = this.root.querySelector('.alt-unit')!;
     this.angleVal = this.root.querySelector('.angle-val')!;
@@ -86,8 +85,6 @@ export class HUD {
     this.fuelPct = this.root.querySelector('.fuel-pct')!;
     this.throtFill = this.root.querySelector('.throt-fill')!;
     this.throtPct = this.root.querySelector('.throt-pct')!;
-    this.heatFill = this.root.querySelector('.heat-fill')!;
-    this.heatPct = this.root.querySelector('.heat-pct')!;
     this.heatFill = this.root.querySelector('.heat-fill')!;
     this.heatPct = this.root.querySelector('.heat-pct')!;
     this.root.addEventListener('click', (e) => {
@@ -226,7 +223,9 @@ export class HUD {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
+    let nearestBody: any = null;
     let nearestAlt = Infinity;
+    let ndx = 0, ndy = 0, ndz = 0;
     for (const body of system.bodies) {
       if (body.mass <= 0) continue;
       const dx = state.position[0] - body.position[0];
@@ -234,8 +233,13 @@ export class HUD {
       const dz = state.position[2] - body.position[2];
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       const r = (body as any).radius ?? 0;
-      const alt = d - r;
-      if (alt < nearestAlt) nearestAlt = alt;
+      const surfaceR = (body as any).getSurfaceRadiusAt?.(state.position) ?? r;
+      const alt = d - surfaceR;
+      if (alt < nearestAlt) {
+        nearestAlt = alt;
+        nearestBody = body;
+        ndx = dx; ndy = dy; ndz = dz;
+      }
     }
     const horiz = Math.sqrt(state.velocity[0] ** 2 + state.velocity[2] ** 2);
     const angle = Math.atan2(horiz, Math.abs(state.velocity[1])) * 180 / Math.PI;
@@ -247,6 +251,13 @@ export class HUD {
 
     // Heat: clamp to 0-100% (100000 = 100% critical)
     const heatPct = Math.min(100, (heat / 100000) * 100);
+
+    // Vertical speed relative to nearest body
+    const dBody = Math.sqrt(ndx * ndx + ndy * ndy + ndz * ndz) || 1;
+    const udx = ndx / dBody, udy = ndy / dBody, udz = ndz / dBody;
+    const vertSpeed = state.velocity[0] * udx + state.velocity[1] * udy + state.velocity[2] * udz;
+    this.vsVal.textContent = vertSpeed.toFixed(1);
+    this.vsVal.style.color = vertSpeed < -5 ? '#FF4444' : vertSpeed > 5 ? '#44FF44' : '#CCCC44';
 
     this.speedVal.textContent = speed.toFixed(1);
     if (nearestAlt > 1000) {

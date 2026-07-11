@@ -61,6 +61,9 @@ export class FlightScene {
   private debris: Debris[] = [];
   private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
   private warpIndex = 0;
+  private crashOverlay: HTMLDivElement | null = null;
+
+  onCrashAction: ((action: 'menu' | 'restart') => void) | null = null;
 
 
   constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements) {
@@ -124,51 +127,6 @@ export class FlightScene {
     const fillLight = new THREE.DirectionalLight(0x8899cc, 0.5);
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
-
-    const spriteTex = (color: string) => {
-      const c = document.createElement('canvas');
-      c.width = 64; c.height = 64;
-      const ctx = c.getContext('2d')!;
-      ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.fill();
-      ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
-      return new THREE.CanvasTexture(c);
-    };
-    const planetColors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', mercury: '#aaa', venus: '#e8a84c', mars: '#d4733a', jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd' };
-    const planetSizes: Record<string, number> = { sun: 6, earth: 4, moon: 2, mercury: 1.5, venus: 2, mars: 2, jupiter: 5, saturn: 4.5, uranus: 2.5, neptune: 2.5 };
-    const spriteMeshes: THREE.Sprite[] = [];
-    for (const body of system.bodies) {
-      if (body.name === 'earth' || body.name === 'sun') continue;
-      const mat = new THREE.SpriteMaterial({ map: spriteTex(planetColors[body.name] || '#888'), transparent: true, depthTest: true });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(planetSizes[body.name] || 10, planetSizes[body.name] || 10, 1);
-      sprite.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
-      sceneMgr.scene.add(sprite);
-      spriteMeshes.push(sprite);
-    }
-    (window as any).__spriteMeshes = spriteMeshes;
-
-    const earthMass = 5.2e24;
-    const earthPos = system.bodyByName('earth')!.position;
-    const soiMeshes: THREE.LineSegments[] = [];
-    for (const body of system.bodies) {
-      if (body.mass <= 0 || body.name === 'earth') continue;
-      const dx = body.position[0] - earthPos[0];
-      const dy = body.position[1] - earthPos[1];
-      const dz = body.position[2] - earthPos[2];
-      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-      const soiR = dist * Math.pow(body.mass / earthMass, 0.4) * VISUAL_SCALE;
-      if (soiR < 1) continue;
-      const geom = new THREE.SphereGeometry(soiR, 24, 12);
-      const edges = new THREE.EdgesGeometry(geom);
-      const mat = new THREE.LineBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.25, depthTest: false });
-      const wire = new THREE.LineSegments(edges, mat);
-      wire.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
-      sceneMgr.scene.add(wire);
-      soiMeshes.push(wire);
-    }
-    (window as any).__soiMeshes = soiMeshes;
 
     this.engineFlame = new EngineFlame();
     this.positionFlameAtNozzle();
@@ -244,10 +202,10 @@ export class FlightScene {
         this.hud.setPaused(false);
       }
       else if (action === 'menu') {
-        window.location.reload();
+        this.onCrashAction?.('menu');
       }
       else if (action === 'restart') {
-        window.location.reload();
+        this.onCrashAction?.('restart');
       }
     };
     this.hud.mount();
@@ -511,6 +469,13 @@ export class FlightScene {
       return;
     }
 
+    if (this.crashed) {
+      this.system.propagate(_dt * this.timeWarp, FIXED_DT);
+      for (const body of this.system.bodies) (body as any).syncMesh?.();
+      this.updateExplosion(baseDt);
+      return;
+    }
+
     _dt *= this.timeWarp;
     if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
 
@@ -601,10 +566,12 @@ export class FlightScene {
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
-    // Integrate position
-    this.state.position[0] += this.state.velocity[0] * _dt;
-    this.state.position[1] += this.state.velocity[1] * _dt;
-    this.state.position[2] += this.state.velocity[2] * _dt;
+    // Integrate position (skip during warp when grounded to prevent bounce)
+    if (!(this.grounded && warpActive)) {
+      this.state.position[0] += this.state.velocity[0] * _dt;
+      this.state.position[1] += this.state.velocity[1] * _dt;
+      this.state.position[2] += this.state.velocity[2] * _dt;
+    }
 
     let nearestBody: any = null;
     let nearestDist = Infinity;
@@ -695,11 +662,11 @@ export class FlightScene {
         const dy = this.state.position[1] - nearestBody.position[1];
         const dz = this.state.position[2] - nearestBody.position[2];
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
         // Penetration check — inside the planet = always crash
         if (d < surfaceR - 1) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 0.5 && d > 0.001) {
-          const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
+        } else if (d < surfaceR + 5 && d > 0.001) {
           const tiltDeg = Math.acos(Math.min(1, Math.abs((0 * dx + 1 * dy + 0 * dz) / d))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
           const speedLimit = this.parachuteDeployed ? 15 : 10;
@@ -710,22 +677,29 @@ export class FlightScene {
           } else if (tiltDeg > tiltLimit) {
             this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
           } else if (isFinite(vertSpeed)) {
-            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
             this.state.velocity = [0, 0, 0];
             this.grounded = true;
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
             this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            this.sound.playLand();
-            this.sound.stopEngine();
-            const bodyName = nearestBody.name;
-            toast.show(`Landed on ${bodyName}!`);
-            if (bodyName === 'earth') this.achievements.unlock('land_earth');
-            else if (bodyName === 'moon') this.achievements.unlock('land_moon');
-            else if (bodyName === 'mars') this.achievements.unlock('land_mars');
-            else if (bodyName === 'venus') this.achievements.unlock('land_venus');
-            else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
+            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 0.5) ||
+                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 0.5) ||
+                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 0.5)) {
+              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
+              this.sound.playLand();
+              this.sound.stopEngine();
+              const bodyName = nearestBody.name;
+              toast.show(`Landed on ${bodyName}!`);
+              if (bodyName === 'earth') this.achievements.unlock('land_earth');
+              else if (bodyName === 'moon') this.achievements.unlock('land_moon');
+              else if (bodyName === 'mars') this.achievements.unlock('land_mars');
+              else if (bodyName === 'venus') this.achievements.unlock('land_venus');
+              else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
+            }
           }
+        } else if (d < surfaceR + 200 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
+          // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
+          this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         }
       }
     } else {
@@ -745,7 +719,7 @@ export class FlightScene {
         refBody.position[2] + this.groundedDir[2],
       ];
       const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
-      const targetDist = surfaceR + 10;
+      const targetDist = surfaceR + 0.5;
       this.state.position[0] = refBody.position[0] + this.groundedDir[0] * targetDist;
       this.state.position[1] = refBody.position[1] + this.groundedDir[1] * targetDist;
       this.state.position[2] = refBody.position[2] + this.groundedDir[2] * targetDist;
@@ -802,56 +776,7 @@ export class FlightScene {
         }
       }
     }
-    // Update explosion particles
-    if (this.explosionMeshes.length > 0) {
-      for (let i = this.explosionMeshes.length - 1; i >= 0; i--) {
-        const m = this.explosionMeshes[i]!;
-        const age = (m as any)._age + baseDt;
-        (m as any)._age = age;
-        const life = (m as any)._life;
-        const t = age / life;
-        if (t >= 1) {
-          this.sceneMgr.scene.remove(m);
-          m.geometry.dispose();
-          (m.material as THREE.Material).dispose();
-          this.explosionMeshes.splice(i, 1);
-          continue;
-        }
-        // Expand
-        const s = 0.2 + t * 2.5;
-        m.scale.setScalar(s);
-        // Fade
-        (m.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t);
-        // Move outward
-        m.position.x += (m as any)._vx * baseDt;
-        m.position.y += (m as any)._vy * baseDt;
-        m.position.z += (m as any)._vz * baseDt;
-      }
-    }
-
-    const sprites = (window as any).__spriteMeshes as THREE.Sprite[] | undefined;
-    if (sprites) {
-      let si = 0;
-      for (const body of this.system.bodies) {
-        if (body.name === 'earth' || body.name === 'sun') continue;
-        if (si < sprites.length) {
-          sprites[si]!.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
-          si++;
-        }
-      }
-    }
-
-    const soiMeshes = (window as any).__soiMeshes as THREE.LineSegments[] | undefined;
-    if (soiMeshes) {
-      let si = 0;
-      for (const body of this.system.bodies) {
-        if (body.mass <= 0 || body.name === 'earth') continue;
-        if (si < soiMeshes.length) {
-          soiMeshes[si]!.position.set(body.position[0] * VISUAL_SCALE, body.position[1] * VISUAL_SCALE, body.position[2] * VISUAL_SCALE);
-          si++;
-        }
-      }
-    }
+    this.updateExplosion(baseDt);
 
     const camRefBody = getReferenceBody(this.state.position, this.system);
     const cdx = this.state.position[0] - camRefBody.position[0];
@@ -919,62 +844,61 @@ export class FlightScene {
 
     const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.part.id);
     if (decouplerMesh) {
-      const detachedMeshes: THREE.Object3D[] = [];
+      // Capture world positions before detaching
+      const worldPositions: THREE.Vector3[] = [];
+      const meshes: THREE.Object3D[] = [];
       while (decouplerMesh.children.length > 0) {
-        detachedMeshes.push(decouplerMesh.children[0]!);
-        decouplerMesh.children[0]!.removeFromParent();
+        const child = decouplerMesh.children[0]!;
+        const wp = new THREE.Vector3();
+        child.getWorldPosition(wp);
+        worldPositions.push(wp);
+        meshes.push(child);
+        child.removeFromParent();
       }
 
       // Create debris from detached parts with physics
       const refBody = getReferenceBody(this.state.position, this.system);
       const pos = [...this.state.position] as Vec3;
-      // Small downward/outward push
+      // Push downward/away from rocket
       const pushDir: Vec3 = [
         refBody.position[0] - pos[0],
         refBody.position[1] - pos[1],
         refBody.position[2] - pos[2],
       ];
       const pdm = Math.sqrt(pushDir[0]*pushDir[0] + pushDir[1]*pushDir[1] + pushDir[2]*pushDir[2]) || 1;
-      const sepVel: Vec3 = [
-        this.state.velocity[0] - pushDir[0] / pdm * 0.5,
-        this.state.velocity[1] - pushDir[1] / pdm * 0.5,
-        this.state.velocity[2] - pushDir[2] / pdm * 0.5,
-      ];
 
-      for (const dm of detachedMeshes) {
+      for (let i = 0; i < meshes.length; i++) {
+        const dm = meshes[i]!;
         const debrisGroup = new THREE.Group();
         debrisGroup.add(dm);
         dm.position.set(0, 0, 0);
 
-        // Apply the rocket's visual position as initial world position
-        const rocketPos = new THREE.Vector3(
-          this.state.position[0] * VISUAL_SCALE,
-          this.state.position[1] * VISUAL_SCALE,
-          this.state.position[2] * VISUAL_SCALE
-        );
-        debrisGroup.position.copy(rocketPos);
-
-        // Slight random offset
-        const offset = new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2,
-          (Math.random() - 0.5) * 2
-        );
-        debrisGroup.position.add(offset);
-
         const scene = this.sceneMgr.scene;
+        debrisGroup.position.copy(worldPositions[i]!);
+        // Small random spread
+        debrisGroup.position.x += (Math.random() - 0.5) * 0.5;
+        debrisGroup.position.y += (Math.random() - 0.5) * 0.5;
+        debrisGroup.position.z += (Math.random() - 0.5) * 0.5;
+
+        // Random rotation for tumbling
+        debrisGroup.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+
         scene.add(debrisGroup);
 
-        const debrisBody = new Body('debris', 100, pos, [...sepVel] as Vec3);
-        // Add random tiny velocity offset
-        debrisBody.velocity[0] += (Math.random() - 0.5) * 0.2;
-        debrisBody.velocity[1] += (Math.random() - 0.5) * 0.2;
-        debrisBody.velocity[2] += (Math.random() - 0.5) * 0.2;
+        // Velocity: rocket velocity + push away + random
+        const pushForce = 1 + Math.random() * 2;
+        const sepVel: Vec3 = [
+          this.state.velocity[0] - pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[1] - pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[2] - pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+        ];
+
+        const debrisBody = new Body('debris', 100, pos, sepVel);
 
         this.debris.push({
           mesh: debrisGroup,
           body: debrisBody,
-          life: 30,
+          life: 60,
         });
       }
     }
@@ -1038,14 +962,81 @@ export class FlightScene {
       this.state.position[1] * VISUAL_SCALE,
       this.state.position[2] * VISUAL_SCALE
     );
+
+    // Crash overlay
+    this.showCrashOverlay(reason);
+  }
+
+  private showCrashOverlay(reason: string): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.7);z-index:1000;
+      font-family:system-ui,sans-serif;color:#fff;
+    `;
+    overlay.innerHTML = `
+      <div style="font-size:48px;font-weight:bold;color:#ff4444;margin-bottom:8px;">CRASH!</div>
+      <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
+      <div style="display:flex;gap:16px;">
+        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#fff;cursor:pointer;">MENU</button>
+        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#fff;cursor:pointer;">LAUNCH AGAIN</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    this.crashOverlay = overlay;
+
+    overlay.querySelector('#crash-menu')!.addEventListener('click', () => {
+      this.onCrashAction?.('menu');
+    });
+    overlay.querySelector('#crash-restart')!.addEventListener('click', () => {
+      this.onCrashAction?.('restart');
+    });
+  }
+
+  private updateExplosion(dt: number): void {
+    if (this.explosionMeshes.length > 0) {
+      for (let i = this.explosionMeshes.length - 1; i >= 0; i--) {
+        const m = this.explosionMeshes[i]!;
+        const age = (m as any)._age + dt;
+        (m as any)._age = age;
+        const life = (m as any)._life;
+        const t = age / life;
+        if (t >= 1) {
+          this.sceneMgr.scene.remove(m);
+          m.geometry.dispose();
+          (m.material as THREE.Material).dispose();
+          this.explosionMeshes.splice(i, 1);
+          continue;
+        }
+        const s = 1 + t * 6;
+        m.scale.setScalar(s);
+        const fadeFactor = life < 1 ? 2 : 1;
+        (m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - t * fadeFactor));
+        m.position.x += (m as any)._vx * dt;
+        m.position.y += (m as any)._vy * dt;
+        m.position.z += (m as any)._vz * dt;
+      }
+    }
   }
 
   private explosionMeshes: THREE.Mesh[] = [];
 
   private spawnExplosion(x: number, y: number, z: number): void {
-    const colors = [0xff6600, 0xff4400, 0xff2200, 0xcc4400, 0x886600];
-    for (let i = 0; i < 6; i++) {
-      const size = 0.3 + Math.random() * 0.5;
+    const colors = [0xff8800, 0xff4400, 0xff2200, 0xff6600, 0xcc4400, 0xffaa00];
+    // Big central fireball
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.8, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    core.position.set(x, y, z);
+    (core as any)._life = 0.8;
+    (core as any)._age = 0;
+    this.sceneMgr.scene.add(core);
+    this.explosionMeshes.push(core);
+    // Expanding fire spheres
+    for (let i = 0; i < 8; i++) {
+      const size = 1 + Math.random() * 1.5;
       const geom = new THREE.SphereGeometry(size, 8, 6);
       const mat = new THREE.MeshBasicMaterial({
         color: colors[i % colors.length]!,
@@ -1055,18 +1046,42 @@ export class FlightScene {
         depthWrite: false,
       });
       const mesh = new THREE.Mesh(geom, mat);
+      const theta = (i / 8) * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const r = 0.3;
       mesh.position.set(
-        x + (Math.random() - 0.5) * 0.5,
-        y + (Math.random() - 0.5) * 0.5,
-        z + (Math.random() - 0.5) * 0.5
+        x + Math.sin(theta) * Math.cos(phi) * r,
+        y + Math.sin(phi) * r,
+        z + Math.cos(theta) * Math.cos(phi) * r
       );
       (mesh as any)._life = 1.5 + Math.random() * 0.5;
       (mesh as any)._age = 0;
-      (mesh as any)._vx = (Math.random() - 0.5) * 2;
-      (mesh as any)._vy = (Math.random() - 0.5) * 2;
-      (mesh as any)._vz = (Math.random() - 0.5) * 2;
+      (mesh as any)._vx = Math.sin(theta) * Math.cos(phi) * (1 + Math.random() * 3);
+      (mesh as any)._vy = Math.sin(phi) * (1 + Math.random() * 3);
+      (mesh as any)._vz = Math.cos(theta) * Math.cos(phi) * (1 + Math.random() * 3);
       this.sceneMgr.scene.add(mesh);
       this.explosionMeshes.push(mesh);
+    }
+    // Smoke ring — grey expanding sprites
+    for (let i = 0; i < 4; i++) {
+      const size = 1.5 + Math.random() * 2;
+      const smokeMat = new THREE.MeshBasicMaterial({
+        color: 0x444444,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.NormalBlending,
+        depthWrite: false,
+      });
+      const smoke = new THREE.Mesh(new THREE.SphereGeometry(size, 6, 6), smokeMat);
+      const theta = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+      smoke.position.set(x + Math.cos(theta) * 0.5, y + (Math.random() - 0.5) * 0.3, z + Math.sin(theta) * 0.5);
+      (smoke as any)._life = 2 + Math.random() * 0.5;
+      (smoke as any)._age = 0;
+      (smoke as any)._vx = Math.cos(theta) * (0.5 + Math.random() * 1.5);
+      (smoke as any)._vy = (Math.random() - 0.5) * 1;
+      (smoke as any)._vz = Math.sin(theta) * (0.5 + Math.random() * 1.5);
+      this.sceneMgr.scene.add(smoke);
+      this.explosionMeshes.push(smoke);
     }
   }
 
@@ -1097,6 +1112,10 @@ export class FlightScene {
   }
 
   dispose(): void {
+    if (this.crashOverlay) {
+      this.crashOverlay.remove();
+      this.crashOverlay = null;
+    }
     this.sceneMgr.scene.remove(this.rocketGroup);
     for (const d of this.debris) {
       this.sceneMgr.scene.remove(d.mesh);
