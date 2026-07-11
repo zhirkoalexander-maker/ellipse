@@ -149,8 +149,8 @@ export const PART_CATALOG: Part[] = [
     mass: 100,
     dragCoeff: 0.3
   },
-  // GLTF Models (scales calibrated: GLTF in meters → game units via gltfScale)
-// Target: ~0.0025 scale for all (1 meter = 0.0025 game units)
+// GLTF Models (scales calibrated: GLTF in meters → game units via gltfScale)
+// Target: ~0.0015 scale for all (1 meter = 0.0015 game units)
   {
     id: 'agena_target',
     name: 'Agena Target Vehicle',
@@ -159,7 +159,7 @@ export const PART_CATALOG: Part[] = [
     mass: 1500,
     dragCoeff: 0.3,
     gltfUrl: '/models/agena.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'apollo_soyuz',
@@ -169,7 +169,7 @@ export const PART_CATALOG: Part[] = [
     mass: 5000,
     dragCoeff: 0.3,
     gltfUrl: '/models/apollo_soyuz.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'saturn_v',
@@ -179,7 +179,7 @@ export const PART_CATALOG: Part[] = [
     mass: 3000000,
     dragCoeff: 0.3,
     gltfUrl: '/models/saturn_v.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'ares_1',
@@ -189,7 +189,7 @@ export const PART_CATALOG: Part[] = [
     mass: 2000000,
     dragCoeff: 0.3,
     gltfUrl: '/models/ares_1.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'apollo_lunar_module',
@@ -199,7 +199,7 @@ export const PART_CATALOG: Part[] = [
     mass: 15000,
     dragCoeff: 0.3,
     gltfUrl: '/models/apollo_lunar_module.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.002
   },
   {
     id: 'atlas_6',
@@ -209,7 +209,7 @@ export const PART_CATALOG: Part[] = [
     mass: 120000,
     dragCoeff: 0.3,
     gltfUrl: '/models/atlas_6.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'atlas_9',
@@ -219,7 +219,7 @@ export const PART_CATALOG: Part[] = [
     mass: 120000,
     dragCoeff: 0.3,
     gltfUrl: '/models/atlas_9.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.0015
   },
   {
     id: 'crawler',
@@ -229,7 +229,7 @@ export const PART_CATALOG: Part[] = [
     mass: 2700000,
     dragCoeff: 0.3,
     gltfUrl: '/models/crawler.glb',
-    gltfScale: 0.0025
+    gltfScale: 0.001
   }
 ];
 

@@ -2,15 +2,15 @@ import * as THREE from 'three';
 import { PART_CATALOG, findPart } from '../parts/PartCatalog';
 import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
-import { PART_SCALE } from '../config/constants';
+import { PART_SCALE, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { buildRocketFromDescription } from '../parts/RocketBuilder';
 import { gltfCache, loadGLTF } from '../parts/PartBuilder';
 
 const PART_HEIGHT: Record<string, number> = {
-  S: 0.6 * PART_SCALE,
-  M: 1.0 * PART_SCALE,
-  L: 1.4 * PART_SCALE,
-  XL: 2.0 * PART_SCALE,
+  S: 0.8 * PART_SCALE,
+  M: 1.2 * PART_SCALE,
+  L: 1.8 * PART_SCALE,
+  XL: 2.5 * PART_SCALE,
 };
 
 export class VABScene {
@@ -40,10 +40,10 @@ export class VABScene {
     const hemi = new THREE.HemisphereLight(0x8888cc, 0x444466, 0.8);
     this.scene.add(hemi);
 
-    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.0001, 10);
-    const camDist = PART_SCALE * 2;
-    this.camera.position.set(0, camDist * 0.3, camDist);
-    this.camera.lookAt(0, 0, 0);
+    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 1000);
+    const camDist = PART_SCALE * 15;
+    this.camera.position.set(0, camDist * 0.3, camDist * 3);
+    this.camera.lookAt(0, PART_SCALE, 0);
 
     const padSize = PART_SCALE * 4;
     const pad = new THREE.Mesh(

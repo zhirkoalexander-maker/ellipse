@@ -43,25 +43,16 @@ const fbm3D = (x: number, y: number, z: number, octaves: number) => {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-export class Venus extends Planet {
-  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    const volcanoes = fbm3D(nx * 6 + 50, ny * 6 + 100, nz * 6 + 150, 4);
-    const plains = fbm3D(nx * 15 + 200, ny * 15 + 300, nz * 15 + 400, 3);
-    const elev = volcanoes * 0.6 + plains * 0.4;
-    const maxDisp = this.visualRadius * 0.015;
-    if (elev > 0.35) return ((elev - 0.35) / 0.65) ** 2 * maxDisp;
-    return -(0.35 - elev) / 0.35 * maxDisp * 0.05;
-  }
-
-  atmosphereGlow: AtmosphereGlow;
+export class Jupiter extends Planet {
+  atmosphereGlow: any;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('venus', 1.46e25, position, velocity, 6.052e6);
+    super('jupiter', 1.9e27, position, velocity, 6.9911e7);
 
     const visualR = this.visualRadius;
 
     const loader = new THREE.TextureLoader();
-    const tex = loader.load('/textures/venus.jpg', (t) => {
+    const tex = loader.load('/textures/jupiter.jpg', (t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 4;
     });
@@ -69,7 +60,7 @@ export class Venus extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.015;
+    const maxDisp = visualR * 0.02;
 
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
@@ -77,13 +68,13 @@ export class Venus extends Planet {
       const ny = vert.y / visualR;
       const nz = vert.z / visualR;
 
-      const volcanoes = fbm3D(nx * 6 + 50, ny * 6 + 100, nz * 6 + 150, 4);
-      const plains = fbm3D(nx * 15 + 200, ny * 15 + 300, nz * 15 + 400, 3);
-      const elev = volcanoes * 0.6 + plains * 0.4;
+      const bands = fbm3D(nx * 8 + 10, ny * 8 + 20, nz * 8 + 30, 4);
+      const micro = fbm3D(nx * 30 + 100, ny * 30 + 200, nz * 30 + 300, 3);
+      const elev = bands * 0.7 + micro * 0.3;
 
       let disp = 0;
-      if (elev > 0.35) disp = ((elev - 0.35) / 0.65) ** 2 * maxDisp;
-      else disp = -(0.35 - elev) / 0.35 * maxDisp * 0.05;
+      if (elev > 0.4) disp = ((elev - 0.4) / 0.6) ** 2 * maxDisp;
+      else disp = -(0.4 - elev) / 0.4 * maxDisp * 0.1;
 
       vert.setLength(visualR + disp);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);
@@ -92,16 +83,17 @@ export class Venus extends Planet {
     geom.computeVertexNormals();
 
     const mat = new THREE.MeshStandardMaterial({
-      map: tex,
+      map: undefined,
       roughness: 0.9,
       metalness: 0.0,
-      color: 0xffffff,
+      color: 0xd4a574,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
+    this.mesh.position.set(0, 0, 0);
+    this.mesh.rotation.z = 3.1 * Math.PI / 180;
 
-    this.atmosphereGlow = new AtmosphereGlow(visualR, 0xe8a84c, 0.4);
+    this.atmosphereGlow = new AtmosphereGlow(visualR, 0xd4a574, 0.15);
     this.mesh.add(this.atmosphereGlow.getMesh());
   }
 }
