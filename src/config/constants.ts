@@ -30,3 +30,9 @@ export const TERRAIN_OCEAN_FRAC = 0;
 
 /** Sea level threshold */
 export const TERRAIN_SEA_LEVEL = 0.35;
+
+/** Resolve asset URL with correct base path for GitHub Pages. */
+export function assetUrl(path: string): string {
+  const base = (import.meta as any).env?.BASE_URL ?? '/';
+  return (base + path.replace(/^\//, '')).replace(/\/\//g, '/');
+}

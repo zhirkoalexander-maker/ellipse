@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Part } from './Part';
-import { PART_SCALE } from '../config/constants';
+import { PART_SCALE, assetUrl } from '../config/constants';
 import {
   generateTankTexture,
   generateCapsuleTexture,
@@ -29,10 +29,11 @@ export const gltfLoader = new GLTFLoader();
 export const gltfCache = new Map<string, THREE.Group>();
 
 export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
-  if (gltfCache.has(url)) {
-    return gltfCache.get(url)!.clone();
+  const resolvedUrl = assetUrl(url);
+  if (gltfCache.has(resolvedUrl)) {
+    return gltfCache.get(resolvedUrl)!.clone();
   }
-  const gltf = await gltfLoader.loadAsync(url);
+  const gltf = await gltfLoader.loadAsync(resolvedUrl);
   const group = gltf.scene;
   // Do NOT apply scale here - it will be applied in buildPartMesh
   // group.scale.setScalar(scale);
@@ -91,7 +92,7 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
     }
   });
   
-  gltfCache.set(url, group);
+  gltfCache.set(resolvedUrl, group);
   return group.clone();
 }
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -68,7 +68,7 @@ export class Earth extends Planet {
   private async loadTexture() {
     const loader = new THREE.TextureLoader();
     const [dayTex] = await Promise.all([
-      loader.loadAsync('/textures/earth_daymap.jpg'),
+      loader.loadAsync(assetUrl('/textures/earth_daymap.jpg')),
     ]);
 
     dayTex.colorSpace = THREE.SRGBColorSpace;
