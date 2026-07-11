@@ -40,8 +40,8 @@ export class Controls {
   update(dt: number): void {
     const up = this.touch?.getThrottleUp() || this.keys.has('w');
     const down = this.touch?.getThrottleDown() || this.keys.has('s');
-    if (up) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
-    if (down) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.5);
+    if (up) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.3);
+    if (down) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.3);
   }
 
   getPitch(): number {
