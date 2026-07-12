@@ -1196,11 +1196,27 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     const normY = upZ * relVelX - upX * relVelZ;
     const normZ = upX * relVelY - upY * relVelX;
     const normLen = Math.sqrt(normX * normX + normY * normY + normZ * normZ) || 1;
+    // Planet direction markers for navball
+    const bodyDirs: Array<{ name: string; dir: [number, number, number]; color: string }> = [];
+    const mapColors: Record<string, string> = {
+      sun: '#ffdd44', earth: '#4fc3f7', moon: '#aaaacc',
+      venus: '#e8a84c', mars: '#d4733a', jupiter: '#d4a574',
+      saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd'
+    };
+    for (const body of this.system.bodies) {
+      if (body.mass <= 0) continue;
+      const dx = body.position[0] - this.state.position[0];
+      const dy = body.position[1] - this.state.position[1];
+      const dz = body.position[2] - this.state.position[2];
+      const d = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+      bodyDirs.push({ name: body.name, dir: [dx/d, dy/d, dz/d], color: mapColors[body.name] || '#888' });
+    }
     this.hud.setNavballData(
       [rocketFwd.x, rocketFwd.y, rocketFwd.z],
       velDir,
       [upX / upNorm, upY / upNorm, upZ / upNorm],
-      [normX / normLen, normY / normLen, normZ / normLen]
+      [normX / normLen, normY / normLen, normZ / normLen],
+      bodyDirs
     );
   }
 
