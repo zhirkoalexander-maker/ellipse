@@ -72,6 +72,7 @@ export class HUD {
         <button class="btn btn--action" data-action="map">MAP</button>
       </div>
       <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | Space Stage | Esc Pause</div>
+      <div style="color:rgba(244,245,242,0.2);font-size:8px;letter-spacing:0.03em;margin-top:4px;">🖱 Drag orbit | Shift+←→ orbit | Scroll zoom | M Map</div>
     `;
     parent.appendChild(this.root);
 
