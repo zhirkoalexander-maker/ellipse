@@ -229,6 +229,16 @@ export class FlightScene {
     this.exhaustLight.position.set(0, -1, 0);
     this.rocketGroup.add(this.exhaustLight);
 
+    // Reentry glow mesh (white-hot spherical halo)
+    const reentryGeom = new THREE.SphereGeometry(2, 16, 16);
+    const reentryMat = new THREE.MeshBasicMaterial({
+      color: 0xff8844, transparent: true, opacity: 0, depthWrite: false
+    });
+    this.reentryGlowMesh = new THREE.Mesh(reentryGeom, reentryMat);
+    this.reentryGlowMesh.position.set(0, 0.5, 0);
+    this.reentryGlowMesh.visible = false;
+    this.rocketGroup.add(this.reentryGlowMesh);
+
     this.groundSmoke = new GroundSmoke();
     this.rocketGroup.add(this.groundSmoke.getMesh());
 
