@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
+import { generateSaturnTexture } from '../effects/ProceduralTextures';
 import { fbm3D } from '../utils/noise';
 
-const VS = 1e-9 * 37500;
+const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 64;
 
 function createRingTexture(): THREE.CanvasTexture {
@@ -74,11 +75,7 @@ export class Saturn extends Planet {
 
     const visualR = this.visualRadius;
 
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load(assetUrl('/textures/saturn.jpg'), (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
-    });
+    const tex = generateSaturnTexture();
 
     const geom = new THREE.SphereGeometry(visualR, 64, 32);
     const posAttr = geom.attributes.position!;
@@ -106,11 +103,11 @@ export class Saturn extends Planet {
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
-      color: 0xf4e4a1,
+      color: 0xffffff,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(0, 0, 0);
+    this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
     this.mesh.rotation.z = 26.7 * Math.PI / 180;
 
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0xf4e4a1, 0.1);
