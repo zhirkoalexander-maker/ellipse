@@ -683,11 +683,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
         ctx.stroke();
 
-        // Main trajectory line
+        // Main trajectory line with gradient (bright near rocket, fades at end)
+        const grad = ctx.createLinearGradient(firstX, firstY, 
+          cx + prediction.points[prediction.points.length-1]![0] * s,
+          cy - prediction.points[prediction.points.length-1]![1] * s);
+        const startCol = prediction.bound ? 'rgba(68,136,204,0.9)' : 'rgba(221,170,68,0.9)';
+        const endCol = prediction.bound ? 'rgba(68,136,204,0.2)' : 'rgba(221,170,68,0.2)';
+        grad.addColorStop(0, startCol);
+        grad.addColorStop(1, endCol);
         ctx.beginPath();
-        ctx.strokeStyle = prediction.bound ? '#4488CC' : '#DDAA44';
-        ctx.lineWidth = 2;
-        ctx.setLineDash(prediction.bound ? [] : [6, 4]);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2.5;
         ctx.moveTo(firstX, firstY);
         for (let i = 1; i < prediction.points.length; i++) {
           const px = cx + prediction.points[i]![0] * s;
@@ -695,24 +701,23 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           ctx.lineTo(px, py);
         }
         ctx.stroke();
-        ctx.setLineDash([]);
 
-        // Orbit direction arrows along path
-        const arrowSteps = Math.max(4, Math.floor(prediction.points.length / 6));
-        ctx.fillStyle = prediction.bound ? '#4488CC' : '#DDAA44';
-        for (let i = arrowSteps; i < prediction.points.length - arrowSteps; i += arrowSteps) {
-          const pi = prediction.points[i]!;
-          const pn = prediction.points[Math.min(i + 2, prediction.points.length - 1)]!;
-          const dx = pn[0] - pi[0];
-          const dy = pn[1] - pi[1];
-          const da = Math.atan2(dy, dx);
-          const ax = cx + pi[0] * s;
-          const ay = cy - pi[1] * s;
+        // Single direction arrow at the end of the trajectory
+        if (prediction.points.length > 4) {
+          const last2 = prediction.points[prediction.points.length - 1]!;
+          const last1 = prediction.points[prediction.points.length - 2]!;
+          const adx = last2[0] - last1[0];
+          const ady = last2[1] - last1[1];
+          const ad = Math.sqrt(adx*adx + ady*ady) || 1;
+          const arrowX = cx + last2[0] * s;
+          const arrowY = cy - last2[1] * s;
+          const aLen = 8;
           ctx.beginPath();
-          ctx.moveTo(ax + Math.cos(da) * 5, ay - Math.sin(da) * 5);
-          ctx.lineTo(ax + Math.cos(da + 1.8) * 7, ay - Math.sin(da + 1.8) * 7);
-          ctx.lineTo(ax + Math.cos(da - 1.8) * 7, ay - Math.sin(da - 1.8) * 7);
+          ctx.moveTo(arrowX, arrowY);
+          ctx.lineTo(arrowX - adx/ad * aLen + ady/ad * aLen * 0.4, arrowY + ady/ad * aLen + adx/ad * aLen * 0.4);
+          ctx.lineTo(arrowX - adx/ad * aLen - ady/ad * aLen * 0.4, arrowY + ady/ad * aLen - adx/ad * aLen * 0.4);
           ctx.closePath();
+          ctx.fillStyle = prediction.bound ? 'rgba(68,136,204,0.6)' : 'rgba(221,170,68,0.6)';
           ctx.fill();
         }
 
