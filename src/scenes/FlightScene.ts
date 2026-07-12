@@ -602,6 +602,29 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         (this.state.position[1] - refBody.position[1]) * VISUAL_SCALE,
         (this.state.position[2] - refBody.position[2]) * VISUAL_SCALE,
       ];
+
+      // Sun direction line from rocket
+      const sun = this.system.bodyByName('sun');
+      if (sun) {
+        const dx = (sun.position[0] - this.state.position[0]) * s;
+        const dz = (sun.position[2] - this.state.position[2]) * s;
+        const dSun = Math.sqrt(dx * dx + dz * dz);
+        if (dSun > 1) {
+          ctx.beginPath();
+          ctx.moveTo(rocketX + dx / dSun * 12, rocketY - dz / dSun * 12);
+          ctx.lineTo(rocketX + dx / dSun * Math.min(dSun, 60), rocketY - dz / dSun * Math.min(dSun, 60));
+          ctx.strokeStyle = 'rgba(255,220,68,0.15)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 6]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(rocketX + dx / dSun * Math.min(dSun, 60), rocketY - dz / dSun * Math.min(dSun, 60), 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,220,68,0.3)';
+          ctx.fill();
+        }
+      }
+
       const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
       if (prediction.points.length > 1) {
         // Glow under line
