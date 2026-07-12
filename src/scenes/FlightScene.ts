@@ -69,6 +69,7 @@ export class FlightScene {
   private missionTime = 0;
   private sasActive = false;
   private sasTargetQuat = new THREE.Quaternion();
+  private screenShake = 0;
 
   private get dragMultiplier(): number {
     return this.gearDeployed ? 2.5 : 1;
@@ -1115,7 +1116,27 @@ for (const b of this.system.bodies) {
     const dv = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
     const gForce = baseDt > 0 ? dv / (baseDt * 9.80665) : 1;
     this.hud.setGForce(gForce);
+    this.hud.setGForceEnabled(gForce > 1.1);
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
+
+    // Screen shake from high G-force or mach effects
+    if (gForce > 2.5) {
+      this.screenShake = Math.min(1, (gForce - 2.5) / 5);
+    } else {
+      this.screenShake *= Math.exp(-3 * baseDt);
+    }
+    if (this.screenShake > 0.01) {
+      const shakeX = (Math.random() - 0.5) * this.screenShake * 0.01;
+      const shakeY = (Math.random() - 0.5) * this.screenShake * 0.01;
+      this.rocketGroup.position.x += shakeX;
+      this.rocketGroup.position.z += shakeY;
+    }
+
+    // Dynamic FOV based on speed (warp effect at high speeds)
+    const speedKms = speed / 1000;
+    const targetFov = 50 + Math.min(30, speedKms * 0.1);
+    this.sceneMgr.camera.fov += (targetFov - this.sceneMgr.camera.fov) * baseDt * 2;
+    this.sceneMgr.camera.updateProjectionMatrix();
 
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
