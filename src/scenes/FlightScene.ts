@@ -691,13 +691,20 @@ for (const b of this.system.bodies) {
     // Current forward direction (rocket local +Y in world space)
     const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
 
-    // Angular velocity with damping (as per ellipse control spec)
+    // Angular velocity with damping and engine gimbal (torque from engine when thrust is active)
+    const engineActive = this.state.throttle > 0;
     const pitchInput = warpActive ? 0 : this.controls.getPitch();
     const yawInput = warpActive ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
     this.angularVel.x += pitchInput * this.ANGULAR_ACCEL * baseDt;
     this.angularVel.y += yawInput * this.ANGULAR_ACCEL * baseDt;
     this.angularVel.z += rollInput * this.ANGULAR_ACCEL * baseDt;
+
+    // Engine gimbal: extra rotation authority when thrust is active
+    if (engineActive && !this.grounded) {
+      this.angularVel.x += pitchInput * this.state.throttle * 4 * baseDt;
+      this.angularVel.y += yawInput * this.state.throttle * 4 * baseDt;
+    }
 
     const damp = Math.exp(-this.ANGULAR_DAMPING * baseDt);
     this.angularVel.multiplyScalar(damp);
@@ -718,7 +725,6 @@ for (const b of this.system.bodies) {
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
     // Apply thrust
-    const engineActive = this.state.throttle > 0;
     let canLiftOff = false;
     if (engineActive && this.grounded) {
       // Compute if thrust exceeds weight before actually applying thrust
