@@ -1240,6 +1240,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     let timeToAp: number | undefined;
     let timeToPe: number | undefined;
     let eccentricity: number | undefined;
+    let period: number | undefined;
     const orbitRefBody = getReferenceBody(this.state.position, this.system);
     if (orbitRefBody && orbitRefBody.mass > 0) {
       const relPos: [number, number, number] = [
@@ -1254,6 +1255,8 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         timeToAp = orbitPred.timeToAp;
         timeToPe = orbitPred.timeToPe;
         eccentricity = orbitPred.eccentricity;
+        period = orbitPred.timeToAp !== undefined && orbitPred.timeToPe !== undefined
+          ? (orbitPred.timeToAp + orbitPred.timeToPe) * 2 : undefined;
       }
     }
 
@@ -1287,7 +1290,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.impactMarker.visible = false;
       }
     }
-    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
+    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity, period);
     this.hud.setSAS(this.sasMode);
 
     // Draw 3D orbit path
