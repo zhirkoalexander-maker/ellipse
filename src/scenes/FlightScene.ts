@@ -1385,6 +1385,15 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       this.hud.setHeading(hdg);
     }
 
+    // Angle of Attack: angle between rocket forward and velocity
+    const rocketForward = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+    const velMagAoa = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+    if (velMagAoa > 1) {
+      const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
+      const aoa = Math.acos(Math.min(1, Math.max(-1, rocketForward.dot(velDir)))) * 180 / Math.PI;
+      this.hud.setAoA(aoa);
+    }
+
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     // Screen shake from high G-force or mach effects
