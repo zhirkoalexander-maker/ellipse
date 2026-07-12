@@ -83,6 +83,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
       <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
+      <div class="hud-row"><span class="hud-label">Ecc</span><span class="hud-value ecc-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="btn-bar">
@@ -306,7 +307,7 @@ export class HUD {
     ctx.stroke();
   }
 
-  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number, timeToAp?: number, timeToPe?: number, missionTime?: number): void {
+  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number, timeToAp?: number, timeToPe?: number, missionTime?: number, eccentricity?: number): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
@@ -359,6 +360,7 @@ export class HUD {
     this.fuelFill.style.width = `${Math.min(100, fuelPct)}%`;
     this.throtPct.textContent = `${(state.throttle * 100).toFixed(0)}%`;
     this.throtFill.style.width = `${state.throttle * 100}%`;
+    this.throtFill.style.background = state.throttle > 0 && state.rocket.totalFuelMass() > 0 ? '#FF8844' : '#446688';
     this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
     this.heatFill.style.width = `${heatPct}%`;
     this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
@@ -387,6 +389,12 @@ export class HUD {
       const mins = Math.floor(missionTime / 60);
       const secs = Math.floor(missionTime % 60);
       this.timeVal.textContent = `T+${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Eccentricity display
+    const eccEl = this.root.querySelector('.ecc-val');
+    if (eccEl && eccentricity !== undefined) {
+      eccEl.textContent = eccentricity.toFixed(3);
     }
   }
 
