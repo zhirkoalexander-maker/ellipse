@@ -1541,6 +1541,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.hud.setMach(mach);
     this.hud.setMass(this.state.rocket.totalMass());
 
+    // Local gravitational acceleration (g = G*M/r²)
+    const gravRefBody = getReferenceBody(this.state.position, this.system);
+    if (gravRefBody && (gravRefBody as any).mass > 0) {
+      const gdx = this.state.position[0] - gravRefBody.position[0];
+      const gdy = this.state.position[1] - gravRefBody.position[1];
+      const gdz = this.state.position[2] - gravRefBody.position[2];
+      const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
+      const localG = (G * (gravRefBody as any).mass) / (gr * gr);
+      this.hud.setGravity(localG);
+    }
+
     // Sonic boom ring when crossing mach 1
     if (mach > 0.98 && mach < 1.02 && !this.sonicBoomRing && nearestAlt < 15000) {
       const ringGeom = new THREE.RingGeometry(0.5, 1.5, 32);
