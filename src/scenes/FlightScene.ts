@@ -987,7 +987,9 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         const alt = nearestDist - (nearestBody as any).radius;
         if (alt > 0 && alt < 300000) {
           const rho = 1.225 * Math.exp(-alt / 8500);
-          const dragForce = 0.5 * rho * speed * speed * CdA;
+          const q = 0.5 * rho * speed * speed;
+          this.hud.setQ(q);
+          const dragForce = q * CdA;
           const dragAccel = dragForce / mass;
           const dragDelta = dragAccel * baseDt;
           if (dragDelta >= speed) {
