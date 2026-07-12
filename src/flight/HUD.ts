@@ -179,7 +179,8 @@ export class HUD {
     rocketFwd: [number, number, number],
     velocityDir: [number, number, number],
     upDir: [number, number, number],
-    orbitNormal?: [number, number, number]
+    orbitNormal?: [number, number, number],
+    bodyDirs?: Array<{ name: string; dir: [number, number, number]; color: string }>
   ): void {
     const ctx = this.navballCtx;
     const cw = 160, ch = 160, cx = 80, cy = 80, R = 75;
@@ -282,6 +283,19 @@ export class HUD {
         ctx.closePath();
         ctx.fillStyle = '#CC88FF';
         ctx.fill();
+      }
+    }
+
+    // Planet direction dots on navball
+    if (bodyDirs) {
+      for (const bd of bodyDirs) {
+        const p = project(bd.dir);
+        if (p.inFront) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = bd.color + 'aa';
+          ctx.fill();
+        }
       }
     }
 
