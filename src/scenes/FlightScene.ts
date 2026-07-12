@@ -781,7 +781,16 @@ for (const b of this.system.bodies) {
     // Flame and sound always show when engine is active (even if thrust < weight)
     if (engineActive) {
       this.sound.setThrottle(this.state.throttle);
+      this.engineFlame.setThrottle(this.state.throttle);
       this.engineFlame.start();
+      // Vacuum mode above 50km
+      const refAltBody = getReferenceBody(this.state.position, this.system);
+      const dxAlt = this.state.position[0] - refAltBody.position[0];
+      const dyAlt = this.state.position[1] - refAltBody.position[1];
+      const dzAlt = this.state.position[2] - refAltBody.position[2];
+      const dAlt = Math.sqrt(dxAlt*dxAlt + dyAlt*dyAlt + dzAlt*dzAlt) || 1;
+      const surfR = (refAltBody as any).getSurfaceRadiusAt?.(this.state.position) ?? (refAltBody as any).radius ?? 6371000;
+      this.engineFlame.setVacuum(dAlt - surfR > 50000);
     } else {
       this.sound.setThrottle(0);
       this.engineFlame.stop();

@@ -36,6 +36,8 @@ export class EngineFlame {
   private active: boolean;
   private nextIndex: number;
   private spriteTex: THREE.Texture;
+  private throttleLevel: number = 1;
+  private inVacuum: boolean = false;
 
   constructor() {
     this.active = false;
@@ -69,6 +71,14 @@ export class EngineFlame {
     this.particles = new THREE.Points(geometry, material);
   }
 
+  setThrottle(t: number): void {
+    this.throttleLevel = Math.max(0.01, t);
+  }
+
+  setVacuum(v: boolean): void {
+    this.inVacuum = v;
+  }
+
   start(): void {
     this.active = true;
   }
@@ -87,22 +97,23 @@ export class EngineFlame {
 
   update(dt: number): void {
     if (this.active) {
-      const spawnCount = 8 + Math.floor(Math.random() * 4);
+      const spawnCount = Math.ceil((4 + Math.floor(Math.random() * 4)) * this.throttleLevel);
+      const vacMult = this.inVacuum ? 3 : 1;
       for (let i = 0; i < spawnCount; i++) {
         const idx = this.nextIndex;
         this.nextIndex = (this.nextIndex + 1) % PARTICLE_COUNT;
 
-        const spread = 0.15 + Math.random() * 0.2;
+        const spread = (0.15 + Math.random() * 0.2) / this.throttleLevel;
         this.positions[idx * 3] = (Math.random() - 0.5) * spread * FLAME_SCALE;
-        this.positions[idx * 3 + 1] = -(Math.random() * 0.08) * FLAME_SCALE;
+        this.positions[idx * 3 + 1] = -(Math.random() * 0.08) * FLAME_SCALE * vacMult;
         this.positions[idx * 3 + 2] = (Math.random() - 0.5) * spread * FLAME_SCALE;
 
-        const speed = 5 + Math.random() * 8;
+        const speed = (5 + Math.random() * 8) * vacMult;
         this.velocities[idx * 3] = (Math.random() - 0.5) * 0.5 * FLAME_SCALE;
         this.velocities[idx * 3 + 1] = -(speed * FLAME_SCALE);
         this.velocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.5 * FLAME_SCALE;
 
-        this.lifetimes[idx] = 0.3 + Math.random() * 0.4;
+        this.lifetimes[idx] = (0.3 + Math.random() * 0.4) * vacMult;
         this.ages[idx] = 0;
       }
     }
