@@ -20,6 +20,8 @@ export class HUD {
   private apeVal!: HTMLSpanElement;
   private peVal!: HTMLSpanElement;
   private twrVal!: HTMLSpanElement;
+  private ttaVal!: HTMLSpanElement;
+  private ttpVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -76,6 +78,8 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
+      <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
+      <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -103,6 +107,8 @@ export class HUD {
     this.apeVal = this.root.querySelector('.ape-val')!;
     this.peVal = this.root.querySelector('.pe-val')!;
     this.twrVal = this.root.querySelector('.twr-val')!;
+    this.ttaVal = this.root.querySelector('.tta-val')!;
+    this.ttpVal = this.root.querySelector('.ttp-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -247,7 +253,7 @@ export class HUD {
     ctx.stroke();
   }
 
-  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number): void {
+  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number, timeToAp?: number, timeToPe?: number): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
@@ -311,6 +317,17 @@ export class HUD {
     }
     if (periapsis !== undefined && isFinite(periapsis)) {
       this.peVal.textContent = periapsis > 1000 ? `${(periapsis / 1000).toFixed(1)}km` : `${periapsis.toFixed(0)}m`;
+    }
+
+    if (timeToAp !== undefined && isFinite(timeToAp)) {
+      this.ttaVal.textContent = timeToAp > 60 ? `${(timeToAp / 60).toFixed(1)}m` : `${timeToAp.toFixed(0)}s`;
+    } else {
+      this.ttaVal.textContent = '—';
+    }
+    if (timeToPe !== undefined && isFinite(timeToPe)) {
+      this.ttpVal.textContent = timeToPe > 60 ? `${(timeToPe / 60).toFixed(1)}m` : `${timeToPe.toFixed(0)}s`;
+    } else {
+      this.ttpVal.textContent = '—';
     }
   }
 
