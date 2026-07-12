@@ -105,6 +105,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Lon</span><span class="hud-value lon-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Mach</span><span class="hud-value mach-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">Mass</span><span class="hud-value mass-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+      <div class="hud-row"><span class="hud-label">g</span><span class="hud-value grav-val" style="font-size:9px;color:#ccccee;">—</span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -239,6 +240,11 @@ export class HUD {
   setMass(kg: number): void {
     const el = this.root.querySelector('.mass-val');
     if (el) el.textContent = `${(kg / 1000).toFixed(1)}t`;
+  }
+
+  setGravity(g: number): void {
+    const el = this.root.querySelector('.grav-val');
+    if (el) el.textContent = `${g.toFixed(2)} m/s²`;
   }
 
   setTWR(twr: number): void {
