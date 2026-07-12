@@ -86,6 +86,7 @@ export class FlightScene {
   private lastAltMilestone = 0;
   private sonicBoomRing: THREE.Mesh | null = null;
   private sonicBoomLife = 0;
+  private reentryGlowMesh: THREE.Mesh | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1088,8 +1089,23 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
             this.state.velocity[2] *= f;
           }
           this.sanitize(this.state.velocity);
+
+          // Reentry glow effect (plasma)
+          const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
+          if (reentryIntensity > 0.05 && this.reentryGlowMesh) {
+            this.reentryGlowMesh.visible = true;
+            this.reentryGlowMesh.scale.setScalar(1 + reentryIntensity * 2);
+            (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity);
+          } else if (this.reentryGlowMesh) {
+            this.reentryGlowMesh.visible = false;
+          }
         }
       }
+      if (this.reentryGlowMesh) {
+        const inAtmo = nearestBody && (nearestBody as any).radius && nearestDist - (nearestBody as any).radius < 300000;
+        if (!inAtmo) this.reentryGlowMesh.visible = false;
+      }
+
 
       // Collision with surface
       const bodyR = nearestBody ? (nearestBody as any).radius ?? 0 : 0;
@@ -1532,11 +1548,6 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       [normX / normLen, normY / normLen, normZ / normLen],
       bodyDirs
     );
-  }
-
-  private updateRocketMesh(): void {
-    const earth = this.system.bodyByName('earth') as any;
-    if (earth) this.rocketGroup.position.set(0, (earth.radius + 100) * VISUAL_SCALE, 0);
   }
 
   private performStage(): void {
