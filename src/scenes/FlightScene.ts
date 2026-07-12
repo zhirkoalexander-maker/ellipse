@@ -1598,6 +1598,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.sceneMgr.camera.fov += (targetFov - this.sceneMgr.camera.fov) * baseDt * 2;
     this.sceneMgr.camera.updateProjectionMatrix();
 
+    // Dynamic sky color (blue near surface, black in space)
+    const nearestAltSky = nearestAlt ?? 0;
+    const skyBlend = Math.min(1, Math.max(0, (nearestAltSky - 20000) / 80000));
+    const skyR = 0.02 + (1 - skyBlend) * 0.35;
+    const skyG = 0.05 + (1 - skyBlend) * 0.55;
+    const skyB = 0.12 + (1 - skyBlend) * 0.85;
+    this.sceneMgr.scene.background = new THREE.Color(skyR, skyG, skyB);
+
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
       this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
