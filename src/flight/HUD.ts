@@ -23,6 +23,7 @@ export class HUD {
   private ttaVal!: HTMLSpanElement;
   private ttpVal!: HTMLSpanElement;
   private timeVal!: HTMLSpanElement;
+  private dvVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -76,6 +77,7 @@ export class HUD {
       </div>
       <div class="separator"></div>
       <div class="hud-row"><span class="hud-label">TWR</span><span class="hud-value twr-val" style="color:#88CCFF;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Δv</span><span class="hud-value dv-val" style="font-size:9px;color:#88CCFF;">—</span></div>
       <div class="hud-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
@@ -113,6 +115,7 @@ export class HUD {
     this.ttaVal = this.root.querySelector('.tta-val')!;
     this.ttpVal = this.root.querySelector('.ttp-val')!;
     this.timeVal = this.root.querySelector('.time-val')!;
+    this.dvVal = this.root.querySelector('.dv-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -134,6 +137,11 @@ export class HUD {
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
+  }
+
+  setDeltaV(dv: number): void {
+    this.dvVal.textContent = dv >= 0 ? `${dv.toFixed(0)} m/s` : '—';
+    this.dvVal.style.color = dv > 500 ? '#44FF44' : dv > 100 ? '#FFAA44' : '#FF4444';
   }
 
   setSAS(active: boolean): void {

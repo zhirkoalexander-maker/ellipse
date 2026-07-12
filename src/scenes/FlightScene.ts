@@ -1091,6 +1091,23 @@ for (const b of this.system.bodies) {
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime);
     this.hud.setSAS(this.sasActive);
 
+    // Compute approximate delta-v remaining
+    const engDv = findFirstEngine(this.state.rocket.assembly.roots);
+    if (engDv && engDv.thrust) {
+      const massWet = this.state.rocket.totalMass();
+      const massDry = massWet - this.state.rocket.totalFuelMass();
+      if (massDry > 0 && massWet > massDry) {
+        const isp = 320; // rough ISP estimate in seconds
+        const ve = isp * 9.80665;
+        const dv = ve * Math.log(massWet / massDry);
+        this.hud.setDeltaV(dv);
+      } else {
+        this.hud.setDeltaV(0);
+      }
+    } else {
+      this.hud.setDeltaV(-1);
+    }
+
     // Compute G-force from velocity change
     const dvx = this.state.velocity[0] - this.prevVel[0];
     const dvy = this.state.velocity[1] - this.prevVel[1];
