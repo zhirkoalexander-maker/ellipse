@@ -1727,35 +1727,77 @@ export function generateGoldTexture(): TextureSet {
   const rng = seededRandomFast(44444);
 
   // === COLOR MAP ===
-  // Gold/mylar foil or gold-anodized aluminum
-  // Base gold gradient
+  // Gold/mylar foil — uneven, creased, oxidized
   const goldGrad = colorCtx.createLinearGradient(0, 0, 0, H);
   if (goldGrad) {
-    goldGrad.addColorStop(0, '#d4a843');
-    goldGrad.addColorStop(0.3, '#c8963a');
-    goldGrad.addColorStop(0.5, '#b8862a');
-    goldGrad.addColorStop(0.7, '#c8963a');
-    goldGrad.addColorStop(1, '#d4a843');
+    goldGrad.addColorStop(0, '#c49a38');
+    goldGrad.addColorStop(0.15, '#daad4a');
+    goldGrad.addColorStop(0.3, '#b8842a');
+    goldGrad.addColorStop(0.5, '#d4a843');
+    goldGrad.addColorStop(0.65, '#c49030');
+    goldGrad.addColorStop(0.8, '#d8b050');
+    goldGrad.addColorStop(1, '#c49a38');
     colorCtx.fillStyle = goldGrad;
     colorCtx.fillRect(0, 0, W, H);
   }
 
-  // Mylar crinkle texture (if foil)
-  for (let i = 0; i < 200; i++) {
+  // Foil crinkle patches (light and dark creases)
+  for (let i = 0; i < 400; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const w = 20 + rng() * 80;
-    const h = 10 + rng() * 40;
-    colorCtx.fillStyle = `rgba(255,255,255,${0.03 + rng() * 0.05})`;
+    const w = 5 + rng() * 60;
+    const h = 3 + rng() * 30;
+    const bright = rng() > 0.5;
+    if (bright) {
+      colorCtx.fillStyle = `rgba(255,225,150,${0.05 + rng() * 0.1})`;
+    } else {
+      colorCtx.fillStyle = `rgba(80,60,20,${0.04 + rng() * 0.08})`;
+    }
     colorCtx.fillRect(x, y, w, h);
-    colorCtx.fillStyle = `rgba(0,0,0,${0.02 + rng() * 0.03})`;
-    colorCtx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.5, h * 0.5);
   }
 
-  // Anodized banding (if solid gold anodized)
-  colorCtx.strokeStyle = 'rgba(180,140,40,0.3)';
-  colorCtx.lineWidth = 1;
-  for (let y = 0; y < H; y += 40) {
+  // Sharp crease lines
+  colorCtx.strokeStyle = 'rgba(60,40,10,0.3)';
+  colorCtx.lineWidth = 0.5;
+  for (let i = 0; i < 150; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 5 + rng() * 40;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    colorCtx.stroke();
+  }
+
+  // Oxidation / dirt spots
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 3 + rng() * 20;
+    const b = 60 + rng() * 60;
+    const g = 50 + rng() * 40;
+    colorCtx.fillStyle = `rgba(${b + 30}, ${g}, ${b / 2}, ${0.1 + rng() * 0.2})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+
+  // Bright specular highlights (foil hotspots)
+  for (let i = 0; i < 30; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 2 + rng() * 15;
+    colorCtx.fillStyle = `rgba(255,240,200,${0.1 + rng() * 0.15})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+
+  // Horizontal banding (from handling/rolling)
+  colorCtx.strokeStyle = 'rgba(160,120,40,0.2)';
+  colorCtx.lineWidth = 1 + rng() * 2;
+  for (let y = 0; y < H; y += 20 + rng() * 30) {
     colorCtx.beginPath();
     colorCtx.moveTo(0, y);
     colorCtx.lineTo(W, y);
@@ -1766,69 +1808,101 @@ export function generateGoldTexture(): TextureSet {
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
-  // Crinkle ridges
-  normalCtx.strokeStyle = '#a0a0a0';
-  normalCtx.lineWidth = 1;
-  for (let i = 0; i < 300; i++) {
+  // Deep crinkle ridges
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 1 + rng() * 2;
+  for (let i = 0; i < 500; i++) {
     const x = rng() * W;
     const y = rng() * H;
     const angle = rng() * Math.PI * 2;
-    const len = 10 + rng() * 50;
+    const len = 3 + rng() * 40;
     normalCtx.beginPath();
     normalCtx.moveTo(x, y);
     normalCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     normalCtx.stroke();
   }
 
-  // Anodized bands
-  normalCtx.strokeStyle = '#909090';
-  normalCtx.lineWidth = 2;
-  for (let y = 0; y < H; y += 40) {
+  // Oxidation pits
+  normalCtx.fillStyle = '#606060';
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 3 + rng() * 20;
     normalCtx.beginPath();
-    normalCtx.moveTo(0, y);
-    normalCtx.lineTo(W, y);
-    normalCtx.stroke();
+    normalCtx.arc(x, y, r, 0, Math.PI * 2);
+    normalCtx.fill();
   }
 
   // === ROUGHNESS MAP ===
-  // Gold foil = somewhat rough, anodized = smoother
-  roughCtx.fillStyle = '#707070';
+  roughCtx.fillStyle = '#808080';
   roughCtx.fillRect(0, 0, W, H);
 
-  // Crinkles slightly rougher
-  roughCtx.fillStyle = '#909090';
-  for (let i = 0; i < 200; i++) {
+  // Crinkles are rougher
+  roughCtx.fillStyle = '#b0b0b0';
+  for (let i = 0; i < 300; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const w = 20 + rng() * 80;
-    const h = 10 + rng() * 40;
+    const w = 5 + rng() * 60;
+    const h = 3 + rng() * 30;
     roughCtx.fillRect(x, y, w, h);
   }
 
+  // Oxidation is rough
+  roughCtx.fillStyle = '#d0d0d0';
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 3 + rng() * 20;
+    roughCtx.beginPath();
+    roughCtx.arc(x, y, r, 0, Math.PI * 2);
+    roughCtx.fill();
+  }
+
   // === METALNESS MAP ===
-  // Gold is highly metallic
   metalCtx.fillStyle = '#f0f0f0';
   metalCtx.fillRect(0, 0, W, H);
+
+  // Oxidation spots lower metalness
+  metalCtx.fillStyle = '#404040';
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 3 + rng() * 20;
+    metalCtx.beginPath();
+    metalCtx.arc(x, y, r, 0, Math.PI * 2);
+    metalCtx.fill();
+  }
 
   // === AO MAP ===
   aoCtx.fillStyle = '#ffffff';
   aoCtx.fillRect(0, 0, W, H);
 
-  // Crinkle shadows
-  aoCtx.strokeStyle = '#808080';
+  // Deep creases shadow
+  aoCtx.strokeStyle = '#707070';
   aoCtx.lineWidth = 3;
   for (let i = 0; i < 300; i++) {
     const x = rng() * W;
     const y = rng() * H;
     const angle = rng() * Math.PI * 2;
-    const len = 10 + rng() * 50;
+    const len = 5 + rng() * 40;
     aoCtx.beginPath();
     aoCtx.moveTo(x, y);
     aoCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     aoCtx.stroke();
   }
 
-  addFilmGrain(colorCtx, W, H, 0.01);
+  // Oxidation patch shadows
+  aoCtx.fillStyle = '#808080';
+  for (let i = 0; i < 80; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 5 + rng() * 22;
+    aoCtx.beginPath();
+    aoCtx.arc(x, y, r, 0, Math.PI * 2);
+    aoCtx.fill();
+  }
+
+  addFilmGrain(colorCtx, W, H, 0.025);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
