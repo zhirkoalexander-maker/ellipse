@@ -84,6 +84,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="hud-row"><span class="hud-label">Ecc</span><span class="hud-value ecc-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Impact</span><span class="hud-value impact-val" style="font-size:9px;color:#CCCC44;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="btn-bar">
@@ -389,6 +390,23 @@ export class HUD {
       const mins = Math.floor(missionTime / 60);
       const secs = Math.floor(missionTime % 60);
       this.timeVal.textContent = `T+${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Impact prediction when falling
+    const impactEl = this.root.querySelector('.impact-val');
+    if (impactEl) {
+      const vertUp = -vertSpeed;
+      if (vertUp > 1 && nearestAlt > 0 && nearestAlt < 500000) {
+        const timeToImpact = nearestAlt / vertUp;
+        if (timeToImpact < 600) {
+          (impactEl as HTMLElement).textContent = `Impact T-${timeToImpact.toFixed(0)}s`;
+          (impactEl as HTMLElement).style.color = timeToImpact < 30 ? '#FF4444' : timeToImpact < 120 ? '#FFAA44' : '#CCCC44';
+        } else {
+          (impactEl as HTMLElement).textContent = '—';
+        }
+      } else {
+        (impactEl as HTMLElement).textContent = '—';
+      }
     }
 
     // Eccentricity display
