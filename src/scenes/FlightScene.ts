@@ -1583,6 +1583,9 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     this.rocketGroup.visible = false;
     this.engineFlame.stop();
 
+    // Camera shake on crash
+    this.screenShake = 3.0;
+
     this.state.position = [
       body.position[0] + dx / d * bodyR,
       body.position[1] + dy / d * bodyR,
@@ -1603,6 +1606,14 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
   }
 
   private showCrashOverlay(reason: string): void {
+    // Flash effect
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:999;pointer-events:none;opacity:0;transition:opacity 0.1s;';
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => { flash.style.opacity = '1'; });
+    setTimeout(() => { flash.style.opacity = '0'; }, 100);
+    setTimeout(() => flash.remove(), 500);
+
     const overlay = document.createElement('div');
     overlay.style.cssText = `
       position:fixed;top:0;left:0;width:100%;height:100%;
