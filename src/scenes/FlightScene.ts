@@ -64,6 +64,12 @@ export class FlightScene {
   private warpIndex = 0;
   private crashOverlay: HTMLDivElement | null = null;
   private prevVel: [number, number, number] = [0, 0, 0];
+  private gearDeployed = false;
+  private gearMeshes: THREE.Mesh[] = [];
+
+  private get dragMultiplier(): number {
+    return this.gearDeployed ? 2.5 : 1;
+  }
 
   onCrashAction: ((action: 'menu' | 'restart') => void) | null = null;
 
@@ -118,8 +124,32 @@ export class FlightScene {
       this.state.position[1] * VISUAL_SCALE,
       this.state.position[2] * VISUAL_SCALE
     );
-
     sceneMgr.scene.add(this.rocketGroup);
+
+    // Landing gear legs (retracted initially)
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2;
+      const legGeom = new THREE.CylinderGeometry(0.015, 0.04, 0.3, 6);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x556677, metalness: 0.8, roughness: 0.3 });
+      const leg = new THREE.Mesh(legGeom, legMat);
+      leg.position.set(Math.cos(angle) * 0.15, -0.1, Math.sin(angle) * 0.15);
+      leg.rotation.z = Math.cos(angle) * 0.3;
+      leg.rotation.x = Math.sin(angle) * 0.3;
+      leg.visible = false;
+      this.rocketGroup.add(leg);
+      this.gearMeshes.push(leg);
+      // Foot pad
+      const footGeom = new THREE.CylinderGeometry(0.05, 0.06, 0.02, 6);
+      const footMat = new THREE.MeshStandardMaterial({ color: 0x445566, metalness: 0.5, roughness: 0.6 });
+      const foot = new THREE.Mesh(footGeom, footMat);
+      foot.position.set(
+        Math.cos(angle) * 0.22,
+        -0.22,
+        Math.sin(angle) * 0.22
+      );
+      this.rocketGroup.add(foot);
+      this.gearMeshes.push(foot);
+    }
 
     for (const body of system.bodies) {
       const pbody = body as any;
@@ -569,6 +599,9 @@ for (const b of this.system.bodies) {
           toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
         }
         e.preventDefault();
+      } else if (e.key === 'g') {
+        this.toggleGear();
+        e.preventDefault();
       }
     });
 
@@ -785,6 +818,7 @@ for (const b of this.system.bodies) {
       const mass = this.state.rocket.totalMass();
       let CdA = mass * 0.001 + 0.2;
       if (this.parachuteDeployed) CdA = 50;
+      else if (this.gearDeployed) CdA *= 2.5;
       if (nearestBody && (nearestBody as any).radius && speed > 0.05 && speed < 1e6) {
         const alt = nearestDist - (nearestBody as any).radius;
         if (alt > 0 && alt < 300000) {
@@ -1132,6 +1166,14 @@ for (const b of this.system.bodies) {
       }
       toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
     }
+  }
+
+  private toggleGear(): void {
+    this.gearDeployed = !this.gearDeployed;
+    for (const m of this.gearMeshes) {
+      m.visible = this.gearDeployed;
+    }
+    toast.show(this.gearDeployed ? 'Landing gear deployed' : 'Landing gear retracted');
   }
 
   private doCrash(reason: string, body: any, dx: number, dy: number, dz: number, d: number, bodyR: number): void {
