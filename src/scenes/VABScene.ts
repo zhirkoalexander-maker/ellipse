@@ -259,6 +259,20 @@ export class VABScene {
       if (child) this.rocketGroup.remove(child);
     }
     if (this.assembly.roots.length > 0) {
+      // Show vehicle name input if this is a new rocket
+      if (!this.rootEl.querySelector('.vab-name-input')) {
+        const nameRow = document.createElement('div');
+        nameRow.className = 'vab-name-row';
+        nameRow.style.cssText = 'padding:4px 0;margin-bottom:6px;';
+        nameRow.innerHTML = `
+          <input type="text" class="vab-name-input" placeholder="Name your rocket..."
+            style="width:100%;background:rgba(244,245,242,0.08);border:1px solid rgba(244,245,242,0.15);
+            border-radius:4px;padding:6px 8px;color:#F4F5F2;font-size:11px;font-family:system-ui,sans-serif;
+            outline:none;box-sizing:border-box;" maxlength="30"
+          />
+        `;
+        this.currentRocketEl.parentElement?.insertBefore(nameRow, this.currentRocketEl);
+      }
       // Check if any part needs GLTF loading
       const needsGLTF = this.assembly.roots.some(n => 
         n.part.kind === 'gltf' && n.part.gltfUrl && !gltfCache.has(n.part.gltfUrl)
