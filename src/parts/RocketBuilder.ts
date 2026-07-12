@@ -3,8 +3,8 @@ import { PART_SCALE } from '../config/constants';
 import { findPart } from './PartCatalog';
 
 const H: Record<string, number> = {
-  S: 0.6 * PART_SCALE, M: 1.0 * PART_SCALE,
-  L: 1.4 * PART_SCALE, XL: 2.0 * PART_SCALE,
+  S: 0.7 * PART_SCALE, M: 1.1 * PART_SCALE,
+  L: 1.6 * PART_SCALE, XL: 2.2 * PART_SCALE,
 };
 
 function addPartAt(assembly: Assembly, id: string, yPos: number): number {
