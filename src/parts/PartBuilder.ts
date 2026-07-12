@@ -82,11 +82,46 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | nu
                 mat.color.setHSL(hsl.h, hsl.s, hsl.l);
               }
             }
-            // Add subtle emissive to engine parts
+            // Detect material type by roughness and color
             const name = obj.name.toLowerCase();
-            if (name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor')) {
-              mat.emissive = new THREE.Color(0x442200);
-              mat.emissiveIntensity = 0.05;
+            const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor') || name.includes('bell');
+            const isMetallic = name.includes('metal') || name.includes('hull') || name.includes('body') || name.includes('frame') || name.includes('strut');
+            const isGlass = name.includes('glass') || name.includes('window') || name.includes('window') || name.includes('canopy') || name.includes('cockpit');
+            const isHeatshield = name.includes('heat') || name.includes('shield') || name.includes('tile');
+            const isSolarPanel = name.includes('solar') || name.includes('panel') || name.includes('array');
+            
+            if (isEngine) {
+              mat.roughness = Math.max(0.05, mat.roughness);
+              mat.metalness = Math.min(1, mat.metalness + 0.3);
+              mat.emissive = new THREE.Color(0x884422);
+              mat.emissiveIntensity = 0.15;
+            } else if (isMetallic) {
+              mat.roughness = Math.max(0.1, mat.roughness * 0.7);
+              mat.metalness = Math.min(1, mat.metalness + 0.4);
+            } else if (isGlass) {
+              mat.roughness = 0;
+              mat.metalness = 0;
+              mat.transparent = true;
+              mat.opacity = 0.6;
+              mat.emissive = new THREE.Color(0x4488ff);
+              mat.emissiveIntensity = 0.08;
+            } else if (isHeatshield) {
+              mat.roughness = Math.min(1, mat.roughness + 0.2);
+              mat.metalness = 0;
+            } else if (isSolarPanel) {
+              mat.roughness = 0.8;
+              mat.metalness = 0;
+              mat.emissive = new THREE.Color(0x4488ff);
+              mat.emissiveIntensity = 0.03;
+            }
+            
+            // Add subtle emissive to engine parts (backward compat)
+            if (!isEngine && !isGlass && !isSolarPanel) {
+              const oldName = obj.name.toLowerCase();
+              if (oldName.includes('engine') || oldName.includes('nozzle') || oldName.includes('thruster') || oldName.includes('motor')) {
+                mat.emissive = new THREE.Color(0x442200);
+                mat.emissiveIntensity = 0.05;
+              }
             }
             mat.needsUpdate = true;
           } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
