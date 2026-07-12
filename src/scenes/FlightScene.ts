@@ -1437,6 +1437,11 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     const lon = Math.atan2(rdx, rdz) * 180 / Math.PI;
     this.hud.setLatLon(lat, (lon + 360) % 360);
 
+    // Mach number (simple: mach1 ≈ 340 m/s at sea level, increases with sqrt(T))
+    const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+    const mach = speedMs / 340;
+    this.hud.setMach(mach);
+
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     // Screen shake from high G-force or mach effects
