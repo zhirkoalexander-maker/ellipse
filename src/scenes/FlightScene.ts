@@ -394,7 +394,7 @@ if (sunPos) {
   }
 }
 
-// Atmospheric halos for bodies with atmospheres
+    // Atmospheric halos for bodies with atmospheres
 const atmosBodies = ['earth', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
 for (const b of this.system.bodies) {
   if (atmosBodies.includes(b.name)) {
@@ -410,6 +410,23 @@ for (const b of this.system.bodies) {
     ctx.arc(bx, by, baseR * 3, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
+  }
+}
+
+// Kármán line atmosphere boundary rings (100km altitude)
+for (const b of this.system.bodies) {
+  if (atmosBodies.includes(b.name)) {
+    const bx = cx + (b.position[0] - this.state.position[0]) * s;
+    const by = cy - (b.position[2] - this.state.position[2]) * s;
+    const baseR = sizes[b.name] || 3;
+    const atmosFactor = 1.2;
+    ctx.beginPath();
+    ctx.arc(bx, by, baseR * atmosFactor, 0, Math.PI * 2);
+    ctx.setLineDash([2, 6]);
+    ctx.strokeStyle = 'rgba(100,180,255,0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 
