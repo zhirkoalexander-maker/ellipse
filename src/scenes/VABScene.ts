@@ -7,10 +7,10 @@ import { buildRocketFromDescription } from '../parts/RocketBuilder';
 import { gltfCache, loadGLTF } from '../parts/PartBuilder';
 
 const PART_HEIGHT: Record<string, number> = {
-  S: 0.8 * PART_SCALE,
-  M: 1.2 * PART_SCALE,
-  L: 1.8 * PART_SCALE,
-  XL: 2.5 * PART_SCALE,
+  S: 0.7 * PART_SCALE,
+  M: 1.1 * PART_SCALE,
+  L: 1.6 * PART_SCALE,
+  XL: 2.2 * PART_SCALE,
 };
 
 export class VABScene {
@@ -24,6 +24,7 @@ export class VABScene {
   private onLaunch: (assembly: Assembly) => void;
   private stackHeight = 0;
   private addedPartNames: string[] = [];
+  private framed = false;
 
   private vabAzimuth = 0;
   private vabPolar = Math.PI / 2;
@@ -100,6 +101,7 @@ export class VABScene {
         </div>
         <div id="vab-parts" style="flex:1;overflow-y:auto;padding:8px;"></div>
         <div style="padding:12px;border-top:1px solid rgba(234,205,158,0.15);">
+          <div id="vab-status" style="font-size:9px;color:rgba(244,245,242,0.4);text-align:center;margin-bottom:6px;">&nbsp;</div>
           <button id="vab-launch" style="width:100%;padding:10px;background:#EACD9E;color:#0A0C18;border:none;border-radius:4px;font-size:13px;cursor:pointer;letter-spacing:0.06em;">LAUNCH</button>
           <button id="vab-remove" style="width:100%;padding:8px;background:transparent;color:#F4F5F2;border:1px solid rgba(244,245,242,0.2);border-radius:4px;font-size:11px;cursor:pointer;margin-top:6px;letter-spacing:0.06em;">REMOVE LAST</button>
           <button id="vab-clear" style="width:100%;padding:8px;background:transparent;color:#F4F5F2;border:1px solid rgba(244,245,242,0.2);border-radius:4px;font-size:11px;cursor:pointer;margin-top:4px;letter-spacing:0.06em;">CLEAR ALL</button>
@@ -279,13 +281,24 @@ export class VABScene {
       );
       
       if (needsGLTF) {
+        const statusEl = document.getElementById('vab-status');
+        if (statusEl) statusEl.textContent = '⏳ Loading 3D models...';
         const { loadGLTF } = await import('../parts/PartBuilder');
+        let loadedCount = 0;
+        let failCount = 0;
         for (const root of this.assembly.roots) {
           if (root.part.kind === 'gltf' && root.part.gltfUrl && !gltfCache.has(root.part.gltfUrl)) {
-            const loaded = await loadGLTF(root.part.gltfUrl, root.part.gltfScale ?? 1);
-            if (!loaded) {
-              console.warn('GLTF load failed, using placeholder for:', root.part.name);
-            }
+            const result = await loadGLTF(root.part.gltfUrl, root.part.gltfScale ?? 1);
+            if (result) loadedCount++; else failCount++;
+          }
+        }
+        if (statusEl) {
+          if (failCount > 0) {
+            statusEl.textContent = `⚠️ ${loadedCount} loaded, ${failCount} failed`;
+            setTimeout(() => { if (statusEl) statusEl.innerHTML = '&nbsp;'; }, 3000);
+          } else {
+            statusEl.textContent = '✓ Models loaded';
+            setTimeout(() => { if (statusEl) statusEl.innerHTML = '&nbsp;'; }, 1500);
           }
         }
       }
@@ -328,15 +341,18 @@ export class VABScene {
         sepY += h0;
       }
 
-      // Auto-frame camera to fit the assembled rocket
-      const box = new THREE.Box3().setFromObject(this.rocketGroup);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z, 0.1);
-      const camDist = maxDim * 3.5;
-      this.camera.position.set(center.x, center.y + maxDim * 0.5, center.z + camDist);
-      this.camera.lookAt(center.x, center.y, center.z);
-      this.camera.updateProjectionMatrix();
+      // Auto-frame camera to fit the assembled rocket (only first time)
+      if (!this.framed) {
+        this.framed = true;
+        const box = new THREE.Box3().setFromObject(this.rocketGroup);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+        const camDist = maxDim * 3.5;
+        this.camera.position.set(center.x, center.y + maxDim * 0.5, center.z + camDist);
+        this.camera.lookAt(center.x, center.y, center.z);
+        this.camera.updateProjectionMatrix();
+      }
     }
   }
 

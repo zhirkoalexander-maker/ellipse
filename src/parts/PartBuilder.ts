@@ -57,107 +57,111 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | nu
   if (gltfCache.has(url)) {
     return gltfCache.get(url)!.clone();
   }
-  try {
-    const gltf = await gltfLoader.loadAsync(resolvedUrl);
-    const group = gltf.scene;
-  
-  // Ensure materials are PBR-ready and boost colors
-  group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-      if (obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const mat of mats) {
-          if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.roughness = Math.max(0.1, mat.roughness ?? 0.5);
-            mat.metalness = Math.max(0, mat.metalness ?? 0);
-            // Boost color saturation for NASA models
-            if (mat.color) {
-              const hsl = { h: 0, s: 0, l: 0 };
-              mat.color.getHSL(hsl);
-              if (hsl.s < 0.3) {
-                hsl.s = Math.min(1, hsl.s * 1.5 + 0.05);
-                hsl.l = Math.min(1, Math.max(0.1, hsl.l * 1.1));
-                mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+  // Try multiple URL variants in case the first one fails
+  const urlsToTry = [resolvedUrl];
+  if (resolvedUrl !== url) urlsToTry.push(url);
+  if (url.startsWith('/')) urlsToTry.push(url.slice(1));
+
+  let lastErr: any;
+  for (const tryUrl of urlsToTry) {
+    try {
+      const gltf = await gltfLoader.loadAsync(tryUrl);
+      const group = gltf.scene;
+      if (!group) continue;
+
+      group.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+          if (obj.material) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (const mat of mats) {
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.roughness = Math.max(0.1, mat.roughness ?? 0.5);
+                mat.metalness = Math.max(0, mat.metalness ?? 0);
+                if (mat.color) {
+                  const hsl = { h: 0, s: 0, l: 0 };
+                  mat.color.getHSL(hsl);
+                  if (hsl.s < 0.3) {
+                    hsl.s = Math.min(1, hsl.s * 1.5 + 0.05);
+                    hsl.l = Math.min(1, Math.max(0.1, hsl.l * 1.1));
+                    mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+                  }
+                }
+                const name = obj.name.toLowerCase();
+                const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor') || name.includes('bell');
+                const isMetallic = name.includes('metal') || name.includes('hull') || name.includes('body') || name.includes('frame') || name.includes('strut');
+                const isGlass = name.includes('glass') || name.includes('window') || name.includes('canopy') || name.includes('cockpit');
+                const isHeatshield = name.includes('heat') || name.includes('shield') || name.includes('tile');
+                const isSolarPanel = name.includes('solar') || name.includes('panel') || name.includes('array');
+
+                if (isEngine) {
+                  mat.roughness = Math.max(0.05, mat.roughness);
+                  mat.metalness = Math.min(1, mat.metalness + 0.3);
+                  mat.emissive = new THREE.Color(0x884422);
+                  mat.emissiveIntensity = 0.15;
+                } else if (isMetallic) {
+                  mat.roughness = Math.max(0.1, mat.roughness * 0.7);
+                  mat.metalness = Math.min(1, mat.metalness + 0.4);
+                } else if (isGlass) {
+                  mat.roughness = 0;
+                  mat.metalness = 0;
+                  mat.transparent = true;
+                  mat.opacity = 0.6;
+                  mat.emissive = new THREE.Color(0x4488ff);
+                  mat.emissiveIntensity = 0.08;
+                } else if (isHeatshield) {
+                  mat.roughness = Math.min(1, mat.roughness + 0.2);
+                  mat.metalness = 0;
+                } else if (isSolarPanel) {
+                  mat.roughness = 0.8;
+                  mat.metalness = 0;
+                  mat.emissive = new THREE.Color(0x4488ff);
+                  mat.emissiveIntensity = 0.03;
+                }
+
+                if (!isEngine && !isGlass && !isSolarPanel) {
+                  if (name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor')) {
+                    mat.emissive = new THREE.Color(0x442200);
+                    mat.emissiveIntensity = 0.05;
+                  }
+                }
+                mat.needsUpdate = true;
+              } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
+                const newMat = new THREE.MeshStandardMaterial({
+                  color: (mat as THREE.MeshBasicMaterial).color ?? 0xffffff,
+                  map: (mat as THREE.MeshBasicMaterial).map,
+                  normalMap: (mat as any).normalMap,
+                  roughnessMap: (mat as any).roughnessMap,
+                  metalnessMap: (mat as any).metalnessMap,
+                  aoMap: (mat as any).aoMap,
+                  roughness: 0.5,
+                  metalness: 0.1,
+                });
+                obj.material = newMat;
               }
             }
-            // Detect material type by roughness and color
-            const name = obj.name.toLowerCase();
-            const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor') || name.includes('bell');
-            const isMetallic = name.includes('metal') || name.includes('hull') || name.includes('body') || name.includes('frame') || name.includes('strut');
-            const isGlass = name.includes('glass') || name.includes('window') || name.includes('window') || name.includes('canopy') || name.includes('cockpit');
-            const isHeatshield = name.includes('heat') || name.includes('shield') || name.includes('tile');
-            const isSolarPanel = name.includes('solar') || name.includes('panel') || name.includes('array');
-            
-            if (isEngine) {
-              mat.roughness = Math.max(0.05, mat.roughness);
-              mat.metalness = Math.min(1, mat.metalness + 0.3);
-              mat.emissive = new THREE.Color(0x884422);
-              mat.emissiveIntensity = 0.15;
-            } else if (isMetallic) {
-              mat.roughness = Math.max(0.1, mat.roughness * 0.7);
-              mat.metalness = Math.min(1, mat.metalness + 0.4);
-            } else if (isGlass) {
-              mat.roughness = 0;
-              mat.metalness = 0;
-              mat.transparent = true;
-              mat.opacity = 0.6;
-              mat.emissive = new THREE.Color(0x4488ff);
-              mat.emissiveIntensity = 0.08;
-            } else if (isHeatshield) {
-              mat.roughness = Math.min(1, mat.roughness + 0.2);
-              mat.metalness = 0;
-            } else if (isSolarPanel) {
-              mat.roughness = 0.8;
-              mat.metalness = 0;
-              mat.emissive = new THREE.Color(0x4488ff);
-              mat.emissiveIntensity = 0.03;
-            }
-            
-            // Add subtle emissive to engine parts (backward compat)
-            if (!isEngine && !isGlass && !isSolarPanel) {
-              const oldName = obj.name.toLowerCase();
-              if (oldName.includes('engine') || oldName.includes('nozzle') || oldName.includes('thruster') || oldName.includes('motor')) {
-                mat.emissive = new THREE.Color(0x442200);
-                mat.emissiveIntensity = 0.05;
-              }
-            }
-            mat.needsUpdate = true;
-          } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-            const newMat = new THREE.MeshStandardMaterial({
-              color: (mat as THREE.MeshBasicMaterial).color ?? 0xffffff,
-              map: (mat as THREE.MeshBasicMaterial).map,
-              normalMap: (mat as any).normalMap,
-              roughnessMap: (mat as any).roughnessMap,
-              metalnessMap: (mat as any).metalnessMap,
-              aoMap: (mat as any).aoMap,
+          } else {
+            obj.material = new THREE.MeshStandardMaterial({
+              color: 0xcccccc,
               roughness: 0.5,
               metalness: 0.1,
             });
-            obj.material = newMat;
           }
         }
-      } else {
-        obj.material = new THREE.MeshStandardMaterial({
-          color: 0xcccccc,
-          roughness: 0.5,
-          metalness: 0.1,
-        });
-      }
+      });
+
+      group.scale.setScalar(scale);
+      gltfCache.set(url, group);
+      return group.clone();
+    } catch (err) {
+      lastErr = err;
     }
-  });
-  
-  // Apply scale to the loaded model
-  group.scale.setScalar(scale);
-  
-  gltfCache.set(url, group);
-  return group.clone();
-  } catch (err) {
-    console.error('Failed to load GLTF:', url, err);
-    toast.show(`Failed to load model: ${url.split('/').pop()}`, 3000);
-    return null;
   }
+
+  console.error('Failed to load GLTF after all attempts:', url, lastErr);
+  toast.show(`Failed to load model: ${url.split('/').pop()}`, 3000);
+  return null;
 }
 
 // Cache for generated texture sets
@@ -201,20 +205,29 @@ function applyCylindricalUV(geometry: THREE.BufferGeometry, heightScale = 1.0): 
   if (!uv) {
     uv = new THREE.BufferAttribute(new Float32Array(pos.count * 2), 2);
   }
-  
+
+  // Compute Y range from actual geometry
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const yRange = maxY - minY || 1;
+
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    
+
     // Cylindrical projection: U = angle around Y, V = height
     const angle = Math.atan2(x, z);
     const u = (angle + Math.PI) / (2 * Math.PI);
-    const v = (y + 1) * 0.5 * heightScale; // Normalize to 0-1 range approximately
-    
+    const v = ((y - minY) / yRange) * heightScale;
+
     uv.setXY(i, u, v);
   }
-  
+
   geometry.setAttribute('uv', uv);
   uv.needsUpdate = true;
 
@@ -307,19 +320,40 @@ case 'gltf': {
         
         g.add(gltfGroup);
       } else {
-        // Placeholder box while GLTF loads
+        // Generate procedural fallback (colored cylinder with fins)
         const d = SIZE_DIMS[part.size];
-        const placeholderGeom = new THREE.BoxGeometry(d.radius * 2, d.height * 0.5, d.radius * 2);
-        const placeholderMat = new THREE.MeshStandardMaterial({
-          color: 0x8888aa,
-          roughness: 0.6,
-          metalness: 0.2,
-          transparent: true,
-          opacity: 0.5,
+        const fallbackMat = new THREE.MeshStandardMaterial({
+          color: 0x88aacc,
+          roughness: 0.4,
+          metalness: 0.3,
         });
-        const placeholder = new THREE.Mesh(placeholderGeom, placeholderMat);
-        placeholder.position.y = -d.height * 0.25;
-        g.add(placeholder);
+        const bodyGeom = new THREE.CylinderGeometry(d.radius, d.radius * 0.8, d.height * 0.8, 16);
+        applyCylindricalUV(bodyGeom);
+        const body = new THREE.Mesh(bodyGeom, fallbackMat);
+        body.position.y = -d.height * 0.1;
+        g.add(body);
+
+        // Nose cone
+        const noseGeom = new THREE.ConeGeometry(d.radius * 0.6, d.height * 0.2, 16);
+        const noseMat = new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.6, metalness: 0.1 });
+        const nose = new THREE.Mesh(noseGeom, noseMat);
+        nose.position.y = d.height * 0.4;
+        g.add(nose);
+
+        // Fins
+        const finMat = new THREE.MeshStandardMaterial({ color: 0x666688, roughness: 0.8, metalness: 0.0 });
+        for (let fi = 0; fi < 4; fi++) {
+          const angle = (fi / 4) * Math.PI * 2;
+          const finGeom = new THREE.BoxGeometry(d.radius * 0.02, d.height * 0.15, d.radius * 0.3);
+          const fin = new THREE.Mesh(finGeom, finMat);
+          fin.position.set(
+            Math.sin(angle) * d.radius * 1.05,
+            -d.height * 0.35,
+            Math.cos(angle) * d.radius * 1.05
+          );
+          fin.rotation.y = -angle;
+          g.add(fin);
+        }
       }
       break;
     }
