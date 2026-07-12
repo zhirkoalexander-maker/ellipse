@@ -72,6 +72,36 @@ export class FlightScene {
   private screenShake = 0;
   private countdownTimer = 0;
   private countdownActive = false;
+  private countdownEl: HTMLElement | null = null;
+
+  private showCountdown(text: string): void {
+    if (!this.countdownEl) {
+      this.countdownEl = document.createElement('div');
+      this.countdownEl.style.cssText = `
+        position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
+        font-size:72px;font-weight:bold;color:#fff;z-index:500;
+        text-shadow:0 0 30px rgba(68,136,255,0.6);
+        font-family:system-ui,sans-serif;pointer-events:none;
+        transition:opacity 0.2s;
+      `;
+      document.body.appendChild(this.countdownEl);
+    }
+    this.countdownEl.textContent = text;
+    this.countdownEl.style.opacity = '1';
+    if (text === 'LIFTOFF!') {
+      this.countdownEl.style.color = '#FF8844';
+      this.countdownEl.style.fontSize = '48px';
+    } else {
+      this.countdownEl.style.color = '#FFFFFF';
+      this.countdownEl.style.fontSize = '72px';
+    }
+  }
+
+  private hideCountdown(): void {
+    if (this.countdownEl) {
+      this.countdownEl.style.opacity = '0';
+    }
+  }
 
   private get dragMultiplier(): number {
     return this.gearDeployed ? 2.5 : 1;
@@ -817,16 +847,17 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       if (!this.countdownActive && !this.launched) {
         this.countdownActive = true;
         this.countdownTimer = 0;
-        toast.show('3');
+        this.showCountdown('3');
       }
       if (this.countdownActive) {
         this.countdownTimer += baseDt;
-        if (this.countdownTimer >= 1 && this.countdownTimer < 2) toast.show('2');
-        else if (this.countdownTimer >= 2 && this.countdownTimer < 3) toast.show('1');
+        if (this.countdownTimer >= 1 && this.countdownTimer < 2) this.showCountdown('2');
+        else if (this.countdownTimer >= 2 && this.countdownTimer < 3) this.showCountdown('1');
         else if (this.countdownTimer >= 3) {
           this.countdownActive = false;
           this.countdownTimer = 0;
-          toast.show('LIFTOFF!');
+          this.showCountdown('LIFTOFF!');
+          setTimeout(() => this.hideCountdown(), 1500);
         }
       }
       // Compute if thrust exceeds weight before actually applying thrust
