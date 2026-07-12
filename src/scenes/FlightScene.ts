@@ -77,6 +77,7 @@ export class FlightScene {
   private impactMarker: THREE.Mesh | null = null;
   private maxAlt = 0;
   private maxSpeed = 0;
+  private orbitLine: THREE.Line | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1269,6 +1270,40 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
     this.hud.setSAS(this.sasMode);
+
+    // Draw 3D orbit path
+    const refBodyOrbit = getReferenceBody(this.state.position, this.system);
+    const relPosOrbit: [number, number, number] = [
+      (this.state.position[0] - refBodyOrbit.position[0]) * VISUAL_SCALE,
+      (this.state.position[1] - refBodyOrbit.position[1]) * VISUAL_SCALE,
+      (this.state.position[2] - refBodyOrbit.position[2]) * VISUAL_SCALE,
+    ];
+    const orbitPred3d = predictOrbit(relPosOrbit, this.state.velocity, refBodyOrbit.mass, 5e14, 90);
+    if (orbitPred3d.points.length > 5) {
+      if (!this.orbitLine) {
+        const geom = new THREE.BufferGeometry();
+        const positions = new Float32Array(orbitPred3d.points.length * 3);
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.LineBasicMaterial({
+          color: orbitPred3d.bound ? 0x4488cc : 0xddaa44,
+          transparent: true, opacity: 0.3, depthWrite: false
+        });
+        this.orbitLine = new THREE.Line(geom, mat);
+        this.sceneMgr.scene.add(this.orbitLine);
+      }
+      const pos = this.orbitLine.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < orbitPred3d.points.length; i++) {
+        pos.array[i * 3] = refBodyOrbit.position[0] * VISUAL_SCALE + orbitPred3d.points[i]![0];
+        pos.array[i * 3 + 1] = this.state.position[1] * VISUAL_SCALE;
+        pos.array[i * 3 + 2] = refBodyOrbit.position[2] * VISUAL_SCALE + orbitPred3d.points[i]![1];
+      }
+      pos.needsUpdate = true;
+      this.orbitLine.geometry.setDrawRange(0, orbitPred3d.points.length);
+      (this.orbitLine.material as THREE.LineBasicMaterial).color.set(orbitPred3d.bound ? 0x4488cc : 0xddaa44);
+      this.orbitLine.visible = true;
+    } else if (this.orbitLine) {
+      this.orbitLine.visible = false;
+    }
 
     // Track personal records
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
