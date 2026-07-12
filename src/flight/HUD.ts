@@ -96,6 +96,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Record</span><span class="hud-value rec-val" style="font-size:9px;color:#EACD9E;">—</span></div>
       <div class="hud-row"><span class="hud-label">Q</span><span class="hud-value q-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Impact</span><span class="hud-value impact-val" style="font-size:9px;color:#CCCC44;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Debris</span><span class="hud-value debris-val" style="font-size:9px;color:#FF8844;">0</span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="btn-bar">
@@ -187,6 +188,10 @@ export class HUD {
     }
   }
 
+  setVisible(v: boolean): void {
+    this.root.style.display = v ? '' : 'none';
+  }
+
   setGForce(g: number): void {
     this.gforceVal.textContent = g.toFixed(2);
     if (g > 5) this.gforceVal.style.color = '#FF4444';
@@ -196,6 +201,11 @@ export class HUD {
 
   setGForceEnabled(enabled: boolean): void {
     (this.root.querySelector('.gforce-row') as HTMLElement)?.style.setProperty('display', enabled ? '' : 'none');
+  }
+
+  setDebris(count: number): void {
+    const el = this.root.querySelector('.debris-val');
+    if (el) el.textContent = count.toString();
   }
 
   setTWR(twr: number): void {
