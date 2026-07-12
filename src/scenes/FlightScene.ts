@@ -1427,6 +1427,16 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       this.hud.setAoA(aoa);
     }
 
+    // Compute latitude/longitude relative to reference body
+    const refBodyLatLon = getReferenceBody(this.state.position, this.system);
+    const rdx = this.state.position[0] - refBodyLatLon.position[0];
+    const rdy = this.state.position[1] - refBodyLatLon.position[1];
+    const rdz = this.state.position[2] - refBodyLatLon.position[2];
+    const rdl = Math.sqrt(rdx*rdx + rdy*rdy + rdz*rdz) || 1;
+    const lat = Math.asin(rdy / rdl) * 180 / Math.PI;
+    const lon = Math.atan2(rdx, rdz) * 180 / Math.PI;
+    this.hud.setLatLon(lat, (lon + 360) % 360);
+
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     // Screen shake from high G-force or mach effects
