@@ -70,6 +70,8 @@ export class FlightScene {
   private sasActive = false;
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
+  private countdownTimer = 0;
+  private countdownActive = false;
 
   private get dragMultiplier(): number {
     return this.gearDeployed ? 2.5 : 1;
@@ -794,6 +796,22 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     // Apply thrust
     let canLiftOff = false;
     if (engineActive && this.grounded) {
+      // Countdown on first throttle-up when grounded
+      if (!this.countdownActive && !this.launched) {
+        this.countdownActive = true;
+        this.countdownTimer = 0;
+        toast.show('3');
+      }
+      if (this.countdownActive) {
+        this.countdownTimer += baseDt;
+        if (this.countdownTimer >= 1 && this.countdownTimer < 2) toast.show('2');
+        else if (this.countdownTimer >= 2 && this.countdownTimer < 3) toast.show('1');
+        else if (this.countdownTimer >= 3) {
+          this.countdownActive = false;
+          this.countdownTimer = 0;
+          toast.show('LIFTOFF!');
+        }
+      }
       // Compute if thrust exceeds weight before actually applying thrust
       const eng = findFirstEngine(this.state.rocket.assembly.roots);
       if (eng && eng.thrust) {
