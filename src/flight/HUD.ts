@@ -1,5 +1,6 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
+import { getReferenceBody } from '../physics/SoiResolver';
 
 export class HUD {
   private root: HTMLDivElement;
@@ -79,6 +80,7 @@ export class HUD {
       <div class="separator"></div>
       <div class="hud-row"><span class="hud-label">TWR</span><span class="hud-value twr-val" style="color:#88CCFF;">—</span></div>
       <div class="hud-row"><span class="hud-label">Δv</span><span class="hud-value dv-val" style="font-size:9px;color:#88CCFF;">—</span></div>
+      <div class="hud-row"><span class="hud-label">SOI</span><span class="hud-value soi-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Isp</span><span class="hud-value isp-val" style="font-size:9px;color:#88CCFF;">—</span></div>
       <div class="hud-row gforce-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
@@ -421,6 +423,13 @@ export class HUD {
     const eccEl = this.root.querySelector('.ecc-val');
     if (eccEl && eccentricity !== undefined) {
       eccEl.textContent = eccentricity.toFixed(3);
+    }
+
+    // SOI body name
+    const soiEl = this.root.querySelector('.soi-val');
+    if (soiEl) {
+      const refBody = getReferenceBody(state.position, system);
+      soiEl.textContent = refBody ? refBody.name.toUpperCase() : '—';
     }
   }
 
