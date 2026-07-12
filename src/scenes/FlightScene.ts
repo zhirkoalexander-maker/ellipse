@@ -84,6 +84,8 @@ export class FlightScene {
   private freeCamLook = new THREE.Vector3(0, 0, 0);
   private hudVisible = true;
   private lastAltMilestone = 0;
+  private sonicBoomRing: THREE.Mesh | null = null;
+  private sonicBoomLife = 0;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1441,6 +1443,31 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
     const mach = speedMs / 340;
     this.hud.setMach(mach);
+
+    // Sonic boom ring when crossing mach 1
+    if (mach > 0.98 && mach < 1.02 && !this.sonicBoomRing && nearestAlt < 15000) {
+      const ringGeom = new THREE.RingGeometry(0.5, 1.5, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false
+      });
+      this.sonicBoomRing = new THREE.Mesh(ringGeom, ringMat);
+      this.sonicBoomRing.position.set(0, 0, 0);
+      this.rocketGroup.add(this.sonicBoomRing);
+      this.sonicBoomLife = 0;
+      toast.show('Sonic boom!');
+    }
+    if (this.sonicBoomRing) {
+      this.sonicBoomLife += baseDt;
+      const scale = 1 + this.sonicBoomLife * 40;
+      this.sonicBoomRing.scale.setScalar(scale);
+      (this.sonicBoomRing.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.4 * (1 - this.sonicBoomLife));
+      if (this.sonicBoomLife > 2) {
+        this.rocketGroup.remove(this.sonicBoomRing);
+        this.sonicBoomRing.geometry.dispose();
+        (this.sonicBoomRing.material as THREE.Material).dispose();
+        this.sonicBoomRing = null;
+      }
+    }
 
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
