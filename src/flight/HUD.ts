@@ -1,6 +1,7 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
 import { getReferenceBody } from '../physics/SoiResolver';
+import { findFirstEngine } from './Thrust';
 
 export class HUD {
   private root: HTMLDivElement;
@@ -26,6 +27,7 @@ export class HUD {
   private timeVal!: HTMLSpanElement;
   private dvVal!: HTMLSpanElement;
   private ispVal!: HTMLSpanElement;
+  private burnVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -82,6 +84,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Δv</span><span class="hud-value dv-val" style="font-size:9px;color:#88CCFF;">—</span></div>
       <div class="hud-row"><span class="hud-label">SOI</span><span class="hud-value soi-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Isp</span><span class="hud-value isp-val" style="font-size:9px;color:#88CCFF;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Burn</span><span class="hud-value burn-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row gforce-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
@@ -124,6 +127,7 @@ export class HUD {
     this.timeVal = this.root.querySelector('.time-val')!;
     this.dvVal = this.root.querySelector('.dv-val')!;
     this.ispVal = this.root.querySelector('.isp-val')!;
+    this.burnVal = this.root.querySelector('.burn-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -430,6 +434,23 @@ export class HUD {
     if (soiEl) {
       const refBody = getReferenceBody(state.position, system);
       soiEl.textContent = refBody ? refBody.name.toUpperCase() : '—';
+    }
+
+    // Burn time remaining
+    if (this.burnVal) {
+      const fuelMass = state.rocket.totalFuelMass();
+      const throttle = state.throttle;
+      if (fuelMass > 0.1 && throttle > 0.01) {
+        const engBurn = findFirstEngine(state.rocket.assembly.roots);
+        if (engBurn && engBurn.thrust) {
+          const thrustN = engBurn.thrust * 1000 * throttle;
+          const massFlow = thrustN / (320 * 9.80665); // kg/s
+          const burnTime = fuelMass / massFlow;
+          this.burnVal.textContent = burnTime > 60 ? `${(burnTime / 60).toFixed(1)}m` : `${burnTime.toFixed(0)}s`;
+        }
+      } else {
+        this.burnVal.textContent = '—';
+      }
     }
   }
 
