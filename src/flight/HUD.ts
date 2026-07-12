@@ -28,6 +28,7 @@ export class HUD {
   private dvVal!: HTMLSpanElement;
   private ispVal!: HTMLSpanElement;
   private burnVal!: HTMLSpanElement;
+  private recVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -91,6 +92,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="hud-row"><span class="hud-label">Ecc</span><span class="hud-value ecc-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Record</span><span class="hud-value rec-val" style="font-size:9px;color:#EACD9E;">—</span></div>
       <div class="hud-row"><span class="hud-label">Q</span><span class="hud-value q-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Impact</span><span class="hud-value impact-val" style="font-size:9px;color:#CCCC44;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
@@ -128,6 +130,7 @@ export class HUD {
     this.dvVal = this.root.querySelector('.dv-val')!;
     this.ispVal = this.root.querySelector('.isp-val')!;
     this.burnVal = this.root.querySelector('.burn-val')!;
+    this.recVal = this.root.querySelector('.rec-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -158,6 +161,10 @@ export class HUD {
 
   setIsp(isp: number): void {
     this.ispVal.textContent = isp > 0 ? `${isp.toFixed(0)}s` : '—';
+  }
+
+  setRecord(text: string): void {
+    this.recVal.textContent = text;
   }
 
   setSAS(active: boolean): void {

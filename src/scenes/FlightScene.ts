@@ -75,6 +75,8 @@ export class FlightScene {
   private countdownEl: HTMLElement | null = null;
   private lastRefBody: string | null = null;
   private impactMarker: THREE.Mesh | null = null;
+  private maxAlt = 0;
+  private maxSpeed = 0;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1252,6 +1254,11 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
     this.hud.setSAS(this.sasActive);
+
+    // Track personal records
+    if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
+    if (speed > this.maxSpeed) this.maxSpeed = speed;
+    this.hud.setRecord(`Alt ${(this.maxAlt/1000).toFixed(0)}km Spd ${this.maxSpeed.toFixed(0)}m/s`);
 
     // Compute approximate delta-v remaining
     const engDv = findFirstEngine(this.state.rocket.assembly.roots);
