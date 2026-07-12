@@ -362,6 +362,42 @@ export class FlightScene {
       mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
     });
     mapCanvas.addEventListener('touchend', () => { mapDragStart = null; });
+    mapCanvas.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      const rect = mapCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const cW = mapCanvas.clientWidth;
+      const cH = mapCanvas.clientHeight;
+      const cx2 = cW/2 + mapPanX;
+      const cy2 = cH/2 + mapPanY;
+      let maxRelD2 = 1;
+      for (const b of this.system.bodies) {
+        const dx = (b.position[0] - this.state.position[0]) * VISUAL_SCALE;
+        const dz = (b.position[2] - this.state.position[2]) * VISUAL_SCALE;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d > maxRelD2) maxRelD2 = d;
+      }
+      const s2 = Math.min(cW, cH) * 0.4 / maxRelD2 * mapZoom;
+      let nearest: string | null = null;
+      let nearestDist = 25;
+      for (const b of this.system.bodies) {
+        const bx = cx2 + (b.position[0] - this.state.position[0]) * s2;
+        const by = cy2 - (b.position[2] - this.state.position[2]) * s2;
+        const dr = Math.sqrt((mx-bx)**2 + (my-by)**2);
+        if (dr < nearestDist) { nearestDist = dr; nearest = b.name; }
+      }
+      if (nearest) {
+        const body = this.system.bodyByName(nearest);
+        if (body) {
+          const zoomTo = nearest === 'earth' ? 20 : nearest === 'moon' ? 50 : 3;
+          mapPanX = -(body.position[0] - this.state.position[0]) * s2;
+          mapPanY = (body.position[2] - this.state.position[2]) * s2;
+          mapZoom = zoomTo;
+          toast.show(`${nearest}: ${((body as any).mass ?? 0).toExponential(2)}kg R=${((body as any).radius ?? 0)/1000}km`);
+        }
+      }
+    });
 
     const drawMap = () => {
       if (!mapActive) return;
