@@ -41,6 +41,9 @@ export class ChaseCamera {
           case 'ArrowDown': this.orbitKeys.down = true; e.preventDefault(); break;
         }
       }
+      // Z/X zoom
+      if (e.key === 'z' || e.key === 'Z') this.zoomKeys.in = true;
+      if (e.key === 'x' || e.key === 'X') this.zoomKeys.out = true;
     });
     window.addEventListener('keyup', (e) => {
       switch (e.key) {
@@ -48,6 +51,8 @@ export class ChaseCamera {
         case 'ArrowRight': this.orbitKeys.right = false; break;
         case 'ArrowUp': this.orbitKeys.up = false; break;
         case 'ArrowDown': this.orbitKeys.down = false; break;
+        case 'z': case 'Z': this.zoomKeys.in = false; break;
+        case 'x': case 'X': this.zoomKeys.out = false; break;
       }
     });
   }
@@ -119,6 +124,8 @@ export class ChaseCamera {
     if (this.orbitKeys.right) this.targetAzimuth -= dt * ORBIT_SPEED;
     if (this.orbitKeys.up) this.targetPolar = Math.max(0.05, this.targetPolar - dt * ORBIT_SPEED * 0.5);
     if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.05, this.targetPolar + dt * ORBIT_SPEED * 0.5);
+    if (this.zoomKeys.in) this.targetDist = Math.max(MIN_DIST, this.targetDist * (1 - dt * ZOOM_SPEED));
+    if (this.zoomKeys.out) this.targetDist = Math.min(MAX_DIST, this.targetDist * (1 + dt * ZOOM_SPEED));
 
     // Smooth interpolation
     this.dist += (this.targetDist - this.dist) * Math.min(1, LERP_SPEED * dt);
@@ -144,7 +151,11 @@ export class ChaseCamera {
     }
 
     this.camera.position.copy(this.smoothPos);
-    this.camera.up.copy(targetUp);
+    // Dynamic up-vector to prevent gimbal lock at poles
+    const upVec = Math.abs(this.polar) < 0.1 ? new THREE.Vector3(0, 0, 1) :
+                  Math.abs(this.polar - Math.PI) < 0.1 ? new THREE.Vector3(0, 0, -1) :
+                  targetUp;
+    this.camera.up.copy(upVec);
     this.camera.lookAt(targetLook);
   }
 }
