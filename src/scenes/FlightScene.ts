@@ -67,6 +67,8 @@ export class FlightScene {
   private gearDeployed = false;
   private gearMeshes: THREE.Mesh[] = [];
   private missionTime = 0;
+  private sasActive = false;
+  private sasTargetQuat = new THREE.Quaternion();
 
   private get dragMultiplier(): number {
     return this.gearDeployed ? 2.5 : 1;
@@ -603,6 +605,15 @@ for (const b of this.system.bodies) {
       } else if (e.key === 'g') {
         this.toggleGear();
         e.preventDefault();
+      } else if (e.key === 't') {
+        this.sasActive = !this.sasActive;
+        if (this.sasActive) {
+          this.sasTargetQuat.copy(this.rocketQuat);
+          toast.show('SAS enabled — holding attitude');
+        } else {
+          toast.show('SAS disabled');
+        }
+        e.preventDefault();
       }
     });
 
@@ -704,6 +715,19 @@ for (const b of this.system.bodies) {
     if (engineActive && !this.grounded) {
       this.angularVel.x += pitchInput * this.state.throttle * 4 * baseDt;
       this.angularVel.y += yawInput * this.state.throttle * 4 * baseDt;
+    }
+
+    // SAS: hold attitude by countering drift
+    if (this.sasActive && !warpActive) {
+      const drift = new THREE.Quaternion().copy(this.sasTargetQuat).invert().multiply(this.rocketQuat);
+      const angle = 2 * Math.acos(Math.abs(drift.w));
+      if (angle > 0.001) {
+        const axis = new THREE.Vector3(drift.x, drift.y, drift.z).normalize();
+        this.angularVel.x -= axis.x * angle * 3 * baseDt;
+        this.angularVel.y -= axis.y * angle * 3 * baseDt;
+        this.angularVel.z -= axis.z * angle * 3 * baseDt;
+      }
+      this.angularVel.multiplyScalar(Math.exp(-5 * baseDt));
     }
 
     const damp = Math.exp(-this.ANGULAR_DAMPING * baseDt);
@@ -1056,6 +1080,7 @@ for (const b of this.system.bodies) {
       }
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime);
+    this.hud.setSAS(this.sasActive);
 
     // Compute G-force from velocity change
     const dvx = this.state.velocity[0] - this.prevVel[0];

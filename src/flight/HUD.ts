@@ -79,6 +79,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
+      <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
@@ -133,6 +134,14 @@ export class HUD {
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
+  }
+
+  setSAS(active: boolean): void {
+    const el = this.root.querySelector('.sas-val');
+    if (el) {
+      el.textContent = active ? 'ON' : 'OFF';
+      (el as HTMLElement).style.color = active ? '#44FF44' : '#666688';
+    }
   }
 
   setGForce(g: number): void {
