@@ -78,6 +78,9 @@ export class FlightScene {
   private maxAlt = 0;
   private maxSpeed = 0;
   private orbitLine: THREE.Line | null = null;
+  private cameraMode: 'chase' | 'free' = 'chase';
+  private freeCamPos = new THREE.Vector3(0, 2, 5);
+  private freeCamLook = new THREE.Vector3(0, 0, 0);
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -724,6 +727,10 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.chase.reset();
         toast.show('Camera view reset');
         e.preventDefault();
+      } else if (e.key === 'c') {
+        this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
+        toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
+        e.preventDefault();
       }
     });
 
@@ -1184,7 +1191,19 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.state.position[2] * VISUAL_SCALE
       );
 
-      this.chase.follow(this.state, baseDt, camUp, warpActive);
+      if (this.cameraMode === 'free') {
+        const rocketWorld = new THREE.Vector3(
+          this.state.position[0] * VISUAL_SCALE,
+          this.state.position[1] * VISUAL_SCALE,
+          this.state.position[2] * VISUAL_SCALE
+        );
+        this.freeCamPos.lerp(rocketWorld.clone().add(new THREE.Vector3(0, 2, 5)), baseDt * 2);
+        this.freeCamLook.lerp(rocketWorld, baseDt * 2);
+        this.sceneMgr.camera.position.copy(this.freeCamPos);
+        this.sceneMgr.camera.lookAt(this.freeCamLook);
+      } else {
+        this.chase.follow(this.state, baseDt, camUp, warpActive);
+      }
 
       if (this.deployedChuteMesh) {
         this.deployedChuteMesh.position.set(
