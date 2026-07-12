@@ -66,6 +66,7 @@ export class FlightScene {
   private prevVel: [number, number, number] = [0, 0, 0];
   private gearDeployed = false;
   private gearMeshes: THREE.Mesh[] = [];
+  private missionTime = 0;
 
   private get dragMultiplier(): number {
     return this.gearDeployed ? 2.5 : 1;
@@ -656,6 +657,10 @@ for (const b of this.system.bodies) {
       return;
     }
 
+    // Track mission time (only when not crashed/paused)
+    this.missionTime += baseDt;
+    this.missionTime = Math.min(this.missionTime, 99999);
+
     _dt *= this.timeWarp;
     if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
 
@@ -1029,7 +1034,7 @@ for (const b of this.system.bodies) {
         pe = orbitPred.periapsis;
       }
     }
-    this.hud.update(this.state, this.system, 0, stageCount, ape, pe);
+    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, undefined, undefined, this.missionTime);
 
     // Compute G-force from velocity change
     const dvx = this.state.velocity[0] - this.prevVel[0];
