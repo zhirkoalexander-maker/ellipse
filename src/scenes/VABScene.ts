@@ -199,10 +199,22 @@ export class VABScene {
       this.currentRocketEl.innerHTML = '<div style="color:rgba(244,245,242,0.3);font-size:10px;font-style:italic;">No parts — click from list below</div>';
       return;
     }
+    const totalMass = this.assembly.roots.reduce((sum, n) => sum + n.part.mass + this.childMass(n), 0);
+    const totalFuel = this.assembly.roots.reduce((sum, n) => sum + (n.part.fuelCapacity ?? 0) + this.childFuel(n), 0);
     this.currentRocketEl.innerHTML = '<div style="color:rgba(244,245,242,0.4);font-size:9px;letter-spacing:0.05em;margin-bottom:4px;">CURRENT ROCKET (top to bottom):</div>' +
       [...this.addedPartNames].reverse().map((name, i) =>
         `<div style="color:#F4F5F2;font-size:10px;padding:1px 0;${i === 0 ? 'color:#EACD9E;' : ''}">${i === 0 ? '▲ ' : ''}${name}</div>`
-      ).join('');
+      ).join('') +
+      `<div style="color:rgba(244,245,242,0.35);font-size:9px;margin-top:6px;border-top:1px solid rgba(244,245,242,0.1);padding-top:4px;">` +
+      `${this.addedPartNames.length} parts | ${totalMass.toFixed(1)}kg | ${totalFuel.toFixed(0)}kg fuel</div>`;
+  }
+
+  private childMass(n: AssemblyNode): number {
+    return n.children.reduce((s, c) => s + c.part.mass + this.childMass(c), 0);
+  }
+
+  private childFuel(n: AssemblyNode): number {
+    return n.children.reduce((s, c) => s + (c.part.fuelCapacity ?? 0) + this.childFuel(c), 0);
   }
 
   private updateVabCamera(): void {
