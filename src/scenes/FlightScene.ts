@@ -70,6 +70,14 @@ export class FlightScene {
   private sasMode: 'off' | 'hold' | 'prograde' | 'retrograde' = 'off';
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
+  private heatEnergy = 0;
+  private readonly MAX_HEAT = 300000;
+  private readonly HEAT_RADIATION_RATE = 0.98;
+  private stageInfo: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> = [];
+  private lastReentryIntensity = 0;
+  private prevMach = 0;
+  private sonicBoomTriggered = false;
+  private sonicBoomTimer = 0;
   private countdownTimer = 0;
   private countdownActive = false;
   private countdownEl: HTMLElement | null = null;
@@ -843,6 +851,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         e.preventDefault();
       } else if (e.key === 'c') {
         this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
+        this.hud.setFreeCamera(this.cameraMode === 'free');
         toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
         e.preventDefault();
       } else if (e.key === 'F1') {
@@ -870,6 +879,85 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       count += this.countStages(n.children);
     }
     return count;
+  }
+
+  /**
+   * Compute per-stage info for the HUD stage panel.
+   * Stage definition: parts are ordered bottom-to-top (flat layout).
+   * A decoupler splits the assembly into two stages. The first stage is below the decoupler,
+   * the next is above. Spent stages had their decoupler already activated.
+   */
+  private computeStageData(): Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> {
+    const roots = this.rocket.assembly.roots;
+    if (roots.length === 0) return [];
+
+    const decouplerIndices: number[] = [];
+    for (let i = 0; i < roots.length; i++) {
+      if (roots[i]!.part.kind === 'decoupler') decouplerIndices.push(i);
+    }
+
+    type Stage = { parts: AssemblyNode[]; active: boolean; spent: boolean };
+    const stages: Stage[] = [];
+
+    let startIdx = 0;
+    for (let i = 0; i <= decouplerIndices.length; i++) {
+      const endIdx = i < decouplerIndices.length ? decouplerIndices[i]! : roots.length;
+      const chunk: AssemblyNode[] = [];
+      for (let j = startIdx; j < endIdx; j++) chunk.push(roots[j]!);
+      if (chunk.length > 0) {
+        const spent = this.isChunkSpent(chunk);
+        stages.push({ parts: chunk, active: !spent, spent });
+      }
+      startIdx = endIdx + 1;
+    }
+
+    let activeIdx = 0;
+    for (let i = 0; i < stages.length; i++) {
+      if (!stages[i]!.spent) { activeIdx = i; break; }
+      activeIdx = i;
+    }
+
+    return stages.map((st, idx) => {
+      let dryMass = 0;
+      let fuelMass = 0;
+      for (const n of st.parts) {
+        dryMass += n.part.mass;
+        if (n.part.fuelCapacity) {
+          const tank = this.rocket.fuelTanks.find(t => t.node === n);
+          fuelMass += tank ? tank.remaining : n.part.fuelCapacity;
+        }
+      }
+      const engineCount = st.parts.filter(p => p.part.kind === 'engine').length;
+      const tankCount = st.parts.filter(p => p.part.fuelCapacity).length;
+
+      const hasEngine = engineCount > 0;
+      const label = hasEngine
+        ? `${engineCount}E ${tankCount}T`
+        : st.parts.length === 1
+          ? (st.parts[0]!.part.name || 'C')
+          : `${st.parts.length}P`;
+
+      return {
+        label: `S${idx + 1}: ${label}`,
+        fuelMass,
+        dryMass,
+        active: idx === activeIdx,
+        spent: st.spent,
+      };
+    });
+  }
+
+  /** A stage chunk is considered "spent" if it has no engines with remaining fuel */
+  private isChunkSpent(chunk: AssemblyNode[]): boolean {
+    const hasEngine = chunk.some(n => n.part.kind === 'engine');
+    if (!hasEngine) return false;
+    for (const n of chunk) {
+      if (n.part.fuelCapacity) {
+        const tank = this.rocket.fuelTanks.find(t => t.node === n);
+        if (tank && tank.remaining > 0.01) return false;
+      }
+    }
+    return true;
   }
 
   update(_dt: number): void {
@@ -1012,6 +1100,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         else if (this.countdownTimer >= 3) {
           this.countdownActive = false;
           this.countdownTimer = 0;
+          this.launched = true;
           this.showCountdown('LIFTOFF!');
           setTimeout(() => this.hideCountdown(), 1500);
         }
@@ -1170,20 +1259,78 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           }
           this.sanitize(this.state.velocity);
 
-          // Reentry glow effect (plasma)
-          const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
-          if (reentryIntensity > 0.05 && this.reentryGlowMesh) {
-            this.reentryGlowMesh.visible = true;
-            this.reentryGlowMesh.scale.setScalar(1 + reentryIntensity * 2);
-            (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity);
-          } else if (this.reentryGlowMesh) {
-            this.reentryGlowMesh.visible = false;
-          }
+        // Reentry glow effect (plasma)
+        const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
+        if (reentryIntensity > 0.05 && this.reentryGlowMesh) {
+          this.reentryGlowMesh.visible = true;
+          this.reentryGlowMesh.scale.setScalar(1 + reentryIntensity * 2);
+          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity);
+          const tempColor = reentryIntensity > 0.8 ? 0xffffff : reentryIntensity > 0.5 ? 0xffcc44 : 0xff8844;
+          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).color.setHex(tempColor);
+        } else if (this.reentryGlowMesh) {
+          this.reentryGlowMesh.visible = false;
+        }
+
+        // Per-part heat visualization - parts glow red based on heat
+        this.lastReentryIntensity = reentryIntensity;
+        if (reentryIntensity > 0.1) {
+          this.rocketGroup.traverse((obj) => {
+            const m = obj as THREE.Mesh;
+            if (!m.isMesh) return;
+            const mat = m.material as THREE.MeshStandardMaterial;
+            if (!mat || !mat.emissive) return;
+            const heatFraction = Math.min(1, this.heatEnergy / 300000);
+            const cr = heatFraction * 0.9;
+            const cg = heatFraction * heatFraction * 0.5;
+            const cb = heatFraction * heatFraction * heatFraction * 0.15;
+            mat.emissive.setRGB(cr, cg, cb);
+            mat.emissiveIntensity = heatFraction * 1.5;
+          });
+        } else if (this.heatEnergy > 0) {
+          const coolFraction = Math.min(1, this.heatEnergy / 300000);
+          this.rocketGroup.traverse((obj) => {
+            const m = obj as THREE.Mesh;
+            if (!m.isMesh) return;
+            const mat = m.material as THREE.MeshStandardMaterial;
+            if (!mat || !mat.emissive) return;
+            mat.emissive.setRGB(coolFraction * 0.4, 0, 0);
+            mat.emissiveIntensity = coolFraction * 0.5;
+          });
+        } else if (this.heatEnergy < 1) {
+          // Fully cooled
+          this.rocketGroup.traverse((obj) => {
+            const m = obj as THREE.Mesh;
+            if (!m.isMesh) return;
+            const mat = m.material as THREE.MeshStandardMaterial;
+            if (!mat || !mat.emissive) return;
+            if (mat.emissiveIntensity > 0) {
+              mat.emissive.setRGB(0, 0, 0);
+              mat.emissiveIntensity = 0;
+            }
+          });
+        }
+
+        // Heat accumulation from aerodynamic heating
+        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-6;
+        this.heatEnergy += heatFlux * baseDt;
         }
       }
       if (this.reentryGlowMesh) {
         const inAtmo = nearestBody && (nearestBody as any).radius && nearestDist - (nearestBody as any).radius < 300000;
         if (!inAtmo) this.reentryGlowMesh.visible = false;
+      }
+
+      // Heat radiation (cooling when out of dense atmosphere)
+      if (!this.grounded) {
+        if (this.heatEnergy > 0) {
+          this.heatEnergy *= this.HEAT_RADIATION_RATE;
+          if (this.heatEnergy < 1) this.heatEnergy = 0;
+        }
+        // Heat-related part failure
+        if (this.heatEnergy > this.MAX_HEAT) {
+          this.crashed = true;
+          toast.show(`OVERHEATED! Ship disintegrated at ${this.heatEnergy.toFixed(0)}J`);
+        }
       }
 
 
@@ -1279,6 +1426,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       (body as any).syncMesh?.();
     }
 
+    // Update atmosphere scattering direction for all planets
+    const sunBody = this.system.bodyByName('sun');
+    if (sunBody && (sunBody as any).mesh) {
+      const sunWorldPos = (sunBody as any).mesh.position as THREE.Vector3;
+      for (const b2 of this.system.bodies) {
+        const b = b2 as any;
+        if (b.atmosphereGlow && b.mesh) {
+          b.atmosphereGlow.setSunDirection(sunWorldPos, b.mesh.position);
+        }
+      }
+    }
+
+    // Animate Earth cloud layer
+    const earthBody = this.system.bodyByName('earth');
+    if (earthBody && 'updateClouds' in earthBody) {
+      (earthBody as any).updateClouds(baseDt);
+    }
+
     // Update debris physics
     if (this.debris.length > 0) {
       const refBody = getReferenceBody(this.state.position, this.system);
@@ -1356,6 +1521,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     const stageCount = this.countStages(this.rocket.assembly.roots);
 
+    // Compute stage info for HUD
+    const stageData = this.computeStageData();
+    this.stageInfo = stageData;
+    this.hud.setStageData(stageData);
+
     // Compute TWR
     const eng = findFirstEngine(this.state.rocket.assembly.roots);
     if (eng && eng.thrust) {
@@ -1428,7 +1598,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.impactMarker.visible = false;
       }
     }
-    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity, period);
+    const activeStage = this.stageInfo.filter(s => s.active).length > 0
+      ? this.stageInfo.findIndex(s => s.active) + 1
+      : 1;
+    this.hud.update(this.state, this.system, this.heatEnergy, stageCount, activeStage);
     this.hud.setSAS(this.sasMode);
 
     // Draw 3D orbit path
@@ -1540,6 +1713,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const mach = speedMs / 340;
     this.hud.setMach(mach);
     this.hud.setMass(this.state.rocket.totalMass());
+
+    // Sonic boom trigger — when crossing Mach 1 in atmosphere
+    if (mach > 1 && this.prevMach < 1 && !this.sonicBoomTriggered) {
+      this.sonicBoomTriggered = true;
+      this.sonicBoomTimer = 1.0;
+      toast.show(`💥 MACH 1 — Sonic boom!`);
+      this.sound.playStaging(); // reuse loud burst sound
+      // Spawn a shock ring
+      this.spawnShockRing(0xaaccff);
+    }
+    if (this.sonicBoomTimer > 0) this.sonicBoomTimer -= baseDt;
+    if (this.sonicBoomTriggered && mach < 0.7) this.sonicBoomTriggered = false;
+    this.prevMach = mach;
 
     // Local gravitational acceleration (g = G*M/r²)
     const gravRefBody = getReferenceBody(this.state.position, this.system);
@@ -1871,10 +2057,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           this.explosionMeshes.splice(i, 1);
           continue;
         }
-        const s = 1 + t * 6;
+        const isShockRing = (m as any)._shockRing;
+        // Shock rings expand much faster (need a bigger scale factor)
+        const s = isShockRing ? 1 + t * 60 : 1 + t * 6;
         m.scale.setScalar(s);
         const fadeFactor = life < 1 ? 2 : 1;
-        (m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 * (1 - t * fadeFactor));
+        (m.material as THREE.MeshBasicMaterial).opacity = isShockRing
+          ? Math.max(0, 0.85 * (1 - t * 1.5))
+          : Math.max(0, 0.9 * (1 - t * fadeFactor));
         m.position.x += (m as any)._vx * dt;
         m.position.y += (m as any)._vy * dt;
         m.position.z += (m as any)._vz * dt;
@@ -1945,6 +2135,40 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.sceneMgr.scene.add(smoke);
       this.explosionMeshes.push(smoke);
     }
+  }
+
+  /**
+   * Spawn a shock ring (e.g. sonic boom, staging event).
+   * The ring expands radially around the rocket over a short amount of time.
+   */
+  private spawnShockRing(color: number = 0xffffff): void {
+    // Place the ring at the rocket's world position
+    const wp = new THREE.Vector3();
+    this.rocketGroup.getWorldPosition(wp);
+    const s = VISUAL_SCALE;
+    const rx = wp.x * VISUAL_SCALE, ry = wp.y * VISUAL_SCALE, rz = wp.z * VISUAL_SCALE;
+
+    const ringGeom = new THREE.RingGeometry(0.1, 0.2, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const ring = new THREE.Mesh(ringGeom, ringMat);
+    ring.position.set(this.rocketGroup.position.x, this.rocketGroup.position.y, this.rocketGroup.position.z);
+    ring.quaternion.copy(this.rocketQuat);
+    ring.scale.setScalar(1.0);
+    (ring as any)._life = 1.2;
+    (ring as any)._age = 0;
+    (ring as any)._shockRing = true;
+    (ring as any)._vx = 0;
+    (ring as any)._vy = 0;
+    (ring as any)._vz = 0;
+    this.sceneMgr.scene.add(ring);
+    this.explosionMeshes.push(ring);
   }
 
   private hasLandingLegs(): boolean {
