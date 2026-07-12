@@ -417,19 +417,25 @@ export class FlightScene {
       const s = Math.min(w, h) * 0.4 / maxRelD * mapZoom;
 
       const colors: Record<string, string> = {
-  sun: '#ffdd44', earth: '#4fc3f7', moon: '#aaaacc',
-  venus: '#e8a84c', mars: '#d4733a', mercury: '#b0b0b0',
-  jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8',
-  neptune: '#4b70dd'
+  sun: '#ffdd44', earth: '#4fc3f7', moon: '#ccccee',
+  venus: '#e8b84c', mars: '#e88444', mercury: '#c0c0c0',
+  jupiter: '#e8b87c', saturn: '#f4e8b0', uranus: '#5fe0f0',
+  neptune: '#5b88ee', pluto: '#ddccbb', titan: '#ddaa77',
+  io: '#eeddaa', europa: '#aaccdd', ganymede: '#bbccaa',
+  phobos: '#bb9988', deimos: '#887766'
 };
 const glowColors: Record<string, string> = {
-  sun: 'rgba(255,220,68,0.12)', earth: 'rgba(79,195,247,0.08)',
-  mars: 'rgba(212,115,58,0.08)', venus: 'rgba(232,168,76,0.08)',
-  jupiter: 'rgba(212,165,116,0.08)', saturn: 'rgba(244,228,161,0.15)',
+  sun: 'rgba(255,220,68,0.20)', earth: 'rgba(79,195,247,0.12)',
+  mars: 'rgba(232,120,68,0.12)', venus: 'rgba(232,184,76,0.12)',
+  jupiter: 'rgba(232,184,124,0.12)', saturn: 'rgba(244,232,176,0.20)',
+  uranus: 'rgba(95,224,240,0.10)', neptune: 'rgba(91,136,238,0.10)',
+  moon: 'rgba(204,204,238,0.06)', titan: 'rgba(221,170,119,0.08)'
 };
 const sizes: Record<string, number> = {
-  sun: 8, earth: 5, moon: 2, venus: 3, mars: 3, mercury: 2,
-  jupiter: 7, saturn: 6, uranus: 3.5, neptune: 3.5
+  sun: 8, earth: 5, moon: 2.5, venus: 3.5, mars: 3.5, mercury: 2.5,
+  jupiter: 7, saturn: 6, uranus: 4, neptune: 3.5,
+  pluto: 1.5, titan: 2, io: 1.5, europa: 1.5, ganymede: 2,
+  phobos: 1, deimos: 1
 };
 
   // Draw planet orbit trails around sun
@@ -562,6 +568,29 @@ ctx.strokeRect(barX, barY, nicePx, barHeight);
 ctx.fillStyle = 'rgba(244,245,242,0.4)';
 ctx.font = '8px monospace';
 ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed(0)+'km'}`, barX, barY - 2);
+
+// Compass rose
+const compassX = 30;
+const compassY = h - 35;
+const compassR = 12;
+ctx.strokeStyle = 'rgba(244,245,242,0.25)';
+ctx.lineWidth = 1;
+ctx.beginPath();
+ctx.arc(compassX, compassY, compassR, 0, Math.PI * 2);
+ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(compassX, compassY - compassR - 5);
+ctx.lineTo(compassX, compassY + compassR + 5);
+ctx.moveTo(compassX - compassR - 5, compassY);
+ctx.lineTo(compassX + compassR + 5, compassY);
+ctx.stroke();
+ctx.fillStyle = 'rgba(244,245,242,0.4)';
+ctx.font = 'bold 8px monospace';
+ctx.fillText('N', compassX - 3, compassY - compassR - 7);
+ctx.fillStyle = 'rgba(244,245,242,0.2)';
+ctx.fillText('S', compassX - 3, compassY + compassR + 12);
+ctx.fillText('W', compassX - compassR - 12, compassY + 3);
+ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
 
       // Draw rocket position on map with trajectory
@@ -1540,9 +1569,11 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     // Planet direction markers for navball
     const bodyDirs: Array<{ name: string; dir: [number, number, number]; color: string }> = [];
     const mapColors: Record<string, string> = {
-      sun: '#ffdd44', earth: '#4fc3f7', moon: '#aaaacc',
-      venus: '#e8a84c', mars: '#d4733a', jupiter: '#d4a574',
-      saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd'
+      sun: '#ffdd44', earth: '#4fc3f7', moon: '#ccccee',
+      venus: '#e8b84c', mars: '#e88444', jupiter: '#e8b87c',
+      saturn: '#f4e8b0', uranus: '#5fe0f0', neptune: '#5b88ee',
+      titan: '#ddaa77', io: '#eeddaa', europa: '#aaccdd',
+      ganymede: '#bbccaa', pluto: '#ddccbb'
     };
     for (const body of this.system.bodies) {
       if (body.mass <= 0) continue;
