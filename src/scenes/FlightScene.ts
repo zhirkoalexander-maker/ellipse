@@ -677,6 +677,17 @@ for (const b of this.system.bodies) {
     }
     if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
+    // Auto-stage when engine has no fuel and there's a decoupler
+    if (!warpActive && !this.grounded && this.state.throttle > 0) {
+      const activeEngine = findFirstEngine(this.state.rocket.assembly.roots);
+      if (!activeEngine || this.state.rocket.totalFuelMass() < 0.1) {
+        const hasDecoupler = this.state.rocket.assembly.roots.some(n =>
+          n.part.kind === 'decoupler' || n.children.some(c => c.part.kind === 'decoupler')
+        );
+        if (hasDecoupler) this.performStage();
+      }
+    }
+
     // Current forward direction (rocket local +Y in world space)
     const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
 
