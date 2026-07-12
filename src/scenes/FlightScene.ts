@@ -436,7 +436,7 @@ for (const b of this.system.bodies) {
   ctx.fillText(b.name.toUpperCase(), bx + sizes[b.name]! + 6, by + 3);
 }
 
-// Draw SOI circles for all bodies
+    // Draw SOI circles for all bodies
 const sunBody = this.system.bodyByName('sun');
 for (const b of this.system.bodies) {
   if (b.name === 'sun' || b.mass <= 0 || !sunBody || b.name === sunBody.name) continue;
@@ -455,6 +455,25 @@ for (const b of this.system.bodies) {
   ctx.stroke();
   ctx.setLineDash([]);
 }
+
+// Scale indicator bar
+const barWidth = 80;
+const barHeight = 3;
+const barX = w - barWidth - 15;
+const barY = h - 30;
+const realKmPerPx = (maxRelD * 2) / Math.min(w, h) * mapZoom;
+const barKm = realKmPerPx * barWidth;
+const niceKm = Math.pow(10, Math.floor(Math.log10(barKm)));
+const nicePx = barWidth * (niceKm / barKm);
+ctx.fillStyle = 'rgba(244,245,242,0.4)';
+ctx.fillRect(barX, barY, nicePx, barHeight);
+ctx.strokeStyle = 'rgba(244,245,242,0.5)';
+ctx.lineWidth = 0.5;
+ctx.strokeRect(barX, barY, nicePx, barHeight);
+ctx.fillStyle = 'rgba(244,245,242,0.4)';
+ctx.font = '8px monospace';
+ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed(0)+'km'}`, barX, barY - 2);
+
 
       // Draw rocket position on map with trajectory
       const rocketX = cx;
