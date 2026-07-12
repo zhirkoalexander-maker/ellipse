@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
-import { hash, noise3D, fbm3D, lerp } from '../utils/noise';
+import { generateUranusTexture } from '../effects/ProceduralTextures';
+import { fbm3D } from '../utils/noise';
 
-const VS = 1e-9 * 37500;
+const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 64;
 
 export class Uranus extends Planet {
@@ -16,11 +17,7 @@ export class Uranus extends Planet {
 
     const visualR = this.visualRadius;
 
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load(assetUrl('/textures/uranus.jpg'), (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
-    });
+    const tex = generateUranusTexture();
 
     const geom = new THREE.SphereGeometry(visualR, 64, 32);
     const posAttr = geom.attributes.position!;
@@ -51,11 +48,11 @@ export class Uranus extends Planet {
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
-      color: 0x4fd0e8,
+      color: 0xffffff,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(0, 0, 0);
+    this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
     this.mesh.rotation.z = -97.8 * Math.PI / 180;
 
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4fd0e8, 0.1);
