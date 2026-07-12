@@ -963,6 +963,22 @@ for (const b of this.system.bodies) {
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     const stageCount = this.countStages(this.rocket.assembly.roots);
 
+    // Compute TWR
+    const eng = findFirstEngine(this.state.rocket.assembly.roots);
+    if (eng && eng.thrust) {
+      const thrustN = eng.thrust * 1000 * this.state.throttle;
+      const refBodyTwr = getReferenceBody(this.state.position, this.system);
+      const dx_t = this.state.position[0] - refBodyTwr.position[0];
+      const dy_t = this.state.position[1] - refBodyTwr.position[1];
+      const dz_t = this.state.position[2] - refBodyTwr.position[2];
+      const r_t = Math.sqrt(dx_t*dx_t + dy_t*dy_t + dz_t*dz_t) || 1;
+      const localG = (G * refBodyTwr.mass) / (r_t * r_t);
+      const weight = this.state.rocket.totalMass() * localG;
+      this.hud.setTWR(thrustN / (weight || 1));
+    } else {
+      this.hud.setTWR(0);
+    }
+
     // Compute Ap/Pe from orbit prediction
     let ape: number | undefined;
     let pe: number | undefined;

@@ -19,6 +19,7 @@ export class HUD {
   private stageVal!: HTMLSpanElement;
   private apeVal!: HTMLSpanElement;
   private peVal!: HTMLSpanElement;
+  private twrVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -71,7 +72,9 @@ export class HUD {
         <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--throttle throt-fill" style="width:0%;"></span></span></div>
       </div>
       <div class="separator"></div>
-      <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value"><span class="stage-val" style="color:var(--accent-gold);">1</span></span></div>
+      <div class="hud-row"><span class="hud-label">TWR</span><span class="hud-value twr-val" style="color:#88CCFF;">—</span></div>
+      <div class="hud-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
+      <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
@@ -99,6 +102,7 @@ export class HUD {
     this.stageVal = this.root.querySelector('.stage-val')!;
     this.apeVal = this.root.querySelector('.ape-val')!;
     this.peVal = this.root.querySelector('.pe-val')!;
+    this.twrVal = this.root.querySelector('.twr-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -127,6 +131,11 @@ export class HUD {
     if (g > 5) this.gforceVal.style.color = '#FF4444';
     else if (g > 3) this.gforceVal.style.color = '#FFAA44';
     else this.gforceVal.style.color = '#88CCFF';
+  }
+
+  setTWR(twr: number): void {
+    this.twrVal.textContent = twr.toFixed(2);
+    this.twrVal.style.color = twr > 1.1 ? '#44CC88' : twr > 0.8 ? '#FFAA44' : '#FF4444';
   }
 
   setPaused(paused: boolean): void {
