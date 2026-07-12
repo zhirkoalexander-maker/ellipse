@@ -33,6 +33,8 @@ export const TERRAIN_SEA_LEVEL = 0.35;
 
 /** Resolve asset URL with correct base path for GitHub Pages. */
 export function assetUrl(path: string): string {
+  // In dev mode, public/ files are served at root (no prefix)
+  if (import.meta.env.DEV) return path;
   const base = (import.meta as any).env?.BASE_URL ?? '/';
   return (base + path.replace(/^\//, '')).replace(/\/\//g, '/');
 }
