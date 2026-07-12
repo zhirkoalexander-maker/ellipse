@@ -1322,6 +1322,30 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       // Capture world positions before detaching
       const worldPositions: THREE.Vector3[] = [];
       const meshes: THREE.Object3D[] = [];
+
+      // Staging particle burst (separation motors)
+      for (let i = 0; i < 16; i++) {
+        const size = 0.02 + Math.random() * 0.04;
+        const pGeom = new THREE.SphereGeometry(size, 4, 3);
+        const pMat = new THREE.MeshBasicMaterial({
+          color: i < 4 ? 0xff8844 : 0xaaaaaa, transparent: true, opacity: 0.9,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const pMesh = new THREE.Mesh(pGeom, pMat);
+        const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
+        const elev = (Math.random() - 0.5) * 0.8;
+        pMesh.position.copy(this.rocketGroup.position);
+        pMesh.position.x += Math.cos(angle) * 0.15;
+        pMesh.position.y += elev * 0.1;
+        pMesh.position.z += Math.sin(angle) * 0.15;
+        this.sceneMgr.scene.add(pMesh);
+        (pMesh as any)._life = 0.6 + Math.random() * 0.4;
+        (pMesh as any)._age = 0;
+        (pMesh as any)._vx = Math.cos(angle) * (0.8 + Math.random() * 1.5);
+        (pMesh as any)._vy = elev * 0.5;
+        (pMesh as any)._vz = Math.sin(angle) * (0.8 + Math.random() * 1.5);
+        this.explosionMeshes.push(pMesh);
+      }
       while (decouplerMesh.children.length > 0) {
         const child = decouplerMesh.children[0]!;
         const wp = new THREE.Vector3();
