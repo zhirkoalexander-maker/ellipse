@@ -578,6 +578,15 @@ for (const b of this.system.bodies) {
     if (!isFinite(v[2])) v[2] = 0;
   }
 
+  private countStages(nodes: AssemblyNode[]): number {
+    let count = 0;
+    for (const n of nodes) {
+      if (n.part.kind === 'decoupler') count++;
+      count += this.countStages(n.children);
+    }
+    return count;
+  }
+
   update(_dt: number): void {
     try {
       this.updateInner(_dt);
@@ -948,7 +957,25 @@ for (const b of this.system.bodies) {
     }
 
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
-    this.hud.update(this.state, this.system);
+    const stageCount = this.countStages(this.rocket.assembly.roots);
+
+    // Compute Ap/Pe from orbit prediction
+    let ape: number | undefined;
+    let pe: number | undefined;
+    const orbitRefBody = getReferenceBody(this.state.position, this.system);
+    if (orbitRefBody && orbitRefBody.mass > 0) {
+      const relPos: [number, number, number] = [
+        (this.state.position[0] - orbitRefBody.position[0]) * VISUAL_SCALE,
+        (this.state.position[1] - orbitRefBody.position[1]) * VISUAL_SCALE,
+        (this.state.position[2] - orbitRefBody.position[2]) * VISUAL_SCALE,
+      ];
+      const orbitPred = predictOrbit(relPos, this.state.velocity, orbitRefBody.mass, 5e14, 360);
+      if (orbitPred.bound) {
+        ape = orbitPred.apoapsis;
+        pe = orbitPred.periapsis;
+      }
+    }
+    this.hud.update(this.state, this.system, 0, stageCount, ape, pe);
 
     // Compute G-force from velocity change
     const dvx = this.state.velocity[0] - this.prevVel[0];

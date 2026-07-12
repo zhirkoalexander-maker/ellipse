@@ -16,6 +16,9 @@ export class HUD {
   private heatFill!: HTMLSpanElement;
   private heatPct!: HTMLSpanElement;
   private gforceVal!: HTMLSpanElement;
+  private stageVal!: HTMLSpanElement;
+  private apeVal!: HTMLSpanElement;
+  private peVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -68,6 +71,8 @@ export class HUD {
         <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--throttle throt-fill" style="width:0%;"></span></span></div>
       </div>
       <div class="separator"></div>
+      <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value"><span class="stage-val" style="color:var(--accent-gold);">1</span></span></div>
+      <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -91,6 +96,9 @@ export class HUD {
     this.heatFill = this.root.querySelector('.heat-fill')!;
     this.heatPct = this.root.querySelector('.heat-pct')!;
     this.gforceVal = this.root.querySelector('.gforce-val')!;
+    this.stageVal = this.root.querySelector('.stage-val')!;
+    this.apeVal = this.root.querySelector('.ape-val')!;
+    this.peVal = this.root.querySelector('.pe-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -230,7 +238,7 @@ export class HUD {
     ctx.stroke();
   }
 
-  update(state: FlightState, system: System, heat: number = 0): void {
+  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
@@ -286,6 +294,15 @@ export class HUD {
     this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
     this.heatFill.style.width = `${heatPct}%`;
     this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
+
+    this.stageVal.textContent = `${stage}`;
+
+    if (apoapsis !== undefined && isFinite(apoapsis)) {
+      this.apeVal.textContent = apoapsis > 1000 ? `${(apoapsis / 1000).toFixed(1)}km` : `${apoapsis.toFixed(0)}m`;
+    }
+    if (periapsis !== undefined && isFinite(periapsis)) {
+      this.peVal.textContent = periapsis > 1000 ? `${(periapsis / 1000).toFixed(1)}km` : `${periapsis.toFixed(0)}m`;
+    }
   }
 
   unmount(): void {
