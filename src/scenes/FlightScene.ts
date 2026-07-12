@@ -67,8 +67,7 @@ export class FlightScene {
   private gearDeployed = false;
   private gearMeshes: THREE.Mesh[] = [];
   private missionTime = 0;
-  private sasActive = false;
-  private sasPrograde = false;
+  private sasMode: 'off' | 'hold' | 'prograde' | 'retrograde' = 'off';
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
   private countdownTimer = 0;
@@ -709,19 +708,15 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.toggleGear();
         e.preventDefault();
       } else if (e.key === 't') {
-        if (this.sasActive && !this.sasPrograde) {
-          this.sasPrograde = true;
-          toast.show('SAS — prograde hold');
-        } else if (this.sasActive && this.sasPrograde) {
-          this.sasActive = false;
-          this.sasPrograde = false;
-          toast.show('SAS disabled');
-        } else {
-          this.sasActive = true;
-          this.sasPrograde = false;
+        const modes: ('off' | 'hold' | 'prograde' | 'retrograde')[] = ['off', 'hold', 'prograde', 'retrograde'];
+        const idx = modes.indexOf(this.sasMode);
+        this.sasMode = modes[(idx + 1) % modes.length]!;
+        if (this.sasMode === 'off') toast.show('SAS disabled');
+        else if (this.sasMode === 'hold') {
           this.sasTargetQuat.copy(this.rocketQuat);
           toast.show('SAS — attitude hold');
-        }
+        } else if (this.sasMode === 'prograde') toast.show('SAS — prograde');
+        else toast.show('SAS — retrograde');
         e.preventDefault();
       } else if (e.key === 'f') {
         this.chase.reset();
@@ -830,16 +825,17 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       this.angularVel.y += yawInput * this.state.throttle * 4 * baseDt;
     }
 
-    // SAS: hold attitude or track prograde
-    if (this.sasActive && !warpActive) {
-      if (this.sasPrograde) {
+    // SAS: hold attitude or track prograde/retrograde
+    if (this.sasMode !== 'off' && !warpActive) {
+      if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
         const velMagSas = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
         if (velMagSas > 0.1) {
-          const targetDir = new THREE.Vector3(
+          let targetDir = new THREE.Vector3(
             this.state.velocity[0] / velMagSas,
             this.state.velocity[1] / velMagSas,
             this.state.velocity[2] / velMagSas
           );
+          if (this.sasMode === 'retrograde') targetDir.negate();
           this.sasTargetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
         }
       }
@@ -1271,7 +1267,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       }
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
-    this.hud.setSAS(this.sasActive, this.sasPrograde);
+    this.hud.setSAS(this.sasMode);
 
     // Track personal records
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
