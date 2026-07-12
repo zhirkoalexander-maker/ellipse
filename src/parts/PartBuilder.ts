@@ -24,41 +24,46 @@ const SIZE_DIMS = {
 const PI = Math.PI;
 const SEG = 64;
 
+// Seeded random for vertex noise
+let _vnoiseSeed = 0;
+function vnoise(): number {
+  _vnoiseSeed = (_vnoiseSeed * 1664525 + 1013904223) >>> 0;
+  return (_vnoiseSeed >>> 0) / 0xffffffff;
+}
+
+function perturbVertices(geom: THREE.BufferGeometry, strength: number): void {
+  const pos = geom.attributes.position;
+  if (!pos) return;
+  const arr = pos.array as Float32Array;
+  for (let i = 0; i < arr.length; i += 3) {
+    const dx = (vnoise() - 0.5) * 2;
+    const dy = (vnoise() - 0.5) * 2;
+    const dz = (vnoise() - 0.5) * 2;
+    arr[i] = arr[i]! + dx * strength;
+    arr[i + 1] = arr[i + 1]! + dy * strength;
+    arr[i + 2] = arr[i + 2]! + dz * strength;
+  }
+  pos.needsUpdate = true;
+  geom.computeVertexNormals();
+}
+
 // GLTF loader
 export const gltfLoader = new GLTFLoader();
 export const gltfCache = new Map<string, THREE.Group>();
 
 export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
   const resolvedUrl = assetUrl(url);
-  if (gltfCache.has(resolvedUrl)) {
-    return gltfCache.get(resolvedUrl)!.clone();
+  if (gltfCache.has(url)) {
+    return gltfCache.get(url)!.clone();
   }
   const gltf = await gltfLoader.loadAsync(resolvedUrl);
   const group = gltf.scene;
-  // Do NOT apply scale here - it will be applied in buildPartMesh
-  // group.scale.setScalar(scale);
   
-  // Debug: log model structure
-  console.log('=== GLTF Model Loaded:', url, '===');
-  group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
-      console.log('Mesh:', obj.name, 'geometry:', obj.geometry.type);
-      if (obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const mat of mats) {
-          console.log('  Material:', mat.type, 'color:', mat.color?.getHexString(), 'map:', !!mat.map);
-        }
-      }
-    }
-  });
-  
-  // Ensure materials are properly configured
+  // Ensure materials are PBR-ready
   group.traverse((obj) => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
-      
-      // Ensure material is properly configured for PBR
       if (obj.material) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const mat of mats) {
@@ -67,7 +72,6 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
             mat.metalness = Math.max(0, mat.metalness ?? 0);
             mat.needsUpdate = true;
           } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
-            // Upgrade to MeshStandardMaterial for PBR
             const newMat = new THREE.MeshStandardMaterial({
               color: (mat as THREE.MeshBasicMaterial).color ?? 0xffffff,
               map: (mat as THREE.MeshBasicMaterial).map,
@@ -82,7 +86,6 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
           }
         }
       } else {
-        // No material - apply default PBR material
         obj.material = new THREE.MeshStandardMaterial({
           color: 0xcccccc,
           roughness: 0.5,
@@ -92,7 +95,7 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
     }
   });
   
-  gltfCache.set(resolvedUrl, group);
+  gltfCache.set(url, group);
   return group.clone();
 }
 
@@ -210,7 +213,7 @@ case 'gltf': {
         box.getCenter(center);
         gltfGroup.position.sub(center);
         
-        // Find nozzle/engine attachment points
+        // Find nozzle/engine attachment points without overwriting materials
         const nozzlePoints: THREE.Vector3[] = [];
         const engineMeshes: THREE.Mesh[] = [];
         
@@ -220,22 +223,13 @@ case 'gltf': {
             const isEngine = name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || 
                              name.includes('motor') || name.includes('combustion');
             
-            // Create fresh material for each mesh
-            const isEnginePart = isEngine || obj.position.y < -0.1; // Lower parts likely engines
-            obj.material = new THREE.MeshStandardMaterial({
-              color: isEnginePart ? 0x666666 : 0xcccccc,
-              roughness: isEnginePart ? 0.3 : 0.4,
-              metalness: isEnginePart ? 0.8 : 0.1,
-              emissive: 0x000000,
-              emissiveIntensity: 0,
-            });
+            const isEnginePart = isEngine || obj.position.y < -0.1;
             
-            // Collect engine/nozzle positions for flame attachment
+            // Collect engine/nozzle positions for flame attachment (preserve original materials)
             if (isEnginePart) {
               const box = new THREE.Box3().setFromObject(obj);
               const center = new THREE.Vector3();
               box.getCenter(center);
-              // Convert to local coordinates relative to gltfGroup
               const localPos = center.clone().sub(gltfGroup.position);
               nozzlePoints.push(localPos);
               engineMeshes.push(obj);
@@ -295,16 +289,25 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
     roughness: 0.6,
     metalness: 0.1,
   });
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.05, SEG), stripeMat);
+  const bandGeom = new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.05, SEG);
+  applyCylindricalUV(bandGeom);
+  perturbVertices(bandGeom, PART_SCALE * 0.008);
+  const band = new THREE.Mesh(bandGeom, stripeMat);
   band.position.y = h * 0.05;
   group.add(band);
 
-  const band2 = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.03, SEG), stripeMat);
+  const band2Geom = new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.03, SEG);
+  applyCylindricalUV(band2Geom);
+  perturbVertices(band2Geom, PART_SCALE * 0.008);
+  const band2 = new THREE.Mesh(band2Geom, stripeMat);
   band2.position.y = -h * 0.15;
   group.add(band2);
 
   // Base ring
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.3, r * 0.95, h * 0.15, SEG), goldMat);
+  const baseGeom = new THREE.CylinderGeometry(r * 1.3, r * 0.95, h * 0.15, SEG);
+  applyCylindricalUV(baseGeom);
+  perturbVertices(baseGeom, PART_SCALE * 0.01);
+  const base = new THREE.Mesh(baseGeom, goldMat);
   base.position.y = -h * 0.3 - h * 0.075;
   group.add(base);
 
@@ -347,17 +350,22 @@ function buildTank(group: THREE.Group, d: { radius: number; height: number }, si
   const bh = h * 0.03;
   const bandGeom = new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG);
   applyCylindricalUV(bandGeom);
+  perturbVertices(bandGeom, PART_SCALE * 0.006);
   const band = new THREE.Mesh(bandGeom, goldMat);
   band.position.y = h / 2 - bh / 2;
   group.add(band);
 
-  const bandB = new THREE.Mesh(bandGeom, goldMat);
+  const bandBGeom = new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG);
+  applyCylindricalUV(bandBGeom);
+  perturbVertices(bandBGeom, PART_SCALE * 0.006);
+  const bandB = new THREE.Mesh(bandBGeom, goldMat);
   bandB.position.y = -h / 2 + bh / 2;
   group.add(bandB);
 
   for (let i = 0; i < 3; i++) {
     const ridgeGeom = new THREE.TorusGeometry(r * 1.01, bh * 1.5, 6, SEG);
     applyCylindricalUV(ridgeGeom);
+    perturbVertices(ridgeGeom, PART_SCALE * 0.005);
     const ridge = new THREE.Mesh(ridgeGeom, goldMat);
     ridge.position.y = -h / 2 + h * 0.2 * (i + 1);
     ridge.rotation.x = PI / 2;
@@ -366,6 +374,7 @@ function buildTank(group: THREE.Group, d: { radius: number; height: number }, si
 
   const ringGeom = new THREE.TorusGeometry(r * 1.02, bh * 1.2, 6, SEG);
   applyCylindricalUV(ringGeom);
+  perturbVertices(ringGeom, PART_SCALE * 0.005);
   const ring = new THREE.Mesh(ringGeom, goldMat);
   ring.position.y = 0;
   ring.rotation.x = PI / 2;
@@ -392,6 +401,7 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   // Mid flange ring
   const ringGeom = new THREE.CylinderGeometry(r * 0.6, r * 0.5, h * 0.06, SEG);
   applyCylindricalUV(ringGeom);
+  perturbVertices(ringGeom, PART_SCALE * 0.015);
   const ring = new THREE.Mesh(ringGeom, goldMat);
   ring.position.y = h * 0.12;
   group.add(ring)
@@ -399,6 +409,7 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   // Nozzle outer
   const bellOuterGeom = new THREE.CylinderGeometry(r * 0.5, r * 0.85, h * 0.4, SEG);
   applyCylindricalUV(bellOuterGeom, 1.5);
+  perturbVertices(bellOuterGeom, PART_SCALE * 0.01);
   const bellOuter = new THREE.Mesh(bellOuterGeom, engineMat);
   bellOuter.position.y = -h * 0.12;
   group.add(bellOuter);
@@ -411,6 +422,7 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   });
   const bellInnerGeom = new THREE.CylinderGeometry(r * 0.35, r * 0.7, h * 0.38, SEG);
   applyCylindricalUV(bellInnerGeom, 1.5);
+  perturbVertices(bellInnerGeom, PART_SCALE * 0.012);
   const bellInner = new THREE.Mesh(bellInnerGeom, darkMat);
   bellInner.position.y = -h * 0.12;
   group.add(bellInner);
@@ -418,6 +430,7 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   // Nozzle exit rim
   const rimGeom = new THREE.CylinderGeometry(r * 0.88, r * 0.88, h * 0.03, SEG);
   applyCylindricalUV(rimGeom);
+  perturbVertices(rimGeom, PART_SCALE * 0.008);
   const rim = new THREE.Mesh(rimGeom, goldMat);
   rim.position.y = -h * 0.12 - h * 0.2 - h * 0.015;
   group.add(rim);
@@ -568,17 +581,20 @@ function buildDecoupler(group: THREE.Group, d: { radius: number; height: number 
 
   const ringGeom = new THREE.CylinderGeometry(r * 1.05, r * 0.92, h * 0.12, SEG);
   applyCylindricalUV(ringGeom);
+  perturbVertices(ringGeom, PART_SCALE * 0.008);
   const ring = new THREE.Mesh(ringGeom, bodyMat);
   group.add(ring);
 
   const bandGeom = new THREE.CylinderGeometry(r * 1.08, r * 1.08, h * 0.04, SEG);
   applyCylindricalUV(bandGeom);
+  perturbVertices(bandGeom, PART_SCALE * 0.005);
   const band = new THREE.Mesh(bandGeom, goldMat);
   band.position.y = h * 0.06;
   group.add(band);
 
   const bottomGeom = new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.04, SEG);
   applyCylindricalUV(bottomGeom);
+  perturbVertices(bottomGeom, PART_SCALE * 0.008);
   const bottom = new THREE.Mesh(bottomGeom, bodyMat);
   bottom.position.y = -h * 0.06;
   group.add(bottom);
@@ -593,6 +609,7 @@ function buildHeatshield(group: THREE.Group, d: { radius: number; height: number
   // Ablative heatshield - convex dish shape
   const shieldGeom = new THREE.CylinderGeometry(r * 1.2, r * 0.8, h * 0.2, SEG, 1, true);
   applyCylindricalUV(shieldGeom, 0.5);
+  perturbVertices(shieldGeom, PART_SCALE * 0.012);
   const shield = new THREE.Mesh(shieldGeom, mat);
   shield.position.y = -h * 0.1;
   group.add(shield);
@@ -600,6 +617,7 @@ function buildHeatshield(group: THREE.Group, d: { radius: number; height: number
   // Backing structure
   const backGeom = new THREE.CylinderGeometry(r * 0.8, r * 0.8, h * 0.08, SEG);
   applyCylindricalUV(backGeom);
+  perturbVertices(backGeom, PART_SCALE * 0.01);
   const backing = new THREE.Mesh(backGeom, mat);
   backing.position.y = -h * 0.2;
   group.add(backing);
