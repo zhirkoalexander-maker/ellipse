@@ -60,7 +60,7 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | nu
     const gltf = await gltfLoader.loadAsync(resolvedUrl);
     const group = gltf.scene;
   
-  // Ensure materials are PBR-ready
+  // Ensure materials are PBR-ready and boost colors
   group.traverse((obj) => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
@@ -71,6 +71,22 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | nu
           if (mat instanceof THREE.MeshStandardMaterial) {
             mat.roughness = Math.max(0.1, mat.roughness ?? 0.5);
             mat.metalness = Math.max(0, mat.metalness ?? 0);
+            // Boost color saturation for NASA models
+            if (mat.color) {
+              const hsl = { h: 0, s: 0, l: 0 };
+              mat.color.getHSL(hsl);
+              if (hsl.s < 0.3) {
+                hsl.s = Math.min(1, hsl.s * 1.5 + 0.05);
+                hsl.l = Math.min(1, Math.max(0.1, hsl.l * 1.1));
+                mat.color.setHSL(hsl.h, hsl.s, hsl.l);
+              }
+            }
+            // Add subtle emissive to engine parts
+            const name = obj.name.toLowerCase();
+            if (name.includes('engine') || name.includes('nozzle') || name.includes('thruster') || name.includes('motor')) {
+              mat.emissive = new THREE.Color(0x442200);
+              mat.emissiveIntensity = 0.05;
+            }
             mat.needsUpdate = true;
           } else if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshPhongMaterial) {
             const newMat = new THREE.MeshStandardMaterial({
