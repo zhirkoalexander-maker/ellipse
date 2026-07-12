@@ -268,17 +268,35 @@ export class FlightScene {
 
       ctx.fillStyle = '#060814'; ctx.fillRect(0, 0, w, h);
 
+      const cx = w / 2 + mapPanX;
+      const cy = h / 2 + mapPanY;
+
+      // Subtle radial gradient from rocket position
+      const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.6);
+      radGrad.addColorStop(0, 'rgba(20,30,60,0.3)');
+      radGrad.addColorStop(0.5, 'rgba(10,15,30,0.15)');
+      radGrad.addColorStop(1, 'rgba(6,8,20,0)');
+      ctx.fillStyle = radGrad;
+      ctx.fillRect(0, 0, w, h);
+
       // Draw grid lines
       ctx.strokeStyle = 'rgba(100,100,150,0.08)';
       ctx.lineWidth = 1;
       const gridSize = 100 * mapZoom;
-      const cx = w / 2 + mapPanX;
-      const cy = h / 2 + mapPanY;
       for (let x = cx % gridSize; x < w; x += gridSize) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
       for (let y = cy % gridSize; y < h; y += gridSize) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      // Concentric range rings from rocket
+      ctx.strokeStyle = 'rgba(68,136,255,0.06)';
+      ctx.lineWidth = 0.5;
+      for (let r = gridSize; r < Math.max(w, h); r += gridSize) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       // Use VISUAL_SCALE for map distances to match visual scale
@@ -291,51 +309,120 @@ export class FlightScene {
       }
       const s = Math.min(w, h) * 0.4 / maxRelD * mapZoom;
 
-      const colors: Record<string, string> = { sun: '#ffdd44', earth: '#4fc3f7', moon: '#888', venus: '#e8a84c', mars: '#d4733a', mercury: '#aaa', jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8', neptune: '#4b70dd' };
-      const sizes: Record<string, number> = { sun: 6, earth: 4, moon: 2, venus: 2, mars: 2, mercury: 1.5, jupiter: 5, saturn: 4.5, uranus: 2.5, neptune: 2.5 };
+      const colors: Record<string, string> = {
+  sun: '#ffdd44', earth: '#4fc3f7', moon: '#aaaacc',
+  venus: '#e8a84c', mars: '#d4733a', mercury: '#b0b0b0',
+  jupiter: '#d4a574', saturn: '#f4e4a1', uranus: '#4fd0e8',
+  neptune: '#4b70dd'
+};
+const glowColors: Record<string, string> = {
+  sun: 'rgba(255,220,68,0.12)', earth: 'rgba(79,195,247,0.08)',
+  mars: 'rgba(212,115,58,0.08)', venus: 'rgba(232,168,76,0.08)',
+  jupiter: 'rgba(212,165,116,0.08)', saturn: 'rgba(244,228,161,0.15)',
+};
+const sizes: Record<string, number> = {
+  sun: 8, earth: 5, moon: 2, venus: 3, mars: 3, mercury: 2,
+  jupiter: 7, saturn: 6, uranus: 3.5, neptune: 3.5
+};
 
-      for (const b of this.system.bodies) {
-        const bx = cx + (b.position[0] - this.state.position[0]) * s;
-        const by = cy - (b.position[2] - this.state.position[2]) * s;
+// Draw planet orbit trails around sun
+const sunPos = this.system.bodyByName('sun')?.position;
+if (sunPos) {
+  for (const b of this.system.bodies) {
+    if (b.name === 'sun' || b.name === 'moon') continue;
+    const relToSun: [number, number, number] = [
+      b.position[0] - sunPos[0],
+      b.position[1] - sunPos[1],
+      b.position[2] - sunPos[2],
+    ];
+    if (b.velocity) {
+      const predOrbit = predictOrbit(relToSun, b.velocity, this.system.bodyByName('sun')!.mass, 5e14, 180);
+      if (predOrbit.points.length > 10) {
         ctx.beginPath();
-        ctx.arc(bx, by, sizes[b.name] || 3, 0, Math.PI * 2);
-        ctx.fillStyle = colors[b.name] || '#888';
-        ctx.fill();
-        ctx.font = '10px sans-serif';
-        ctx.fillStyle = '#F4F5F2';
-        ctx.fillText(b.name.toUpperCase(), bx + 10, by + 4);
+        ctx.strokeStyle = colors[b.name] + '30';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 6]);
+        const firstX = cx + (predOrbit.points[0]![0] + sunPos[0]) * s;
+        const firstY = cy - (predOrbit.points[0]![1] + sunPos[2]) * s;
+        ctx.moveTo(firstX, firstY);
+        for (let i = 1; i < predOrbit.points.length; i += 2) {
+          const px = cx + (predOrbit.points[i]![0] + sunPos[0]) * s;
+          const py = cy - (predOrbit.points[i]![1] + sunPos[2]) * s;
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
+    }
+  }
+}
 
-      // Draw rocket position on map
+// Planet bodies with glow
+for (const b of this.system.bodies) {
+  const bx = cx + (b.position[0] - this.state.position[0]) * s;
+  const by = cy - (b.position[2] - this.state.position[2]) * s;
+
+  // Glow for sun and large bodies
+  if (sizes[b.name] && sizes[b.name]! >= 5) {
+    ctx.beginPath();
+    ctx.arc(bx, by, sizes[b.name]! * 3, 0, Math.PI * 2);
+    ctx.fillStyle = glowColors[b.name] || 'rgba(100,100,150,0.05)';
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(bx, by, sizes[b.name] || 3, 0, Math.PI * 2);
+  ctx.fillStyle = colors[b.name] || '#888';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(244,245,242,0.3)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  ctx.font = '9px monospace';
+  ctx.fillStyle = '#F4F5F2';
+  ctx.fillText(b.name.toUpperCase(), bx + sizes[b.name]! + 6, by + 3);
+}
+
+      // Draw rocket position on map with trajectory
       const rocketX = cx;
       const rocketY = cy;
-      ctx.beginPath();
-      ctx.arc(rocketX, rocketY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = '#EACD9E';
-      ctx.fill();
-      ctx.strokeStyle = '#EACD9E';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Draw rocket direction arrow
       const velX = this.state.velocity[0] || 0;
       const velZ = this.state.velocity[2] || 0;
       const velMag = Math.sqrt(velX * velX + velZ * velZ);
+      const velAngle = velMag > 0.1 ? Math.atan2(velZ, velX) : 0;
+
+      // Rocket icon - diamond shape in velocity direction
+      ctx.save();
+      ctx.translate(rocketX, rocketY);
+      ctx.rotate(-velAngle);
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(0, -4);
+      ctx.lineTo(-5, 0);
+      ctx.lineTo(0, 4);
+      ctx.closePath();
+      ctx.fillStyle = '#EACD9E';
+      ctx.fill();
+      ctx.strokeStyle = '#EACD9E';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw velocity vector arrow
       if (velMag > 0.1) {
-        const velAngle = Math.atan2(velZ, velX);
-        const arrowLen = 15;
+        const arrowLen = Math.min(30, 10 + velMag * s * 2);
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(velAngle) * 8, cy - Math.sin(velAngle) * 8);
-        ctx.lineTo(cx + Math.cos(velAngle) * (8 + arrowLen), cy - Math.sin(velAngle) * (8 + arrowLen));
-        ctx.strokeStyle = '#EACD9E';
-        ctx.lineWidth = 2;
+        ctx.moveTo(rocketX, rocketY);
+        ctx.lineTo(rocketX + Math.cos(velAngle) * arrowLen, rocketY - Math.sin(velAngle) * arrowLen);
+        ctx.strokeStyle = 'rgba(234,205,158,0.6)';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-        // Arrow head
+        // Arrow tip
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(velAngle) * (8 + arrowLen), cy - Math.sin(velAngle) * (8 + arrowLen));
-        ctx.lineTo(cx + Math.cos(velAngle + 0.5) * (8 + arrowLen - 5), cy - Math.sin(velAngle + 0.5) * (8 + arrowLen - 5));
-        ctx.lineTo(cx + Math.cos(velAngle - 0.5) * (8 + arrowLen - 5), cy - Math.sin(velAngle - 0.5) * (8 + arrowLen - 5));
+        ctx.moveTo(rocketX + Math.cos(velAngle) * arrowLen, rocketY - Math.sin(velAngle) * arrowLen);
+        ctx.lineTo(rocketX + Math.cos(velAngle + 0.4) * (arrowLen - 5), rocketY - Math.sin(velAngle + 0.4) * (arrowLen - 5));
+        ctx.lineTo(rocketX + Math.cos(velAngle - 0.4) * (arrowLen - 5), rocketY - Math.sin(velAngle - 0.4) * (arrowLen - 5));
         ctx.closePath();
-        ctx.fillStyle = '#EACD9E';
+        ctx.fillStyle = 'rgba(234,205,158,0.6)';
         ctx.fill();
       }
 
@@ -363,9 +450,10 @@ export class FlightScene {
         ];
         const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
         if (prediction.points.length > 1) {
+          // Glow under line
           ctx.beginPath();
-          ctx.strokeStyle = prediction.bound ? '#4488CC' : '#DDAA44';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = prediction.bound ? 'rgba(68,136,204,0.15)' : 'rgba(221,170,68,0.15)';
+          ctx.lineWidth = 8;
           const firstX = cx + prediction.points[0]![0] * s;
           const firstY = cy - prediction.points[0]![1] * s;
           ctx.moveTo(firstX, firstY);
@@ -376,13 +464,57 @@ export class FlightScene {
           }
           ctx.stroke();
 
+          // Main trajectory line
+          ctx.beginPath();
+          ctx.strokeStyle = prediction.bound ? '#4488CC' : '#DDAA44';
+          ctx.lineWidth = 2;
+          ctx.setLineDash(prediction.bound ? [] : [6, 4]);
+          ctx.moveTo(firstX, firstY);
+          for (let i = 1; i < prediction.points.length; i++) {
+            const px = cx + prediction.points[i]![0] * s;
+            const py = cy - prediction.points[i]![1] * s;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Orbit direction arrows along path
+          const arrowSteps = Math.max(4, Math.floor(prediction.points.length / 6));
+          ctx.fillStyle = prediction.bound ? '#4488CC' : '#DDAA44';
+          for (let i = arrowSteps; i < prediction.points.length - arrowSteps; i += arrowSteps) {
+            const pi = prediction.points[i]!;
+            const pn = prediction.points[Math.min(i + 2, prediction.points.length - 1)]!;
+            const dx = pn[0] - pi[0];
+            const dy = pn[1] - pi[1];
+            const da = Math.atan2(dy, dx);
+            const ax = cx + pi[0] * s;
+            const ay = cy - pi[1] * s;
+            ctx.beginPath();
+            ctx.moveTo(ax + Math.cos(da) * 5, ay - Math.sin(da) * 5);
+            ctx.lineTo(ax + Math.cos(da + 1.8) * 7, ay - Math.sin(da + 1.8) * 7);
+            ctx.lineTo(ax + Math.cos(da - 1.8) * 7, ay - Math.sin(da - 1.8) * 7);
+            ctx.closePath();
+            ctx.fill();
+          }
+
           if (prediction.bound && isFinite(prediction.apoapsis) && isFinite(prediction.periapsis)) {
             const apX = cx + prediction.apoapsis * s;
             const peX = cx + prediction.periapsis * s;
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillStyle = '#DDAA44';
-            ctx.fillText('Ap', apX + 4, cy - 6);
-            ctx.fillText('Pe', peX + 4, cy + 14);
+            // Ap marker
+            ctx.beginPath();
+            ctx.arc(apX, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#FF8844';
+            ctx.fill();
+            ctx.font = 'bold 9px monospace';
+            ctx.fillStyle = '#FF8844';
+            ctx.fillText('Ap', apX + 6, cy + 3);
+            // Pe marker
+            ctx.beginPath();
+            ctx.arc(peX, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#44DD88';
+            ctx.fill();
+            ctx.fillStyle = '#44DD88';
+            ctx.fillText('Pe', peX + 6, cy + 3);
           }
         }
       }
