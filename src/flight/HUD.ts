@@ -86,6 +86,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
       <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
       <div class="hud-row"><span class="hud-label">Ecc</span><span class="hud-value ecc-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Q</span><span class="hud-value q-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Impact</span><span class="hud-value impact-val" style="font-size:9px;color:#CCCC44;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
@@ -420,6 +421,14 @@ export class HUD {
     const eccEl = this.root.querySelector('.ecc-val');
     if (eccEl && eccentricity !== undefined) {
       eccEl.textContent = eccentricity.toFixed(3);
+    }
+  }
+
+  setQ(q: number): void {
+    const el = this.root.querySelector('.q-val');
+    if (el) {
+      el.textContent = q > 1000 ? `${(q / 1000).toFixed(1)} kPa` : `${q.toFixed(0)} Pa`;
+      (el as HTMLElement).style.color = q > 10000 ? '#FF4444' : q > 2000 ? '#FFAA44' : '#aaaacc';
     }
   }
 
