@@ -47,6 +47,23 @@ export class VABScene {
     const hemi = new THREE.HemisphereLight(0x8888cc, 0x444466, 0.8);
     this.scene.add(hemi);
 
+    // VAB grid floor
+    const gridSize = 10;
+    const gridDivs = 20;
+    const gridHelper = new THREE.GridHelper(gridSize, gridDivs, 0x334466, 0x223355);
+    gridHelper.position.y = -0.3;
+    this.scene.add(gridHelper);
+
+    // Subtle platform ring
+    const ringGeom = new THREE.RingGeometry(0.5, 0.8, 32);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x223355, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(ringGeom, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -0.28;
+    this.scene.add(ring);
+
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 1000);
     this.updateVabCamera();
 
