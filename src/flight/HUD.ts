@@ -1,37 +1,20 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
-import { getReferenceBody } from '../physics/SoiResolver';
-import { findFirstEngine } from './Thrust';
 
 export class HUD {
   private root: HTMLDivElement;
   private speedVal!: HTMLSpanElement;
-  private speedUnit!: HTMLSpanElement;
-  private vsVal!: HTMLSpanElement;
   private altVal!: HTMLSpanElement;
-  private altUnit!: HTMLSpanElement;
-  private angleVal!: HTMLSpanElement;
-  private fuelFill!: HTMLSpanElement;
-  private fuelPct!: HTMLSpanElement;
-  private throtFill!: HTMLSpanElement;
-  private throtPct!: HTMLSpanElement;
+  private massVal!: HTMLSpanElement;
   private heatFill!: HTMLSpanElement;
   private heatPct!: HTMLSpanElement;
-  private gforceVal!: HTMLSpanElement;
-  private stageVal!: HTMLSpanElement;
-  private apeVal!: HTMLSpanElement;
-  private peVal!: HTMLSpanElement;
-  private twrVal!: HTMLSpanElement;
-  private ttaVal!: HTMLSpanElement;
-  private ttpVal!: HTMLSpanElement;
-  private timeVal!: HTMLSpanElement;
-  private dvVal!: HTMLSpanElement;
-  private ispVal!: HTMLSpanElement;
-  private burnVal!: HTMLSpanElement;
-  private recVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
+  private camModeEl!: HTMLDivElement;
+  private machEl!: HTMLDivElement;
+  private stagePanel!: HTMLDivElement;
+  private stageLabel!: HTMLDivElement;
   onAction: ((action: string) => void) | null = null;
 
   constructor() {
@@ -61,85 +44,34 @@ export class HUD {
 
   mount(parent: HTMLElement = document.body): void {
     this.root.innerHTML = `
-      <div class="hud-row"><span class="hud-label">Velocity</span><span class="hud-value"><span class="speed-val">0</span> <span class="speed-unit" style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
-      <div class="hud-row"><span class="hud-label">V/S</span><span class="hud-value"><span class="vs-val" style="color:#44FF44;">0</span> <span style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
-      <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
-      <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
-      <div class="hud-row"><span class="hud-label">G-Force</span><span class="hud-value"><span class="gforce-val" style="color:#88CCFF;">1.0</span><span style="font-size:11px;color:var(--text-muted);">G</span></span></div>
-      <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
-      <div class="separator"></div>
-      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
-        <div class="hud-row"><span class="hud-label">Fuel</span><span class="text-data-sm fuel-pct">0%</span></div>
-        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--fuel fuel-fill" style="width:0%;"></span></span></div>
+      <div class="hud-primary">
+        <div class="hud-speed"><span class="speed-val">0</span> <span style="font-size:11px;color:var(--text-muted);">m/s</span></div>
+        <div class="hud-alt"><span class="alt-val">0</span> <span style="font-size:11px;color:var(--text-muted);">m</span></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
-        <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
-        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--heat heat-fill" style="width:0%;"></span></span></div>
+      <div class="hud-bottom">
+        <div class="hud-row"><span class="hud-label">Mass</span><span class="mass-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-1);">
+          <div class="hud-row"><span class="hud-label">Heat</span><span class="text-data-sm heat-pct">0%</span></div>
+          <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--heat heat-fill" style="width:0%;"></span></span></div>
+        </div>
+        <div class="btn-bar">
+          <button class="btn btn--action" data-action="stage">STAGE</button>
+          <button class="btn btn--action" data-action="parachute">CHUTE</button>
+          <button class="btn btn--action" data-action="map">MAP</button>
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:var(--space-1);">
-        <div class="hud-row"><span class="hud-label">Throttle</span><span class="text-data-sm throt-pct">0%</span></div>
-        <div class="data-bar"><span class="data-bar__track"><span class="data-bar__fill data-bar__fill--throttle throt-fill" style="width:0%;"></span></span></div>
-      </div>
-      <div class="separator"></div>
-      <div class="hud-row"><span class="hud-label">TWR</span><span class="hud-value twr-val" style="color:#88CCFF;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Δv</span><span class="hud-value dv-val" style="font-size:9px;color:#88CCFF;">—</span></div>
-      <div class="hud-row"><span class="hud-label">SOI</span><span class="hud-value soi-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Isp</span><span class="hud-value isp-val" style="font-size:9px;color:#88CCFF;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Burn</span><span class="hud-value burn-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row gforce-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
-      <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
-      <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
-      <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
-      <div class="hud-row"><span class="hud-label">Ap/Pe</span><span class="hud-value" style="font-size:9px;"><span class="ape-val" style="color:#FF8844;">—</span> / <span class="pe-val" style="color:#44DD88;">—</span></span></div>
-      <div class="hud-row"><span class="hud-label">Ecc</span><span class="hud-value ecc-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Period</span><span class="hud-value period-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Record</span><span class="hud-value rec-val" style="font-size:9px;color:#EACD9E;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Q</span><span class="hud-value q-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Impact</span><span class="hud-value impact-val" style="font-size:9px;color:#CCCC44;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Debris</span><span class="hud-value debris-val" style="font-size:9px;color:#FF8844;">0</span></div>
-      <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
-      <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Heading</span><span class="hud-value hdg-val" style="font-size:9px;color:#88CCFF;">—</span></div>
-      <div class="hud-row"><span class="hud-label">AoA</span><span class="hud-value aoa-val" style="font-size:9px;color:#FF8844;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Lat</span><span class="hud-value lat-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Lon</span><span class="hud-value lon-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Mach</span><span class="hud-value mach-val" style="font-size:9px;color:#FF8844;">—</span></div>
-      <div class="hud-row"><span class="hud-label">Mass</span><span class="hud-value mass-val" style="font-size:9px;color:#aaaacc;">—</span></div>
-      <div class="hud-row"><span class="hud-label">g</span><span class="hud-value grav-val" style="font-size:9px;color:#ccccee;">—</span></div>
-      <div class="btn-bar">
-        <button class="btn btn--action" data-action="stage">STAGE</button>
-        <button class="btn btn--action" data-action="parachute">CHUTE</button>
-        <button class="btn btn--action" data-action="map">MAP</button>
-      </div>
-      <div style="color:rgba(244,245,242,0.35);font-size:9px;letter-spacing:0.05em;">W/S Throttle | ↑↓ Pitch | ←→ Yaw | Space Stage | Esc Pause</div>
-      <div style="color:rgba(244,245,242,0.2);font-size:8px;letter-spacing:0.03em;margin-top:4px;">🖱 Drag orbit | Shift+←→ orbit | Scroll zoom | M Map</div>
+      <div class="hud-cam-mode" style="position:absolute;bottom:120px;right:20px;color:rgba(244,245,242,0.5);font-size:10px;font-family:monospace;pointer-events:none;"></div>
+      <div class="hud-mach" style="position:fixed;top:20px;right:20px;color:rgba(244,245,242,0.7);font-size:13px;font-family:monospace;z-index:100;text-align:right;"></div>
     `;
     parent.appendChild(this.root);
 
     this.speedVal = this.root.querySelector('.speed-val')!;
-    this.speedUnit = this.root.querySelector('.speed-unit')!;
-    this.vsVal = this.root.querySelector('.vs-val')!;
     this.altVal = this.root.querySelector('.alt-val')!;
-    this.altUnit = this.root.querySelector('.alt-unit')!;
-    this.angleVal = this.root.querySelector('.angle-val')!;
-    this.fuelFill = this.root.querySelector('.fuel-fill')!;
-    this.fuelPct = this.root.querySelector('.fuel-pct')!;
-    this.throtFill = this.root.querySelector('.throt-fill')!;
-    this.throtPct = this.root.querySelector('.throt-pct')!;
+    this.massVal = this.root.querySelector('.mass-val')!;
     this.heatFill = this.root.querySelector('.heat-fill')!;
     this.heatPct = this.root.querySelector('.heat-pct')!;
-    this.gforceVal = this.root.querySelector('.gforce-val')!;
-    this.stageVal = this.root.querySelector('.stage-val')!;
-    this.apeVal = this.root.querySelector('.ape-val')!;
-    this.peVal = this.root.querySelector('.pe-val')!;
-    this.twrVal = this.root.querySelector('.twr-val')!;
-    this.ttaVal = this.root.querySelector('.tta-val')!;
-    this.ttpVal = this.root.querySelector('.ttp-val')!;
-    this.timeVal = this.root.querySelector('.time-val')!;
-    this.dvVal = this.root.querySelector('.dv-val')!;
-    this.ispVal = this.root.querySelector('.isp-val')!;
-    this.burnVal = this.root.querySelector('.burn-val')!;
-    this.recVal = this.root.querySelector('.rec-val')!;
+    this.camModeEl = this.root.querySelector('.hud-cam-mode')!;
+    this.machEl = this.root.querySelector('.hud-mach')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -156,43 +88,42 @@ export class HUD {
     parent.appendChild(navballContainer);
     this.navballCanvas = canvas;
     this.navballCtx = canvas.getContext('2d')!;
+
+    // Stage panel
+    const stagePanel = document.createElement('div');
+    stagePanel.style.cssText = `
+      position:fixed;left:16px;bottom:20px;z-index:100;
+      width:150px;display:flex;flex-direction:column;gap:3px;
+    `;
+    this.stagePanel = stagePanel;
+
+    const stageLabel = document.createElement('div');
+    stageLabel.style.cssText = `
+      color:var(--accent-gold);font-size:11px;font-weight:600;
+      font-family:monospace;letter-spacing:0.05em;
+      padding:4px 6px;border-bottom:1px solid rgba(200,152,56,0.2);
+      margin-bottom:4px;
+    `;
+    stageLabel.textContent = 'STAGES';
+    stagePanel.appendChild(stageLabel);
+    this.stageLabel = stageLabel;
+
+    parent.appendChild(stagePanel);
   }
 
   setWarpLabel(label: string): void {
-    const el = this.root.querySelector('.warp-val');
-    if (el) el.textContent = label;
   }
 
   setDeltaV(dv: number): void {
-    this.dvVal.textContent = dv >= 0 ? `${dv.toFixed(0)} m/s` : '—';
-    this.dvVal.style.color = dv > 500 ? '#44FF44' : dv > 100 ? '#FFAA44' : '#FF4444';
   }
 
   setIsp(isp: number): void {
-    this.ispVal.textContent = isp > 0 ? `${isp.toFixed(0)}s` : '—';
   }
 
   setRecord(text: string): void {
-    this.recVal.textContent = text;
   }
 
   setSAS(mode: 'off' | 'hold' | 'prograde' | 'retrograde'): void {
-    const el = this.root.querySelector('.sas-val');
-    if (el) {
-      if (mode === 'off') {
-        el.textContent = 'OFF';
-        (el as HTMLElement).style.color = '#666688';
-      } else if (mode === 'prograde') {
-        el.textContent = 'PRG';
-        (el as HTMLElement).style.color = '#44FF44';
-      } else if (mode === 'retrograde') {
-        el.textContent = 'RET';
-        (el as HTMLElement).style.color = '#FF6644';
-      } else {
-        el.textContent = 'HLD';
-        (el as HTMLElement).style.color = '#44AAFF';
-      }
-    }
   }
 
   setVisible(v: boolean): void {
@@ -200,63 +131,51 @@ export class HUD {
   }
 
   setGForce(g: number): void {
-    this.gforceVal.textContent = g.toFixed(2);
-    if (g > 5) this.gforceVal.style.color = '#FF4444';
-    else if (g > 3) this.gforceVal.style.color = '#FFAA44';
-    else this.gforceVal.style.color = '#88CCFF';
   }
 
   setGForceEnabled(enabled: boolean): void {
-    (this.root.querySelector('.gforce-row') as HTMLElement)?.style.setProperty('display', enabled ? '' : 'none');
   }
 
   setDebris(count: number): void {
-    const el = this.root.querySelector('.debris-val');
-    if (el) el.textContent = count.toString();
   }
 
   setHeading(heading: number): void {
-    const el = this.root.querySelector('.hdg-val');
-    if (el) el.textContent = `${heading.toFixed(0)}°`;
   }
 
   setAoA(aoa: number): void {
-    const el = this.root.querySelector('.aoa-val');
-    if (el) el.textContent = `${aoa.toFixed(1)}°`;
   }
 
   setLatLon(lat: number, lon: number): void {
-    const latEl = this.root.querySelector('.lat-val');
-    const lonEl = this.root.querySelector('.lon-val');
-    if (latEl) latEl.textContent = `${lat.toFixed(2)}°${lat >= 0 ? 'N' : 'S'}`;
-    if (lonEl) lonEl.textContent = `${lon.toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
   }
 
   setMach(mach: number): void {
-    const el = this.root.querySelector('.mach-val');
-    if (el) el.textContent = mach.toFixed(2);
+    if (!this.machEl) return;
+    if (mach > 0.7) {
+      this.machEl.textContent = `MACH ${mach.toFixed(2)}`;
+      this.machEl.style.color = mach > 1.0 ? '#ff6644' : mach > 0.9 ? '#ffaa44' : '#aaaacc';
+    } else {
+      this.machEl.textContent = '';
+    }
   }
 
   setMass(kg: number): void {
-    const el = this.root.querySelector('.mass-val');
-    if (el) el.textContent = `${(kg / 1000).toFixed(1)}t`;
+    if (this.massVal) this.massVal.textContent = `${(kg / 1000).toFixed(1)}t`;
+  }
+
+  setFreeCamera(active: boolean): void {
+    if (this.camModeEl) {
+      this.camModeEl.textContent = active ? 'FREE CAM' : '';
+    }
   }
 
   setGravity(g: number): void {
-    const el = this.root.querySelector('.grav-val');
-    if (el) el.textContent = `${g.toFixed(2)} m/s²`;
   }
 
   setTWR(twr: number): void {
-    this.twrVal.textContent = twr.toFixed(2);
-    this.twrVal.style.color = twr > 1.1 ? '#44CC88' : twr > 0.8 ? '#FFAA44' : '#FF4444';
   }
 
   setPaused(paused: boolean): void {
     this.pauseOverlay.style.display = paused ? 'flex' : 'none';
-    // Update zoom label visibility when paused
-    const warpEl = this.root.querySelector('.warp-val') as HTMLElement | null;
-    if (warpEl) warpEl.style.opacity = paused ? '0.5' : '1';
   }
 
   setNavballData(
@@ -271,132 +190,242 @@ export class HUD {
     ctx.clearRect(0, 0, cw, ch);
 
     ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#0a0a1a'; ctx.fill();
+    ctx.fillStyle = '#080812'; ctx.fill();
 
-    const dotUp = upDir[0] * rocketFwd[0] + upDir[1] * rocketFwd[1] + upDir[2] * rocketFwd[2];
-    const horizonY = dotUp * R;
+    // Build the rocket's local reference frame
+    const fwd: [number, number, number] = [rocketFwd[0], rocketFwd[1], rocketFwd[2]];
+    const fwdLen = Math.sqrt(fwd[0]*fwd[0] + fwd[1]*fwd[1] + fwd[2]*fwd[2]) || 1;
+    fwd[0] /= fwdLen; fwd[1] /= fwdLen; fwd[2] /= fwdLen;
+
+    // Reference up = component of upDir perpendicular to fwd
+    const dotFU = fwd[0]*upDir[0] + fwd[1]*upDir[1] + fwd[2]*upDir[2];
+    let refUp: [number, number, number] = [
+      upDir[0] - fwd[0] * dotFU,
+      upDir[1] - fwd[1] * dotFU,
+      upDir[2] - fwd[2] * dotFU,
+    ];
+    const refUpLen = Math.sqrt(refUp[0]*refUp[0] + refUp[1]*refUp[1] + refUp[2]*refUp[2]) || 1;
+    refUp[0] /= refUpLen; refUp[1] /= refUpLen; refUp[2] /= refUpLen;
+
+    // Right vector = cross(fwd, refUp)
+    const right: [number, number, number] = [
+      fwd[1]*refUp[2] - fwd[2]*refUp[1],
+      fwd[2]*refUp[0] - fwd[0]*refUp[2],
+      fwd[0]*refUp[1] - fwd[1]*refUp[0],
+    ];
+
+    // Project a world direction onto the navball using stereographic projection
+    const project = (dir: [number, number, number]) => {
+      const m = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]) || 1;
+      const dx = dir[0]/m, dy = dir[1]/m, dz = dir[2]/m;
+
+      // Transform to local frame: (right, refUp, fwd)
+      const lx = dx*right[0] + dy*right[1] + dz*right[2];
+      const ly = dx*refUp[0] + dy*refUp[1] + dz*refUp[2];
+      const lz = dx*fwd[0] + dy*fwd[1] + dz*fwd[2];
+
+      const inFront = lz > 0;
+      // Stereographic projection: map hemisphere to disk
+      const d = lz > 0 ? R / (1 + lz) : R * 0.5;
+      const sx = cx + lx * d;
+      const sy = cy - ly * d;
+      return { x: sx, y: sy, inFront, lx, ly, lz };
+    };
+
+    const r2 = R * R;
 
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.clip();
 
-    ctx.fillStyle = '#2244aa';
-    ctx.fillRect(cx - R, cy - R - horizonY, R * 2, R + horizonY);
-    ctx.fillStyle = '#885522';
-    ctx.fillRect(cx - R, cy - horizonY, R * 2, R + horizonY);
+    // Draw background: sky/ground hemispheres
+    // Project up vector to find horizon position on navball
+    const upProj = project(upDir);
+    const nadProj = project([-upDir[0], -upDir[1], -upDir[2]]);
 
+    // Sky hemisphere (blue gradient)
+    const skyGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    skyGrad.addColorStop(0, '#0a0a22');
+    skyGrad.addColorStop(0.4, '#1a2a4a');
+    skyGrad.addColorStop(1, '#224488');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+    // Ground hemisphere drawn as a clipped ellipse based on up/nadir positions
+    // The horizon cuts through the navball where the up/nadir projections lie on the sphere
+    // We approximate by drawing inverted triangle gradient toward nadir
+    if (nadProj.inFront) {
+      const earthGrad = ctx.createRadialGradient(nadProj.x, nadProj.y, 0, nadProj.x, nadProj.y, R * 1.2);
+      earthGrad.addColorStop(0, '#6a4a2a');
+      earthGrad.addColorStop(0.3, '#5a3a1a');
+      earthGrad.addColorStop(0.7, '#3a2a12');
+      earthGrad.addColorStop(1, 'rgba(10,10,40,0)');
+      ctx.fillStyle = earthGrad;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    }
+
+    // Grid: pitch ladder
     for (let deg = -80; deg <= 80; deg += 10) {
-      const y = cy - Math.sin(deg * Math.PI / 180) * R;
-      ctx.beginPath();
+      const rad = deg * Math.PI / 180;
+      const cosP = Math.cos(rad);
+      const sinP = Math.sin(rad);
+      // Project the pitch angle: a direction at angle 'deg' from forward
+      // dir = cos(deg)*fwd + sin(deg)*refUp
+      const dir: [number, number, number] = [
+        fwd[0]*cosP + refUp[0]*sinP,
+        fwd[1]*cosP + refUp[1]*sinP,
+        fwd[2]*cosP + refUp[2]*sinP,
+      ];
+      const p = project(dir);
+      if (!p.inFront) continue;
+      const dx2 = p.x - cx, dy2 = p.y - cy;
+      if (dx2*dx2 + dy2*dy2 > r2) continue;
+
       const lineW = deg === 0 ? 30 : deg % 20 === 0 ? 22 : 14;
-      ctx.moveTo(cx - lineW, y);
-      ctx.lineTo(cx + lineW, y);
-      ctx.strokeStyle = deg === 0 ? '#FFCC44' : 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = deg === 0 ? 1.5 : 0.7;
+      ctx.beginPath();
+      ctx.moveTo(cx - lineW * (1 - Math.abs(sinP) * 0.3), p.y);
+      ctx.lineTo(cx + lineW * (1 - Math.abs(sinP) * 0.3), p.y);
+      ctx.strokeStyle = deg === 0 ? '#FFCC44' : 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = deg === 0 ? 1.5 : 0.6;
       ctx.stroke();
       if (deg % 20 === 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '8px sans-serif';
-        ctx.fillText(`${Math.abs(deg)}`, cx + lineW + 3, y + 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = '7px sans-serif';
+        ctx.fillText(`${Math.abs(deg)}`, cx + lineW + 3, p.y + 2);
       }
     }
 
-    ctx.beginPath();
-    ctx.moveTo(cx - R, cy - horizonY);
-    ctx.lineTo(cx + R, cy - horizonY);
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // Draw heading markers on the horizon
+    for (let h = 0; h < 360; h += 45) {
+      const hr = h * Math.PI / 180;
+      // A horizontal direction = rotate refUp around fwd by h degrees
+      // We can approximate by using the right vector
+      const hx = right[0]*Math.cos(hr) + refUp[0]*Math.sin(hr);
+      const hy = right[1]*Math.cos(hr) + refUp[1]*Math.sin(hr);
+      const hz = right[2]*Math.cos(hr) + refUp[2]*Math.sin(hr);
+      // This is on the horizon plane (perpendicular to upDir)
+      const hDir: [number, number, number] = [
+        hx - fwd[0]*dotFU,
+        hy - fwd[1]*dotFU,
+        hz - fwd[2]*dotFU,
+      ];
+      const hm = Math.sqrt(hDir[0]*hDir[0] + hDir[1]*hDir[1] + hDir[2]*hDir[2]) || 1;
+      const hp = project([hDir[0]/hm, hDir[1]/hm, hDir[2]/hm]);
+      if (hp.inFront) {
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.font = '6px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${h}°`, hp.x, hp.y + 2);
+        ctx.textAlign = 'start';
+      }
+    }
 
-    const project = (dir: [number, number, number]) => {
-      const m = Math.sqrt(dir[0]**2 + dir[1]**2 + dir[2]**2) || 1;
-      const dx = dir[0] / m, dy = dir[1] / m, dz = dir[2] / m;
-      const fwdD = dx * rocketFwd[0] + dy * rocketFwd[1] + dz * rocketFwd[2];
-      const projX = dx - rocketFwd[0] * fwdD;
-      const projY = dy - rocketFwd[1] * fwdD;
-      const plen = Math.sqrt(projX * projX + projY * projY) || 1;
-      return { x: cx + (projX / plen) * R * 0.78, y: cy - (projY / plen) * R * 0.78, inFront: fwdD > 0 };
+    // Markers
+    const drawMarker = (
+      dir: [number, number, number],
+      drawFn: (p: { x: number; y: number }) => void,
+    ) => {
+      const p = project(dir);
+      if (p.inFront) drawFn(p);
     };
 
-    const pg = project(velocityDir);
-    if (pg.inFront) {
-      ctx.beginPath(); ctx.arc(pg.x, pg.y, 6, 0, Math.PI * 2);
+    // Prograde (velocity direction)
+    drawMarker(velocityDir, (p) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
       ctx.fillStyle = '#44FF44'; ctx.fill();
-      ctx.beginPath(); ctx.arc(pg.x, pg.y, 9, 0, Math.PI * 2);
-      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#44FF44'; ctx.font = 'bold 8px sans-serif';
-      ctx.fillText('P', pg.x + 8, pg.y + 3);
-    }
-
-    const rgVel: [number, number, number] = [-velocityDir[0], -velocityDir[1], -velocityDir[2]];
-    const rg = project(rgVel);
-    if (rg.inFront) {
-      ctx.beginPath(); ctx.arc(rg.x, rg.y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(68,255,68,0.6)'; ctx.fill();
-      ctx.beginPath(); ctx.arc(rg.x, rg.y, 9, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
       ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(rg.x - 5, rg.y - 5); ctx.lineTo(rg.x + 5, rg.y + 5);
-      ctx.moveTo(rg.x + 5, rg.y - 5); ctx.lineTo(rg.x - 5, rg.y + 5);
-      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1.5; ctx.stroke();
-    }
+    });
 
-    const zn = project(upDir);
-    if (zn.inFront) {
-      ctx.beginPath(); ctx.moveTo(zn.x, zn.y - 8); ctx.lineTo(zn.x - 6, zn.y + 4); ctx.lineTo(zn.x + 6, zn.y + 4); ctx.closePath();
+    // Retrograde (opposite velocity)
+    drawMarker([-velocityDir[0], -velocityDir[1], -velocityDir[2]], (p) => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(68,255,68,0.5)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - 4, p.y - 4); ctx.lineTo(p.x + 4, p.y + 4);
+      ctx.moveTo(p.x + 4, p.y - 4); ctx.lineTo(p.x - 4, p.y + 4);
+      ctx.strokeStyle = '#44FF44'; ctx.lineWidth = 1; ctx.stroke();
+    });
+
+    // Zenith (up)
+    drawMarker(upDir, (p) => {
+      ctx.beginPath(); ctx.moveTo(p.x, p.y - 7); ctx.lineTo(p.x - 5, p.y + 4); ctx.lineTo(p.x + 5, p.y + 4); ctx.closePath();
       ctx.fillStyle = '#4488FF'; ctx.fill();
-    }
+    });
 
-    const nd: [number, number, number] = [-upDir[0], -upDir[1], -upDir[2]];
-    const ndp = project(nd);
-    if (ndp.inFront) {
-      ctx.beginPath(); ctx.moveTo(ndp.x, ndp.y + 8); ctx.lineTo(ndp.x - 6, ndp.y - 4); ctx.lineTo(ndp.x + 6, ndp.y - 4); ctx.closePath();
-      ctx.fillStyle = '#4488FF'; ctx.fill();
-    }
+    // Nadir (down)
+    drawMarker([-upDir[0], -upDir[1], -upDir[2]], (p) => {
+      ctx.beginPath(); ctx.moveTo(p.x, p.y + 7); ctx.lineTo(p.x - 5, p.y - 4); ctx.lineTo(p.x + 5, p.y - 4); ctx.closePath();
+      ctx.fillStyle = '#CC8844'; ctx.fill();
+    });
 
-    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    // Center indicator (rocket's nose direction)
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fillStyle = '#FFAA44'; ctx.fill();
+    ctx.strokeStyle = '#FFAA44'; ctx.lineWidth = 1;
+    ctx.stroke();
 
-    // Orbit normal marker (triangle)
+    // Orbit normal
     if (orbitNormal) {
-      const onProj = project(orbitNormal);
-      if (onProj.inFront) {
+      drawMarker(orbitNormal, (p) => {
         ctx.beginPath();
-        ctx.moveTo(onProj.x, onProj.y - 7);
-        ctx.lineTo(onProj.x - 5, onProj.y + 5);
-        ctx.lineTo(onProj.x + 5, onProj.y + 5);
+        ctx.moveTo(p.x, p.y - 6);
+        ctx.lineTo(p.x - 5, p.y + 4);
+        ctx.lineTo(p.x + 5, p.y + 4);
         ctx.closePath();
         ctx.fillStyle = '#CC88FF';
         ctx.fill();
-      }
+      });
+
+      // Anti-normal
+      drawMarker([-orbitNormal[0], -orbitNormal[1], -orbitNormal[2]], (p) => {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + 6);
+        ctx.lineTo(p.x - 5, p.y - 4);
+        ctx.lineTo(p.x + 5, p.y - 4);
+        ctx.closePath();
+        ctx.fillStyle = '#8844CC';
+        ctx.fill();
+      });
     }
 
-    // Planet direction dots on navball
+    // Planet direction dots
     if (bodyDirs) {
       for (const bd of bodyDirs) {
-        const p = project(bd.dir);
-        if (p.inFront) {
+        drawMarker(bd.dir, (p) => {
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
           ctx.fillStyle = bd.color + 'aa';
           ctx.fill();
-        }
+        });
       }
     }
 
     ctx.restore();
 
+    // Outer ring
     ctx.beginPath(); ctx.arc(cx, cy, R + 1, 0, Math.PI * 2);
     ctx.strokeStyle = '#334466'; ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Tick marks at 45-degree intervals on the ring
+    for (let deg = 0; deg < 360; deg += 45) {
+      const rad = deg * Math.PI / 180;
+      const inner = R - 8, outer = R + 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(rad) * inner, cy + Math.sin(rad) * inner);
+      ctx.lineTo(cx + Math.cos(rad) * outer, cy + Math.sin(rad) * outer);
+      ctx.strokeStyle = '#4a6a8a'; ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 
-  update(state: FlightState, system: System, heat: number = 0, stage: number = 1, apoapsis?: number, periapsis?: number, timeToAp?: number, timeToPe?: number, missionTime?: number, eccentricity?: number, period?: number): void {
+  update(state: FlightState, system: System, heat: number = 0, stageCount: number = 1, currentStage: number = 1): void {
     const speed = Math.sqrt(
       state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
     );
-    let nearestBody: any = null;
     let nearestAlt = Infinity;
-    let ndx = 0, ndy = 0, ndz = 0;
     for (const body of system.bodies) {
       if (body.mass <= 0) continue;
       const dx = state.position[0] - body.position[0];
@@ -406,125 +435,72 @@ export class HUD {
       const r = (body as any).radius ?? 0;
       const surfaceR = (body as any).getSurfaceRadiusAt?.(state.position) ?? r;
       const alt = d - surfaceR;
-      if (alt < nearestAlt) {
-        nearestAlt = alt;
-        nearestBody = body;
-        ndx = dx; ndy = dy; ndz = dz;
-      }
+      if (alt < nearestAlt) nearestAlt = alt;
     }
-    const horiz = Math.sqrt(state.velocity[0] ** 2 + state.velocity[2] ** 2);
-    const angle = Math.atan2(horiz, Math.abs(state.velocity[1])) * 180 / Math.PI;
 
-    const maxFuelMass = state.rocket.assembly.totalFuelCapacity();
-    const fuelPct = maxFuelMass > 0
-      ? (state.rocket.totalFuelMass() / maxFuelMass) * 100
-      : 0;
-
-    // Heat: clamp to 0-100% (100000 = 100% critical)
-    const heatPct = Math.min(100, (heat / 100000) * 100);
-
-    // Vertical speed relative to nearest body
-    const dBody = Math.sqrt(ndx * ndx + ndy * ndy + ndz * ndz) || 1;
-    const udx = ndx / dBody, udy = ndy / dBody, udz = ndz / dBody;
-    const vertSpeed = state.velocity[0] * udx + state.velocity[1] * udy + state.velocity[2] * udz;
-    this.vsVal.textContent = vertSpeed.toFixed(1);
-    this.vsVal.style.color = vertSpeed < -5 ? '#FF4444' : vertSpeed > 5 ? '#44FF44' : '#CCCC44';
+    const heatPct = Math.min(100, (heat / 300000) * 100);
 
     this.speedVal.textContent = speed.toFixed(1);
     if (nearestAlt > 1000) {
       this.altVal.textContent = (nearestAlt / 1000).toFixed(2);
-      this.altUnit.textContent = 'km';
     } else {
       this.altVal.textContent = nearestAlt.toFixed(0);
-      this.altUnit.textContent = 'm';
     }
-    this.angleVal.textContent = angle.toFixed(0);
-    this.fuelPct.textContent = `${fuelPct.toFixed(0)}%`;
-    this.fuelFill.style.width = `${Math.min(100, fuelPct)}%`;
-    this.throtPct.textContent = `${(state.throttle * 100).toFixed(0)}%`;
-    this.throtFill.style.width = `${state.throttle * 100}%`;
-    this.throtFill.style.background = state.throttle > 0 && state.rocket.totalFuelMass() > 0 ? '#FF8844' : '#446688';
     this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
     this.heatFill.style.width = `${heatPct}%`;
     this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
 
-    this.stageVal.textContent = `${stage}`;
+    // Update stage indicator
+    if (stageCount > 0 && this.stageLabel) {
+      this.stageLabel.textContent = `STAGE ${currentStage}/${stageCount}`;
+    }
+  }
 
-    if (apoapsis !== undefined && isFinite(apoapsis)) {
-      this.apeVal.textContent = apoapsis > 1000 ? `${(apoapsis / 1000).toFixed(1)}km` : `${apoapsis.toFixed(0)}m`;
-    }
-    if (periapsis !== undefined && isFinite(periapsis)) {
-      this.peVal.textContent = periapsis > 1000 ? `${(periapsis / 1000).toFixed(1)}km` : `${periapsis.toFixed(0)}m`;
-    }
+  setStageData(stages: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }>): void {
+    if (!this.stagePanel) return;
 
-    if (timeToAp !== undefined && isFinite(timeToAp)) {
-      this.ttaVal.textContent = timeToAp > 60 ? `${(timeToAp / 60).toFixed(1)}m` : `${timeToAp.toFixed(0)}s`;
-    } else {
-      this.ttaVal.textContent = '—';
-    }
-    if (timeToPe !== undefined && isFinite(timeToPe)) {
-      this.ttpVal.textContent = timeToPe > 60 ? `${(timeToPe / 60).toFixed(1)}m` : `${timeToPe.toFixed(0)}s`;
-    } else {
-      this.ttpVal.textContent = '—';
+    // Remove existing stage rows (keep the label)
+    const children = Array.from(this.stagePanel.children);
+    for (const c of children) {
+      if (c !== this.stageLabel) c.remove();
     }
 
-    if (missionTime !== undefined) {
-      const mins = Math.floor(missionTime / 60);
-      const secs = Math.floor(missionTime % 60);
-      this.timeVal.textContent = `T+${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
+    for (const st of stages) {
+      const row = document.createElement('div');
+      const fuelPct = st.dryMass > 0 ? Math.max(0, Math.min(100, (st.fuelMass / (st.fuelMass + st.dryMass)) * 100)) : 0;
 
-    // Impact prediction when falling
-    const impactEl = this.root.querySelector('.impact-val');
-    if (impactEl) {
-      const vertUp = -vertSpeed;
-      if (vertUp > 1 && nearestAlt > 0 && nearestAlt < 500000) {
-        const timeToImpact = nearestAlt / vertUp;
-        if (timeToImpact < 600) {
-          (impactEl as HTMLElement).textContent = `Impact T-${timeToImpact.toFixed(0)}s`;
-          (impactEl as HTMLElement).style.color = timeToImpact < 30 ? '#FF4444' : timeToImpact < 120 ? '#FFAA44' : '#CCCC44';
-        } else {
-          (impactEl as HTMLElement).textContent = '—';
-        }
-      } else {
-        (impactEl as HTMLElement).textContent = '—';
-      }
-    }
+      let bg = st.spent ? 'rgba(40,40,50,0.5)' : st.active ? 'rgba(60,80,50,0.6)' : 'rgba(30,35,45,0.5)';
+      let border = st.active ? '1px solid rgba(200,152,56,0.4)' : '1px solid rgba(60,60,80,0.3)';
 
-    // Eccentricity display
-    const eccEl = this.root.querySelector('.ecc-val');
-    if (eccEl && eccentricity !== undefined) {
-      eccEl.textContent = eccentricity.toFixed(3);
-    }
+      row.style.cssText = `
+        display:flex;flex-direction:column;gap:2px;
+        padding:4px 6px;border-radius:4px;
+        background:${bg};border:${border};
+        font-family:monospace;font-size:9px;
+        color:${st.spent ? '#555' : st.active ? '#ddd' : '#888'};
+      `;
 
-    // Orbital period
-    const periodEl = this.root.querySelector('.period-val');
-    if (periodEl && period !== undefined && isFinite(period)) {
-      periodEl.textContent = period > 3600 ? `${(period / 3600).toFixed(1)}h` : period > 60 ? `${(period / 60).toFixed(1)}m` : `${period.toFixed(0)}s`;
-    }
+      const top = document.createElement('div');
+      top.style.cssText = 'display:flex;justify-content:space-between;';
+      top.innerHTML = `<span>${st.label}</span><span>${fuelPct.toFixed(0)}%</span>`;
+      row.appendChild(top);
 
-    // SOI body name
-    const soiEl = this.root.querySelector('.soi-val');
-    if (soiEl) {
-      const refBody = getReferenceBody(state.position, system);
-      soiEl.textContent = refBody ? refBody.name.toUpperCase() : '—';
-    }
+      const bar = document.createElement('div');
+      bar.style.cssText = `
+        height:3px;border-radius:2px;
+        background:${st.spent ? '#333' : '#333'};
+        position:relative;
+      `;
+      const fill = document.createElement('div');
+      fill.style.cssText = `
+        height:100%;border-radius:2px;width:${fuelPct}%;
+        background:${fuelPct > 50 ? '#4a8' : fuelPct > 20 ? '#da5' : '#c44'};
+        transition:width 0.3s;
+      `;
+      bar.appendChild(fill);
+      row.appendChild(bar);
 
-    // Burn time remaining
-    if (this.burnVal) {
-      const fuelMass = state.rocket.totalFuelMass();
-      const throttle = state.throttle;
-      if (fuelMass > 0.1 && throttle > 0.01) {
-        const engBurn = findFirstEngine(state.rocket.assembly.roots);
-        if (engBurn && engBurn.thrust) {
-          const thrustN = engBurn.thrust * 1000 * throttle;
-          const massFlow = thrustN / (320 * 9.80665); // kg/s
-          const burnTime = fuelMass / massFlow;
-          this.burnVal.textContent = burnTime > 60 ? `${(burnTime / 60).toFixed(1)}m` : `${burnTime.toFixed(0)}s`;
-        }
-      } else {
-        this.burnVal.textContent = '—';
-      }
+      this.stagePanel.appendChild(row);
     }
   }
 
