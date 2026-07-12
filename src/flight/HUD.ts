@@ -104,6 +104,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">Lat</span><span class="hud-value lat-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Lon</span><span class="hud-value lon-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="hud-row"><span class="hud-label">Mach</span><span class="hud-value mach-val" style="font-size:9px;color:#FF8844;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Mass</span><span class="hud-value mass-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -233,6 +234,11 @@ export class HUD {
   setMach(mach: number): void {
     const el = this.root.querySelector('.mach-val');
     if (el) el.textContent = mach.toFixed(2);
+  }
+
+  setMass(kg: number): void {
+    const el = this.root.querySelector('.mass-val');
+    if (el) el.textContent = `${(kg / 1000).toFixed(1)}t`;
   }
 
   setTWR(twr: number): void {
