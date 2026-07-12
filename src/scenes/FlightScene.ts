@@ -78,6 +78,7 @@ export class FlightScene {
   private maxAlt = 0;
   private maxSpeed = 0;
   private orbitLine: THREE.Line | null = null;
+  private exhaustLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamPos = new THREE.Vector3(0, 2, 5);
   private freeCamLook = new THREE.Vector3(0, 0, 0);
@@ -219,6 +220,11 @@ export class FlightScene {
     this.engineFlame = new EngineFlame();
     this.positionFlameAtNozzle();
     this.rocketGroup.add(this.engineFlame.getMesh());
+
+    // Engine exhaust light
+    this.exhaustLight = new THREE.PointLight(0xff8844, 0, 20);
+    this.exhaustLight.position.set(0, -1, 0);
+    this.rocketGroup.add(this.exhaustLight);
 
     this.groundSmoke = new GroundSmoke();
     this.rocketGroup.add(this.groundSmoke.getMesh());
@@ -949,6 +955,10 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       this.engineFlame.stop();
     }
     this.engineFlame.update(baseDt);
+    if (this.exhaustLight) {
+      this.exhaustLight.intensity = this.state.throttle * 3;
+      this.exhaustLight.color.setHSL(0.08 - this.state.throttle * 0.05, 1, 0.5 + this.state.throttle * 0.3);
+    }
 
     // Ground smoke when engine active and grounded
     if (engineActive && this.grounded) this.groundSmoke.start();
