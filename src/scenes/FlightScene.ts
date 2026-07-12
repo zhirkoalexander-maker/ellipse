@@ -1469,6 +1469,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
     const mach = speedMs / 340;
     this.hud.setMach(mach);
+    this.hud.setMass(this.state.rocket.totalMass());
 
     // Sonic boom ring when crossing mach 1
     if (mach > 0.98 && mach < 1.02 && !this.sonicBoomRing && nearestAlt < 15000) {
