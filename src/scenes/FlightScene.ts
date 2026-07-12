@@ -336,6 +336,7 @@ export class FlightScene {
       mapPanY += (e.touches[0]!.clientY - mapDragStart.y);
       mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
     });
+    mapCanvas.addEventListener('touchend', () => { mapDragStart = null; });
 
     const drawMap = () => {
       if (!mapActive) return;
