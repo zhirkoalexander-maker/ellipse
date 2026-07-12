@@ -84,8 +84,18 @@ this.system = new System();
 
   private async preloadModels(): Promise<void> {
     const { loadGLTF } = await import('../parts/PartBuilder');
-    // Preload Agena Target Vehicle
-    await loadGLTF('/models/agena.glb', 1.0);
+    const models = [
+      '/models/agena.glb',
+      '/models/saturn_v.glb',
+      '/models/apollo_soyuz.glb',
+      '/models/ares_1.glb',
+      '/models/apollo_lunar_module.glb',
+      '/models/atlas_6.glb',
+      '/models/atlas_9.glb',
+      '/models/crawler.glb',
+    ];
+    await Promise.allSettled(models.map(url => loadGLTF(url, 1.0)));
+    console.log('GLTF models preloaded:', models.length);
   }
 
   start(): void {
