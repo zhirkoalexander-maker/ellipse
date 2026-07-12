@@ -360,7 +360,7 @@ const sizes: Record<string, number> = {
   jupiter: 7, saturn: 6, uranus: 3.5, neptune: 3.5
 };
 
-// Draw planet orbit trails around sun
+  // Draw planet orbit trails around sun
 const sunPos = this.system.bodyByName('sun')?.position;
 if (sunPos) {
   for (const b of this.system.bodies) {
@@ -389,6 +389,25 @@ if (sunPos) {
         ctx.setLineDash([]);
       }
     }
+  }
+}
+
+// Atmospheric halos for bodies with atmospheres
+const atmosBodies = ['earth', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+for (const b of this.system.bodies) {
+  if (atmosBodies.includes(b.name)) {
+    const bx = cx + (b.position[0] - this.state.position[0]) * s;
+    const by = cy - (b.position[2] - this.state.position[2]) * s;
+    const baseR = sizes[b.name] || 3;
+    const grad = ctx.createRadialGradient(bx, by, baseR * 0.5, bx, by, baseR * 3);
+    const col = colors[b.name] || '#888';
+    grad.addColorStop(0, col + '30');
+    grad.addColorStop(0.5, col + '15');
+    grad.addColorStop(1, col + '00');
+    ctx.beginPath();
+    ctx.arc(bx, by, baseR * 3, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
   }
 }
 
