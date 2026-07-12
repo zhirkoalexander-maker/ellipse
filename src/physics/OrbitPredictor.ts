@@ -6,6 +6,8 @@ export interface OrbitPrediction {
   apoapsis: number;
   periapsis: number;
   bound: boolean;
+  timeToAp?: number;
+  timeToPe?: number;
 }
 
 export function predictOrbit(
@@ -50,6 +52,28 @@ export function predictOrbit(
   const pts: [number, number][] = [];
   const thetaMax = bound ? Math.PI : Math.acos(-1 / Math.max(e, 1.001)) * 0.98;
 
+  // Compute time to Ap/Pe for bound orbits
+  let timeToAp: number | undefined;
+  let timeToPe: number | undefined;
+  if (bound) {
+    const orbitPeriod = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
+    const dot = (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) / (r || 1);
+    const cosTheta = (a * (1 - e * e) / r - 1) / e;
+    const sinTheta = dot * Math.sqrt(a * (1 - e * e) / mu) / (e || 1);
+    let trueAnomaly = Math.atan2(sinTheta, cosTheta);
+    if (trueAnomaly < 0) trueAnomaly += Math.PI * 2;
+    const cosE = (e + cosTheta) / (1 + e * cosTheta);
+    const sinE = Math.sqrt(1 - e * e) * sinTheta / (1 + e * cosTheta);
+    let E = Math.atan2(sinE, cosE);
+    if (E < 0) E += Math.PI * 2;
+    const meanAnomaly = E - e * sinE;
+    const timeFromPe = meanAnomaly * orbitPeriod / (2 * Math.PI);
+    const timeToPeOrbit = orbitPeriod - timeFromPe;
+    const timeToApOrbit = (timeToPeOrbit + orbitPeriod / 2) % orbitPeriod;
+    timeToPe = timeToPeOrbit;
+    timeToAp = timeToApOrbit;
+  }
+
   for (let i = 0; i <= steps; i++) {
     const theta = -thetaMax + (2 * thetaMax * i) / steps;
     const denom = 1 + e * Math.cos(theta);
@@ -63,5 +87,5 @@ export function predictOrbit(
     pts.push([x, z]);
   }
 
-  return { points: pts, eccentricity: e, apoapsis, periapsis, bound };
+  return { points: pts, eccentricity: e, apoapsis, periapsis, bound, timeToAp, timeToPe };
 }
