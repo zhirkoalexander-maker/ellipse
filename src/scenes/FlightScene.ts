@@ -1377,6 +1377,14 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     this.hud.setGForce(gForce);
     this.hud.setGForceEnabled(gForce > 1.1);
     this.hud.setDebris(this.debris.length);
+
+    // Compute heading from velocity horizontal component
+    const velH = Math.sqrt(this.state.velocity[0] * this.state.velocity[0] + this.state.velocity[2] * this.state.velocity[2]);
+    if (velH > 0.5) {
+      const hdg = (Math.atan2(this.state.velocity[0], this.state.velocity[2]) * 180 / Math.PI + 360) % 360;
+      this.hud.setHeading(hdg);
+    }
+
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     // Screen shake from high G-force or mach effects
