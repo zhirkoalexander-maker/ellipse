@@ -174,7 +174,8 @@ export class HUD {
   setNavballData(
     rocketFwd: [number, number, number],
     velocityDir: [number, number, number],
-    upDir: [number, number, number]
+    upDir: [number, number, number],
+    orbitNormal?: [number, number, number]
   ): void {
     const ctx = this.navballCtx;
     const cw = 160, ch = 160, cx = 80, cy = 80, R = 75;
@@ -265,6 +266,20 @@ export class HUD {
 
     ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#FFAA44'; ctx.fill();
+
+    // Orbit normal marker (triangle)
+    if (orbitNormal) {
+      const onProj = project(orbitNormal);
+      if (onProj.inFront) {
+        ctx.beginPath();
+        ctx.moveTo(onProj.x, onProj.y - 7);
+        ctx.lineTo(onProj.x - 5, onProj.y + 5);
+        ctx.lineTo(onProj.x + 5, onProj.y + 5);
+        ctx.closePath();
+        ctx.fillStyle = '#CC88FF';
+        ctx.fill();
+      }
+    }
 
     ctx.restore();
 
