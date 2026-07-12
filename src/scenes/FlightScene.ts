@@ -1207,16 +1207,18 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     if (engDv && engDv.thrust) {
       const massWet = this.state.rocket.totalMass();
       const massDry = massWet - this.state.rocket.totalFuelMass();
+      const isp = 320;
       if (massDry > 0 && massWet > massDry) {
-        const isp = 320; // rough ISP estimate in seconds
         const ve = isp * 9.80665;
         const dv = ve * Math.log(massWet / massDry);
         this.hud.setDeltaV(dv);
       } else {
         this.hud.setDeltaV(0);
       }
+      this.hud.setIsp(isp);
     } else {
       this.hud.setDeltaV(-1);
+      this.hud.setIsp(0);
     }
 
     // Compute G-force from velocity change
