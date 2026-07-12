@@ -78,7 +78,7 @@ export class HUD {
       <div class="separator"></div>
       <div class="hud-row"><span class="hud-label">TWR</span><span class="hud-value twr-val" style="color:#88CCFF;">—</span></div>
       <div class="hud-row"><span class="hud-label">Δv</span><span class="hud-value dv-val" style="font-size:9px;color:#88CCFF;">—</span></div>
-      <div class="hud-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
+      <div class="hud-row gforce-row"><span class="hud-label">G</span><span class="hud-value gforce-val" style="color:#88CCFF;">1.00</span></div>
       <div class="hud-row"><span class="hud-label">Stage</span><span class="hud-value stage-val" style="color:var(--accent-gold);">1</span></div>
       <div class="hud-row"><span class="hud-label">Time</span><span class="hud-value time-val" style="font-size:9px;color:#aaaacc;">T+00:00</span></div>
       <div class="hud-row"><span class="hud-label">SAS</span><span class="hud-value sas-val" style="font-size:9px;color:#666688;">OFF</span></div>
@@ -157,6 +157,10 @@ export class HUD {
     if (g > 5) this.gforceVal.style.color = '#FF4444';
     else if (g > 3) this.gforceVal.style.color = '#FFAA44';
     else this.gforceVal.style.color = '#88CCFF';
+  }
+
+  setGForceEnabled(enabled: boolean): void {
+    (this.root.querySelector('.gforce-row') as HTMLElement)?.style.setProperty('display', enabled ? '' : 'none');
   }
 
   setTWR(twr: number): void {
