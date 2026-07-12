@@ -100,6 +100,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">T to Ap</span><span class="hud-value tta-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="hud-row"><span class="hud-label">Heading</span><span class="hud-value hdg-val" style="font-size:9px;color:#88CCFF;">—</span></div>
+      <div class="hud-row"><span class="hud-label">AoA</span><span class="hud-value aoa-val" style="font-size:9px;color:#FF8844;">—</span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -212,6 +213,11 @@ export class HUD {
   setHeading(heading: number): void {
     const el = this.root.querySelector('.hdg-val');
     if (el) el.textContent = `${heading.toFixed(0)}°`;
+  }
+
+  setAoA(aoa: number): void {
+    const el = this.root.querySelector('.aoa-val');
+    if (el) el.textContent = `${aoa.toFixed(1)}°`;
   }
 
   setTWR(twr: number): void {
