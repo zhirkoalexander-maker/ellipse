@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Part } from './Part';
 import { PART_SCALE, assetUrl } from '../config/constants';
+import { toast } from '../ui/Toast';
 import {
   generateTankTexture,
   generateCapsuleTexture,
@@ -112,10 +113,14 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | nu
     }
   });
   
+  // Apply scale to the loaded model
+  group.scale.setScalar(scale);
+  
   gltfCache.set(url, group);
   return group.clone();
   } catch (err) {
     console.error('Failed to load GLTF:', url, err);
+    toast.show(`Failed to load model: ${url.split('/').pop()}`, 3000);
     return null;
   }
 }
