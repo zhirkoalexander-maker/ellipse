@@ -82,6 +82,7 @@ export class FlightScene {
   private freeCamPos = new THREE.Vector3(0, 2, 5);
   private freeCamLook = new THREE.Vector3(0, 0, 0);
   private hudVisible = true;
+  private lastAltMilestone = 0;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1337,6 +1338,16 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
     if (speed > this.maxSpeed) this.maxSpeed = speed;
     this.hud.setRecord(`Alt ${(this.maxAlt/1000).toFixed(0)}km Spd ${this.maxSpeed.toFixed(0)}m/s`);
+
+    // Altitude milestone notifications
+    const milestones = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000];
+    for (const m of milestones) {
+      if (nearestAlt >= m && this.lastAltMilestone < m) {
+        this.lastAltMilestone = m;
+        toast.show(`Altitude: ${m >= 1000 ? (m/1000)+'km' : m+'m'}`);
+        break;
+      }
+    }
 
     // Compute approximate delta-v remaining
     const engDv = findFirstEngine(this.state.rocket.assembly.roots);
