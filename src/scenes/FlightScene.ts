@@ -73,6 +73,7 @@ export class FlightScene {
   private countdownTimer = 0;
   private countdownActive = false;
   private countdownEl: HTMLElement | null = null;
+  private lastRefBody: string | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -923,6 +924,12 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     
     // Always compute nearest body for collision checks
     const nearRef = getReferenceBody(this.state.position, this.system);
+    // SOI change notification
+    const refName = nearRef.name;
+    if (this.lastRefBody && this.lastRefBody !== refName) {
+      toast.show(`Entering ${refName.toUpperCase()} SOI`);
+    }
+    this.lastRefBody = refName;
     const ndx = nearRef.position[0] - this.state.position[0];
     const ndy = nearRef.position[1] - this.state.position[1];
     const ndz = nearRef.position[2] - this.state.position[2];
