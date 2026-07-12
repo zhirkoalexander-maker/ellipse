@@ -1038,6 +1038,8 @@ for (const b of this.system.bodies) {
     // Compute Ap/Pe from orbit prediction
     let ape: number | undefined;
     let pe: number | undefined;
+    let timeToAp: number | undefined;
+    let timeToPe: number | undefined;
     const orbitRefBody = getReferenceBody(this.state.position, this.system);
     if (orbitRefBody && orbitRefBody.mass > 0) {
       const relPos: [number, number, number] = [
@@ -1049,9 +1051,11 @@ for (const b of this.system.bodies) {
       if (orbitPred.bound) {
         ape = orbitPred.apoapsis;
         pe = orbitPred.periapsis;
+        timeToAp = orbitPred.timeToAp;
+        timeToPe = orbitPred.timeToPe;
       }
     }
-    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, undefined, undefined, this.missionTime);
+    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime);
 
     // Compute G-force from velocity change
     const dvx = this.state.velocity[0] - this.prevVel[0];
