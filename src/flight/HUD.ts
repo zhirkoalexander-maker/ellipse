@@ -167,15 +167,18 @@ export class HUD {
     this.recVal.textContent = text;
   }
 
-  setSAS(active: boolean, prograde: boolean = false): void {
+  setSAS(mode: 'off' | 'hold' | 'prograde' | 'retrograde'): void {
     const el = this.root.querySelector('.sas-val');
     if (el) {
-      if (!active) {
+      if (mode === 'off') {
         el.textContent = 'OFF';
         (el as HTMLElement).style.color = '#666688';
-      } else if (prograde) {
+      } else if (mode === 'prograde') {
         el.textContent = 'PRG';
         (el as HTMLElement).style.color = '#44FF44';
+      } else if (mode === 'retrograde') {
+        el.textContent = 'RET';
+        (el as HTMLElement).style.color = '#FF6644';
       } else {
         el.textContent = 'HLD';
         (el as HTMLElement).style.color = '#44AAFF';
