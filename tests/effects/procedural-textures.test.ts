@@ -11,8 +11,8 @@ describe('ProceduralTextures', () => {
 
   it('generateEarthBumpMap returns a CanvasTexture', () => {
     const tex = generateEarthBumpMap();
-    expect(tex.image.width).toBe(512);
-    expect(tex.image.height).toBe(256);
+    expect(tex.image.width).toBe(1024);
+    expect(tex.image.height).toBe(512);
   });
 
   it('generateMoonTexture returns a CanvasTexture', () => {
