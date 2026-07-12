@@ -60,7 +60,7 @@ export class FlightScene {
   private crashed = false;
   private paused = false;
   private debris: Debris[] = [];
-  private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
+  private warpLevels = [1, 3, 5, 10, 100, 1000, 100000, 1000000];
   private warpIndex = 0;
   private crashOverlay: HTMLDivElement | null = null;
   private prevVel: [number, number, number] = [0, 0, 0];
@@ -1129,10 +1129,19 @@ for (const b of this.system.bodies) {
     const upY = this.state.position[1] - refBody.position[1];
     const upZ = this.state.position[2] - refBody.position[2];
     const upNorm = Math.sqrt(upX * upX + upY * upY + upZ * upZ) || 1;
+    // Orbit normal (angular momentum vector)
+    const relVelX = this.state.velocity[0];
+    const relVelY = this.state.velocity[1];
+    const relVelZ = this.state.velocity[2];
+    const normX = upY * relVelZ - upZ * relVelY;
+    const normY = upZ * relVelX - upX * relVelZ;
+    const normZ = upX * relVelY - upY * relVelX;
+    const normLen = Math.sqrt(normX * normX + normY * normY + normZ * normZ) || 1;
     this.hud.setNavballData(
       [rocketFwd.x, rocketFwd.y, rocketFwd.z],
       velDir,
-      [upX / upNorm, upY / upNorm, upZ / upNorm]
+      [upX / upNorm, upY / upNorm, upZ / upNorm],
+      [normX / normLen, normY / normLen, normZ / normLen]
     );
   }
 
