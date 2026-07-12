@@ -25,6 +25,13 @@ export class VABScene {
   private stackHeight = 0;
   private addedPartNames: string[] = [];
 
+  private vabAzimuth = 0;
+  private vabPolar = Math.PI / 2;
+  private vabDist = 3;
+  private vabIsDragging = false;
+  private vabPrevMouse = { x: 0, y: 0 };
+  private vabTarget = new THREE.Vector3(0, PART_SCALE, 0);
+
   constructor(onLaunch: (assembly: Assembly) => void) {
     this.onLaunch = onLaunch;
 
@@ -41,9 +48,7 @@ export class VABScene {
     this.scene.add(hemi);
 
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 1000);
-    const camDist = PART_SCALE * 15;
-    this.camera.position.set(0, camDist * 0.3, camDist * 3);
-    this.camera.lookAt(0, PART_SCALE, 0);
+    this.updateVabCamera();
 
     const padSize = PART_SCALE * 4;
     const pad = new THREE.Mesh(
@@ -56,6 +61,9 @@ export class VABScene {
     this.assembly = new Assembly();
     this.rocketGroup = new THREE.Group();
     this.scene.add(this.rocketGroup);
+
+    // VAB orbit controls
+    this.setupVabOrbit();
 
     // UI
     this.rootEl = document.createElement('div');
@@ -180,6 +188,42 @@ export class VABScene {
       ).join('');
   }
 
+  private updateVabCamera(): void {
+    const ox = this.vabDist * Math.sin(this.vabPolar) * Math.cos(this.vabAzimuth);
+    const oy = this.vabDist * Math.cos(this.vabPolar);
+    const oz = this.vabDist * Math.sin(this.vabPolar) * Math.sin(this.vabAzimuth);
+    this.camera.position.set(
+      this.vabTarget.x + ox,
+      this.vabTarget.y + oy,
+      this.vabTarget.z + oz,
+    );
+    this.camera.lookAt(this.vabTarget);
+  }
+
+  private setupVabOrbit(): void {
+    const handler = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      this.vabIsDragging = true;
+      this.vabPrevMouse = { x: e.clientX, y: e.clientY };
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('mousemove', (e) => {
+      if (!this.vabIsDragging) return;
+      const dx = e.clientX - this.vabPrevMouse.x;
+      const dy = e.clientY - this.vabPrevMouse.y;
+      this.vabAzimuth -= dx * 0.005;
+      this.vabPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.vabPolar + dy * 0.005));
+      this.vabPrevMouse = { x: e.clientX, y: e.clientY };
+      this.updateVabCamera();
+    });
+    document.addEventListener('mouseup', () => { this.vabIsDragging = false; });
+    document.addEventListener('wheel', (e: WheelEvent) => {
+      this.vabDist *= e.deltaY > 0 ? 1.1 : 0.9;
+      this.vabDist = Math.max(0.5, Math.min(50, this.vabDist));
+      this.updateVabCamera();
+    }, { passive: true });
+  }
+
   private async refreshMesh(): Promise<void> {
     while (this.rocketGroup.children.length > 0) {
       const child = this.rocketGroup.children[0];
@@ -218,6 +262,16 @@ export class VABScene {
         }
       });
       this.rocketGroup.add(mesh);
+
+      // Auto-frame camera to fit the assembled rocket
+      const box = new THREE.Box3().setFromObject(this.rocketGroup);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z, 0.1);
+      const camDist = maxDim * 3.5;
+      this.camera.position.set(center.x, center.y + maxDim * 0.5, center.z + camDist);
+      this.camera.lookAt(center.x, center.y, center.z);
+      this.camera.updateProjectionMatrix();
     }
   }
 
