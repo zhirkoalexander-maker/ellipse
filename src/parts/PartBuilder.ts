@@ -51,13 +51,14 @@ function perturbVertices(geom: THREE.BufferGeometry, strength: number): void {
 export const gltfLoader = new GLTFLoader();
 export const gltfCache = new Map<string, THREE.Group>();
 
-export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
+export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | null> {
   const resolvedUrl = assetUrl(url);
   if (gltfCache.has(url)) {
     return gltfCache.get(url)!.clone();
   }
-  const gltf = await gltfLoader.loadAsync(resolvedUrl);
-  const group = gltf.scene;
+  try {
+    const gltf = await gltfLoader.loadAsync(resolvedUrl);
+    const group = gltf.scene;
   
   // Ensure materials are PBR-ready
   group.traverse((obj) => {
@@ -97,6 +98,10 @@ export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group> {
   
   gltfCache.set(url, group);
   return group.clone();
+  } catch (err) {
+    console.error('Failed to load GLTF:', url, err);
+    return null;
+  }
 }
 
 // Cache for generated texture sets
@@ -171,7 +176,7 @@ export async function buildPartMeshAsync(part: Part): Promise<THREE.Group> {
   if (part.gltfUrl) {
     const scale = part.gltfScale ?? 1;
     const gltfGroup = await loadGLTF(part.gltfUrl, scale);
-    g.add(gltfGroup);
+    if (gltfGroup) g.add(gltfGroup);
     return g;
   }
 
@@ -201,7 +206,7 @@ export function buildPartMesh(part: Part): THREE.Group {
     case 'decoupler': buildDecoupler(g, d); break;
     case 'heatshield': buildHeatshield(g, d); break;
 case 'gltf': {
-      // Use cached GLTF model if available
+      // Use cached GLTF model if available, otherwise placeholder
       if (part.gltfUrl && gltfCache.has(part.gltfUrl)) {
         const scale = part.gltfScale ?? 1;
         const gltfGroup = gltfCache.get(part.gltfUrl)!.clone();
@@ -245,6 +250,20 @@ case 'gltf': {
         (gltfGroup as any).userData.engineMeshes = engineMeshes;
         
         g.add(gltfGroup);
+      } else {
+        // Placeholder box while GLTF loads
+        const d = SIZE_DIMS[part.size];
+        const placeholderGeom = new THREE.BoxGeometry(d.radius * 2, d.height * 0.5, d.radius * 2);
+        const placeholderMat = new THREE.MeshStandardMaterial({
+          color: 0x8888aa,
+          roughness: 0.6,
+          metalness: 0.2,
+          transparent: true,
+          opacity: 0.5,
+        });
+        const placeholder = new THREE.Mesh(placeholderGeom, placeholderMat);
+        placeholder.position.y = -d.height * 0.25;
+        g.add(placeholder);
       }
       break;
     }

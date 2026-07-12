@@ -192,24 +192,29 @@ export class VABScene {
       );
       
       if (needsGLTF) {
-        // Load missing GLTF models
         const { loadGLTF } = await import('../parts/PartBuilder');
         for (const root of this.assembly.roots) {
           if (root.part.kind === 'gltf' && root.part.gltfUrl && !gltfCache.has(root.part.gltfUrl)) {
-            await loadGLTF(root.part.gltfUrl, root.part.gltfScale ?? 1);
+            const loaded = await loadGLTF(root.part.gltfUrl, root.part.gltfScale ?? 1);
+            if (!loaded) {
+              console.warn('GLTF load failed, using placeholder for:', root.part.name);
+            }
           }
         }
       }
       
       const mesh = this.assembly.toMesh();
-      // Ensure GLTF models are visible
+      // Ensure all meshes are visible
       mesh.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+        if (obj instanceof THREE.Mesh && obj.material) {
           obj.visible = true;
-          obj.material.transparent = false;
-          obj.material.opacity = 1;
-          obj.material.depthWrite = true;
-          obj.material.depthTest = true;
+          const mat = obj.material;
+          if (!Array.isArray(mat)) {
+            mat.transparent = false;
+            mat.opacity = 1;
+            mat.depthWrite = true;
+            mat.depthTest = true;
+          }
         }
       });
       this.rocketGroup.add(mesh);
