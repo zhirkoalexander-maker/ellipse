@@ -383,6 +383,26 @@ for (const b of this.system.bodies) {
   ctx.fillText(b.name.toUpperCase(), bx + sizes[b.name]! + 6, by + 3);
 }
 
+// Draw SOI circles for all bodies
+const sunBody = this.system.bodyByName('sun');
+for (const b of this.system.bodies) {
+  if (b.name === 'sun' || b.mass <= 0 || !sunBody || b.name === sunBody.name) continue;
+  const dx = (b.position[0] - sunBody.position[0]) * VISUAL_SCALE;
+  const dz = (b.position[2] - sunBody.position[2]) * VISUAL_SCALE;
+  const distToSun = Math.sqrt(dx * dx + dz * dz);
+  if (distToSun < 1) continue;
+  const soiR = distToSun * Math.pow(b.mass / sunBody.mass, 0.4);
+  const bx_s = cx + (b.position[0] - this.state.position[0]) * s;
+  const by_s = cy - (b.position[2] - this.state.position[2]) * s;
+  ctx.beginPath();
+  ctx.arc(bx_s, by_s, soiR * s, 0, Math.PI * 2);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = (colors[b.name] || '#888') + '44';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
       // Draw rocket position on map with trajectory
       const rocketX = cx;
       const rocketY = cy;
@@ -429,94 +449,78 @@ for (const b of this.system.bodies) {
 
       // Draw trajectory endpoint if prediction available
       const refBody = getReferenceBody(this.state.position, this.system);
-      if (refBody && refBody.mass > 0) {
-        if (refBody.name !== 'sun') {
-          const sun = this.system.bodyByName('sun')!;
-          const dSx = (refBody.position[0] - sun.position[0]) * VISUAL_SCALE;
-          const dSz = (refBody.position[2] - sun.position[2]) * VISUAL_SCALE;
-          const distToSun = Math.sqrt(dSx * dSx + dSz * dSz);
-          const soiR = distToSun * Math.pow(refBody.mass / sun.mass, 0.4);
-          ctx.beginPath();
-          ctx.arc(cx, cy, soiR * s, 0, Math.PI * 2);
-          ctx.setLineDash([4, 4]);
-          ctx.strokeStyle = 'rgba(68, 136, 255, 0.3)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          ctx.setLineDash([]);
+      const relPos: [number, number, number] = [
+        (this.state.position[0] - refBody.position[0]) * VISUAL_SCALE,
+        (this.state.position[1] - refBody.position[1]) * VISUAL_SCALE,
+        (this.state.position[2] - refBody.position[2]) * VISUAL_SCALE,
+      ];
+      const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
+      if (prediction.points.length > 1) {
+        // Glow under line
+        ctx.beginPath();
+        ctx.strokeStyle = prediction.bound ? 'rgba(68,136,204,0.15)' : 'rgba(221,170,68,0.15)';
+        ctx.lineWidth = 8;
+        const firstX = cx + prediction.points[0]![0] * s;
+        const firstY = cy - prediction.points[0]![1] * s;
+        ctx.moveTo(firstX, firstY);
+        for (let i = 1; i < prediction.points.length; i++) {
+          const px = cx + prediction.points[i]![0] * s;
+          const py = cy - prediction.points[i]![1] * s;
+          ctx.lineTo(px, py);
         }
-        const relPos: [number, number, number] = [
-          (this.state.position[0] - refBody.position[0]) * VISUAL_SCALE,
-          (this.state.position[1] - refBody.position[1]) * VISUAL_SCALE,
-          (this.state.position[2] - refBody.position[2]) * VISUAL_SCALE,
-        ];
-        const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
-        if (prediction.points.length > 1) {
-          // Glow under line
+        ctx.stroke();
+
+        // Main trajectory line
+        ctx.beginPath();
+        ctx.strokeStyle = prediction.bound ? '#4488CC' : '#DDAA44';
+        ctx.lineWidth = 2;
+        ctx.setLineDash(prediction.bound ? [] : [6, 4]);
+        ctx.moveTo(firstX, firstY);
+        for (let i = 1; i < prediction.points.length; i++) {
+          const px = cx + prediction.points[i]![0] * s;
+          const py = cy - prediction.points[i]![1] * s;
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Orbit direction arrows along path
+        const arrowSteps = Math.max(4, Math.floor(prediction.points.length / 6));
+        ctx.fillStyle = prediction.bound ? '#4488CC' : '#DDAA44';
+        for (let i = arrowSteps; i < prediction.points.length - arrowSteps; i += arrowSteps) {
+          const pi = prediction.points[i]!;
+          const pn = prediction.points[Math.min(i + 2, prediction.points.length - 1)]!;
+          const dx = pn[0] - pi[0];
+          const dy = pn[1] - pi[1];
+          const da = Math.atan2(dy, dx);
+          const ax = cx + pi[0] * s;
+          const ay = cy - pi[1] * s;
           ctx.beginPath();
-          ctx.strokeStyle = prediction.bound ? 'rgba(68,136,204,0.15)' : 'rgba(221,170,68,0.15)';
-          ctx.lineWidth = 8;
-          const firstX = cx + prediction.points[0]![0] * s;
-          const firstY = cy - prediction.points[0]![1] * s;
-          ctx.moveTo(firstX, firstY);
-          for (let i = 1; i < prediction.points.length; i++) {
-            const px = cx + prediction.points[i]![0] * s;
-            const py = cy - prediction.points[i]![1] * s;
-            ctx.lineTo(px, py);
-          }
-          ctx.stroke();
+          ctx.moveTo(ax + Math.cos(da) * 5, ay - Math.sin(da) * 5);
+          ctx.lineTo(ax + Math.cos(da + 1.8) * 7, ay - Math.sin(da + 1.8) * 7);
+          ctx.lineTo(ax + Math.cos(da - 1.8) * 7, ay - Math.sin(da - 1.8) * 7);
+          ctx.closePath();
+          ctx.fill();
+        }
 
-          // Main trajectory line
+        if (prediction.bound && isFinite(prediction.apoapsis) && isFinite(prediction.periapsis)) {
+          const apX = cx + prediction.apoapsis * s;
+          const peX = cx + prediction.periapsis * s;
+          // Ap marker
           ctx.beginPath();
-          ctx.strokeStyle = prediction.bound ? '#4488CC' : '#DDAA44';
-          ctx.lineWidth = 2;
-          ctx.setLineDash(prediction.bound ? [] : [6, 4]);
-          ctx.moveTo(firstX, firstY);
-          for (let i = 1; i < prediction.points.length; i++) {
-            const px = cx + prediction.points[i]![0] * s;
-            const py = cy - prediction.points[i]![1] * s;
-            ctx.lineTo(px, py);
-          }
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          // Orbit direction arrows along path
-          const arrowSteps = Math.max(4, Math.floor(prediction.points.length / 6));
-          ctx.fillStyle = prediction.bound ? '#4488CC' : '#DDAA44';
-          for (let i = arrowSteps; i < prediction.points.length - arrowSteps; i += arrowSteps) {
-            const pi = prediction.points[i]!;
-            const pn = prediction.points[Math.min(i + 2, prediction.points.length - 1)]!;
-            const dx = pn[0] - pi[0];
-            const dy = pn[1] - pi[1];
-            const da = Math.atan2(dy, dx);
-            const ax = cx + pi[0] * s;
-            const ay = cy - pi[1] * s;
-            ctx.beginPath();
-            ctx.moveTo(ax + Math.cos(da) * 5, ay - Math.sin(da) * 5);
-            ctx.lineTo(ax + Math.cos(da + 1.8) * 7, ay - Math.sin(da + 1.8) * 7);
-            ctx.lineTo(ax + Math.cos(da - 1.8) * 7, ay - Math.sin(da - 1.8) * 7);
-            ctx.closePath();
-            ctx.fill();
-          }
-
-          if (prediction.bound && isFinite(prediction.apoapsis) && isFinite(prediction.periapsis)) {
-            const apX = cx + prediction.apoapsis * s;
-            const peX = cx + prediction.periapsis * s;
-            // Ap marker
-            ctx.beginPath();
-            ctx.arc(apX, cy, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#FF8844';
-            ctx.fill();
-            ctx.font = 'bold 9px monospace';
-            ctx.fillStyle = '#FF8844';
-            ctx.fillText('Ap', apX + 6, cy + 3);
-            // Pe marker
-            ctx.beginPath();
-            ctx.arc(peX, cy, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#44DD88';
-            ctx.fill();
-            ctx.fillStyle = '#44DD88';
-            ctx.fillText('Pe', peX + 6, cy + 3);
-          }
+          ctx.arc(apX, cy, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#FF8844';
+          ctx.fill();
+          ctx.font = 'bold 9px monospace';
+          ctx.fillStyle = '#FF8844';
+          ctx.fillText('Ap', apX + 6, cy + 3);
+          // Pe marker
+          ctx.beginPath();
+          ctx.arc(peX, cy, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#44DD88';
+          ctx.fill();
+          ctx.fillStyle = '#44DD88';
+          ctx.fillText('Pe', peX + 6, cy + 3);
         }
       }
 
