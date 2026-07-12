@@ -68,6 +68,7 @@ export class FlightScene {
   private gearMeshes: THREE.Mesh[] = [];
   private missionTime = 0;
   private sasActive = false;
+  private sasPrograde = false;
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
   private countdownTimer = 0;
@@ -708,12 +709,18 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.toggleGear();
         e.preventDefault();
       } else if (e.key === 't') {
-        this.sasActive = !this.sasActive;
-        if (this.sasActive) {
-          this.sasTargetQuat.copy(this.rocketQuat);
-          toast.show('SAS enabled — holding attitude');
-        } else {
+        if (this.sasActive && !this.sasPrograde) {
+          this.sasPrograde = true;
+          toast.show('SAS — prograde hold');
+        } else if (this.sasActive && this.sasPrograde) {
+          this.sasActive = false;
+          this.sasPrograde = false;
           toast.show('SAS disabled');
+        } else {
+          this.sasActive = true;
+          this.sasPrograde = false;
+          this.sasTargetQuat.copy(this.rocketQuat);
+          toast.show('SAS — attitude hold');
         }
         e.preventDefault();
       } else if (e.key === 'f') {
@@ -823,8 +830,19 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       this.angularVel.y += yawInput * this.state.throttle * 4 * baseDt;
     }
 
-    // SAS: hold attitude by countering drift
+    // SAS: hold attitude or track prograde
     if (this.sasActive && !warpActive) {
+      if (this.sasPrograde) {
+        const velMagSas = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+        if (velMagSas > 0.1) {
+          const targetDir = new THREE.Vector3(
+            this.state.velocity[0] / velMagSas,
+            this.state.velocity[1] / velMagSas,
+            this.state.velocity[2] / velMagSas
+          );
+          this.sasTargetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
+        }
+      }
       const drift = new THREE.Quaternion().copy(this.sasTargetQuat).invert().multiply(this.rocketQuat);
       const angle = 2 * Math.acos(Math.abs(drift.w));
       if (angle > 0.001) {
@@ -1253,7 +1271,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
       }
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
-    this.hud.setSAS(this.sasActive);
+    this.hud.setSAS(this.sasActive, this.sasPrograde);
 
     // Track personal records
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;

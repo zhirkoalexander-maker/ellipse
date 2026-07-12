@@ -5,6 +5,7 @@ export class Controls {
   private keys: Set<string> = new Set();
   private stagePressed = false;
   private pauseToggle = false;
+  private throttleLimiter = 1.0;
   readonly state: FlightState;
   touch: TouchControls | null = null;
 

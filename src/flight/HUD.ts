@@ -167,11 +167,19 @@ export class HUD {
     this.recVal.textContent = text;
   }
 
-  setSAS(active: boolean): void {
+  setSAS(active: boolean, prograde: boolean = false): void {
     const el = this.root.querySelector('.sas-val');
     if (el) {
-      el.textContent = active ? 'ON' : 'OFF';
-      (el as HTMLElement).style.color = active ? '#44FF44' : '#666688';
+      if (!active) {
+        el.textContent = 'OFF';
+        (el as HTMLElement).style.color = '#666688';
+      } else if (prograde) {
+        el.textContent = 'PRG';
+        (el as HTMLElement).style.color = '#44FF44';
+      } else {
+        el.textContent = 'HLD';
+        (el as HTMLElement).style.color = '#44AAFF';
+      }
     }
   }
 
