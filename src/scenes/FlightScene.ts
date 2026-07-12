@@ -1112,6 +1112,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     let pe: number | undefined;
     let timeToAp: number | undefined;
     let timeToPe: number | undefined;
+    let eccentricity: number | undefined;
     const orbitRefBody = getReferenceBody(this.state.position, this.system);
     if (orbitRefBody && orbitRefBody.mass > 0) {
       const relPos: [number, number, number] = [
@@ -1125,9 +1126,10 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         pe = orbitPred.periapsis;
         timeToAp = orbitPred.timeToAp;
         timeToPe = orbitPred.timeToPe;
+        eccentricity = orbitPred.eccentricity;
       }
     }
-    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime);
+    this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
     this.hud.setSAS(this.sasActive);
 
     // Compute approximate delta-v remaining
