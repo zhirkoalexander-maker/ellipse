@@ -74,6 +74,7 @@ export class FlightScene {
   private countdownActive = false;
   private countdownEl: HTMLElement | null = null;
   private lastRefBody: string | null = null;
+  private impactMarker: THREE.Mesh | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -187,6 +188,16 @@ export class FlightScene {
       this.rocketGroup.add(foot);
       this.gearMeshes.push(foot);
     }
+
+    // Impact prediction marker (red ring on surface)
+    const markerGeom = new THREE.RingGeometry(0.05, 0.15, 16);
+    const markerMat = new THREE.MeshBasicMaterial({
+      color: 0xff3333, side: THREE.DoubleSide, transparent: true, opacity: 0.6, depthWrite: false
+    });
+    this.impactMarker = new THREE.Mesh(markerGeom, markerMat);
+    this.impactMarker.rotation.x = -Math.PI / 2;
+    this.impactMarker.visible = false;
+    this.sceneMgr.scene.add(this.impactMarker);
 
     for (const body of system.bodies) {
       const pbody = body as any;
@@ -1206,6 +1217,37 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         timeToAp = orbitPred.timeToAp;
         timeToPe = orbitPred.timeToPe;
         eccentricity = orbitPred.eccentricity;
+      }
+    }
+
+    // Update impact marker position
+    if (this.impactMarker) {
+      const refBodyMarker = getReferenceBody(this.state.position, this.system);
+      const rPos: [number, number, number] = [
+        (this.state.position[0] - refBodyMarker.position[0]),
+        (this.state.position[1] - refBodyMarker.position[1]),
+        (this.state.position[2] - refBodyMarker.position[2]),
+      ];
+      const markerPred = predictOrbit(rPos, this.state.velocity, refBodyMarker.mass, 5e14, 360);
+      if (markerPred.points.length > 10 && !markerPred.bound) {
+        const last = markerPred.points[markerPred.points.length - 1]!;
+        const surfaceR = (refBodyMarker as any).getSurfaceRadiusAt?.([last[0], 0, last[1]]) ?? (refBodyMarker as any).radius ?? 6371000;
+        const surfacePos: [number, number, number] = [
+          refBodyMarker.position[0] + last[0],
+          0,
+          refBodyMarker.position[2] + last[1],
+        ];
+        const dir = Math.sqrt(last[0]*last[0] + last[1]*last[1]);
+        if (dir > surfaceR * 0.5) {
+          const hitX = refBodyMarker.position[0] + last[0] / dir * surfaceR;
+          const hitZ = refBodyMarker.position[2] + last[1] / dir * surfaceR;
+          this.impactMarker.position.set(hitX * VISUAL_SCALE, 0, hitZ * VISUAL_SCALE);
+          this.impactMarker.visible = true;
+        } else {
+          this.impactMarker.visible = false;
+        }
+      } else {
+        this.impactMarker.visible = false;
       }
     }
     this.hud.update(this.state, this.system, 0, stageCount, ape, pe, timeToAp, timeToPe, this.missionTime, eccentricity);
