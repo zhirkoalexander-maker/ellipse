@@ -397,45 +397,46 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   const isLarge = size === 'L' || size === 'XL';
 
   // === COLOR MAP ===
-  // Light grey base (like real rocket tanks)
-  colorCtx.fillStyle = '#ecece8';
+  // Light grey-white base (like real rocket tanks)
+  colorCtx.fillStyle = '#e8e8e4';
   colorCtx.fillRect(0, 0, W, H);
 
-  // Subtle vertical gradient
+  // Subtle vertical gradient for lighting effect
   const grad = colorCtx.createLinearGradient(0, 0, 0, H);
   if (grad) {
-    grad.addColorStop(0, 'rgba(0,0,0,0.04)');
-    grad.addColorStop(0.5, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.03)');
+    grad.addColorStop(0, 'rgba(0,0,0,0.03)');
+    grad.addColorStop(0.3, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.04)');
     colorCtx.fillStyle = grad;
     colorCtx.fillRect(0, 0, W, H);
   }
 
   // Horizontal weld seams
-  const panelCount = isSmall ? 6 : isLarge ? 16 : 10;
+  const panelCount = isSmall ? 4 : isLarge ? 12 : 8;
   const panelH = H / panelCount;
-  colorCtx.strokeStyle = '#d0d0ca';
-  colorCtx.lineWidth = 3;
   for (let y = panelH; y < H; y += panelH) {
+    // Seam shadow
+    colorCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+    colorCtx.lineWidth = 2;
     colorCtx.beginPath();
     colorCtx.moveTo(0, y);
     colorCtx.lineTo(W, y);
     colorCtx.stroke();
-    // Weld bead
-    colorCtx.strokeStyle = 'rgba(255,255,255,0.12)';
+
+    // Weld bead highlight
+    colorCtx.strokeStyle = 'rgba(255,255,255,0.15)';
     colorCtx.lineWidth = 1.5;
     colorCtx.beginPath();
     colorCtx.moveTo(0, y - 1.5);
     colorCtx.lineTo(W, y - 1.5);
     colorCtx.stroke();
-    colorCtx.strokeStyle = '#d0d0ca';
-    colorCtx.lineWidth = 3;
   }
 
   // Vertical stringers
-  const stringerCount = isSmall ? 12 : isLarge ? 28 : 18;
-  colorCtx.strokeStyle = 'rgba(90,90,100,0.06)';
-  colorCtx.lineWidth = 2;
+  const stringerCount = isSmall ? 8 : isLarge ? 24 : 14;
+  colorCtx.strokeStyle = 'rgba(80,80,90,0.04)';
+  colorCtx.lineWidth = 1.5;
   for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     colorCtx.beginPath();
@@ -445,59 +446,113 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   // Rivets along weld seams
-  colorCtx.fillStyle = '#c8c8c2';
+  colorCtx.fillStyle = '#c0c0ba';
   for (let y = panelH; y < H; y += panelH) {
-    for (let x = 40; x < W - 40; x += 80) {
+    for (let x = 30; x < W - 30; x += 60) {
       colorCtx.beginPath();
-      colorCtx.arc(x, y, 5, 0, Math.PI * 2);
+      colorCtx.arc(x, y, 4, 0, Math.PI * 2);
       colorCtx.fill();
-      colorCtx.strokeStyle = '#b0b0aa';
-      colorCtx.lineWidth = 1;
+      colorCtx.strokeStyle = '#a0a09a';
+      colorCtx.lineWidth = 0.5;
       colorCtx.stroke();
     }
   }
 
-  // Insulation foam patches (SpaceX Falcon 9 style — orange/brown)
-  const foamCount = isSmall ? 4 : isLarge ? 14 : 8;
+  // US flag pattern on larger tanks
+  if (isLarge) {
+    const flagX = W * 0.08, flagY = H * 0.15;
+    const flagW = W * 0.12, flagH = H * 0.08;
+    // Blue field
+    colorCtx.fillStyle = '#002868';
+    colorCtx.fillRect(flagX, flagY, flagW * 0.4, flagH);
+    // Red stripes
+    for (let i = 0; i < 7; i++) {
+      colorCtx.fillStyle = i % 2 === 0 ? '#BF0A30' : '#ffffff';
+      colorCtx.fillRect(flagX + flagW * 0.4, flagY + (i / 7) * flagH, flagW * 0.6, flagH / 7);
+    }
+    // White stars (simplified as dots)
+    colorCtx.fillStyle = '#ffffff';
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 3; col++) {
+        colorCtx.beginPath();
+        colorCtx.arc(flagX + (col + 0.5) * (flagW * 0.4 / 3), flagY + (row + 0.5) * (flagH / 5), 2, 0, Math.PI * 2);
+        colorCtx.fill();
+      }
+    }
+  }
+
+  // "USA" text on tanks
+  colorCtx.fillStyle = 'rgba(30,40,80,0.12)';
+  colorCtx.font = `bold ${H * 0.06}px monospace`;
+  colorCtx.textAlign = 'center';
+  colorCtx.fillText('USA', W / 2, H * 0.25);
+
+  // Insulation foam patches (SpaceX Falcon 9 style)
+  const foamCount = isSmall ? 3 : isLarge ? 12 : 6;
   for (let i = 0; i < foamCount; i++) {
-    const x = rng() * W * 0.85 + W * 0.075;
-    const y = rng() * H * 0.75 + H * 0.1;
-    const w = 50 + rng() * 180;
-    const h = 40 + rng() * 120;
-    // Orange-brown foam base
-    colorCtx.fillStyle = `rgb(${200 + rng() * 30}, ${160 + rng() * 20}, ${100 + rng() * 20})`;
-    colorCtx.globalAlpha = 0.7 + rng() * 0.25;
+    const x = rng() * W * 0.8 + W * 0.1;
+    const y = rng() * H * 0.7 + H * 0.15;
+    const w = 60 + rng() * 200;
+    const h = 50 + rng() * 140;
+
+    // Orange-brown foam base with variation
+    const fr = 180 + rng() * 40;
+    const fg = 140 + rng() * 30;
+    const fb = 80 + rng() * 30;
+    colorCtx.fillStyle = `rgb(${fr}, ${fg}, ${fb})`;
+    colorCtx.globalAlpha = 0.6 + rng() * 0.3;
     colorCtx.fillRect(x, y, w, h);
-    // Foam texture dots
-    colorCtx.fillStyle = `rgb(${180 + rng() * 20}, ${140 + rng() * 20}, ${80 + rng() * 20})`;
-    for (let d = 0; d < 20; d++) {
+
+    // Foam texture dots/strokes
+    colorCtx.fillStyle = `rgb(${fr - 20}, ${fg - 15}, ${fb - 10})`;
+    for (let d = 0; d < 15; d++) {
       colorCtx.beginPath();
-      colorCtx.arc(x + rng() * w, y + rng() * h, 2 + rng() * 5, 0, Math.PI * 2);
+      colorCtx.arc(x + rng() * w, y + rng() * h, 2 + rng() * 6, 0, Math.PI * 2);
+      colorCtx.fill();
+    }
+
+    // Frost/ice patches on foam (white semi-transparent)
+    colorCtx.fillStyle = 'rgba(200, 220, 240, 0.15)';
+    for (let d = 0; d < 5; d++) {
+      colorCtx.beginPath();
+      colorCtx.arc(x + rng() * w, y + rng() * h, 5 + rng() * 15, 0, Math.PI * 2);
       colorCtx.fill();
     }
     colorCtx.globalAlpha = 1;
   }
 
-  // Top/bottom domes
-  colorCtx.fillStyle = '#6a6a70';
-  colorCtx.fillRect(0, 0, W, H * 0.015);
-  colorCtx.fillRect(0, H * 0.985, W, H * 0.015);
+  // Top/bottom domes (slightly darker)
+  colorCtx.fillStyle = '#606068';
+  colorCtx.fillRect(0, 0, W, H * 0.012);
+  colorCtx.fillRect(0, H * 0.988, W, H * 0.012);
 
-  // Vertical seam
-  colorCtx.strokeStyle = 'rgba(90,90,100,0.35)';
-  colorCtx.lineWidth = 4;
+  // Vertical seam (welded joint along the side)
+  colorCtx.strokeStyle = 'rgba(80,80,90,0.3)';
+  colorCtx.lineWidth = 3;
   colorCtx.beginPath();
   colorCtx.moveTo(W * 0.5, 0);
   colorCtx.lineTo(W * 0.5, H);
   colorCtx.stroke();
+
+  // Subtle dirt/grime streaks
+  colorCtx.strokeStyle = 'rgba(60,50,40,0.03)';
+  colorCtx.lineWidth = 1;
+  for (let i = 0; i < 30; i++) {
+    const sx = rng() * W;
+    const sy = rng() * H;
+    colorCtx.beginPath();
+    colorCtx.moveTo(sx, sy);
+    colorCtx.lineTo(sx + (rng() - 0.5) * 20, sy + rng() * H * 0.3);
+    colorCtx.stroke();
+  }
 
   // === NORMAL MAP ===
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
   // Panel seam ridges
-  normalCtx.strokeStyle = '#b8b8b8';
-  normalCtx.lineWidth = 10;
+  normalCtx.strokeStyle = '#b0b0b0';
+  normalCtx.lineWidth = 8;
   for (let y = panelH; y < H; y += panelH) {
     normalCtx.beginPath();
     normalCtx.moveTo(0, y);
@@ -506,8 +561,8 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   // Stringers
-  normalCtx.strokeStyle = '#989898';
-  normalCtx.lineWidth = 4;
+  normalCtx.strokeStyle = '#909090';
+  normalCtx.lineWidth = 3;
   for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     normalCtx.beginPath();
@@ -517,22 +572,22 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   // Rivets
-  normalCtx.fillStyle = '#d0d0d0';
+  normalCtx.fillStyle = '#c8c8c8';
   for (let y = panelH; y < H; y += panelH) {
-    for (let x = 40; x < W - 40; x += 80) {
+    for (let x = 30; x < W - 30; x += 60) {
       normalCtx.beginPath();
-      normalCtx.arc(x, y, 6, 0, Math.PI * 2);
+      normalCtx.arc(x, y, 5, 0, Math.PI * 2);
       normalCtx.fill();
     }
   }
 
   // === ROUGHNESS MAP ===
-  roughCtx.fillStyle = '#a0a0a0';
+  roughCtx.fillStyle = '#909090';
   roughCtx.fillRect(0, 0, W, H);
 
   // Seams rougher
-  roughCtx.strokeStyle = '#d0d0d0';
-  roughCtx.lineWidth = 12;
+  roughCtx.strokeStyle = '#c0c0c0';
+  roughCtx.lineWidth = 10;
   for (let y = panelH; y < H; y += panelH) {
     roughCtx.beginPath();
     roughCtx.moveTo(0, y);
@@ -542,27 +597,30 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
 
   // Foam areas very rough
   for (let i = 0; i < foamCount; i++) {
-    const x = rng() * W * 0.85 + W * 0.075;
-    const y = rng() * H * 0.75 + H * 0.1;
-    const w = 50 + rng() * 180;
-    const h = 40 + rng() * 120;
+    const x = rng() * W * 0.8 + W * 0.1;
+    const y = rng() * H * 0.7 + H * 0.15;
+    const w = 60 + rng() * 200;
+    const h = 50 + rng() * 140;
     roughCtx.fillStyle = '#e0e0e0';
     roughCtx.fillRect(x, y, w, h);
   }
 
   // Domes smoother
-  roughCtx.fillStyle = '#606060';
-  roughCtx.fillRect(0, 0, W, H * 0.015);
-  roughCtx.fillRect(0, H * 0.985, W, H * 0.015);
+  roughCtx.fillStyle = '#505050';
+  roughCtx.fillRect(0, 0, W, H * 0.012);
+  roughCtx.fillRect(0, H * 0.988, W, H * 0.012);
 
   // === METALNESS MAP ===
-  metalCtx.fillStyle = '#080808';
+  metalCtx.fillStyle = '#050505';
   metalCtx.fillRect(0, 0, W, H);
 
-  metalCtx.fillStyle = '#d0d0d0';
-  metalCtx.fillRect(0, 0, W, H * 0.015);
-  metalCtx.fillRect(0, H * 0.985, W, H * 0.015);
-  metalCtx.fillStyle = '#707070';
+  // Domes slightly metallic (bare metal)
+  metalCtx.fillStyle = '#c0c0c0';
+  metalCtx.fillRect(0, 0, W, H * 0.012);
+  metalCtx.fillRect(0, H * 0.988, W, H * 0.012);
+
+  // Vertical seam metallic
+  metalCtx.fillStyle = '#606060';
   metalCtx.fillRect(W * 0.49, 0, W * 0.02, H);
 
   // === AO MAP ===
@@ -570,7 +628,7 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   aoCtx.fillRect(0, 0, W, H);
 
   aoCtx.strokeStyle = '#808080';
-  aoCtx.lineWidth = 14;
+  aoCtx.lineWidth = 12;
   for (let y = panelH; y < H; y += panelH) {
     aoCtx.beginPath();
     aoCtx.moveTo(0, y);
@@ -579,7 +637,7 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
   }
 
   aoCtx.strokeStyle = '#b0b0b0';
-  aoCtx.lineWidth = 8;
+  aoCtx.lineWidth = 6;
   for (let i = 1; i < stringerCount; i++) {
     const x = (i / stringerCount) * W;
     aoCtx.beginPath();
@@ -588,7 +646,7 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
     aoCtx.stroke();
   }
 
-  addFilmGrain(colorCtx, W, H, 0.012);
+  addFilmGrain(colorCtx, W, H, 0.010);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
@@ -628,32 +686,52 @@ export function generateCapsuleTexture(): TextureSet {
     colorCtx.stroke();
   }
 
-  // Heat shield (dark ablative)
+  // Heat shield (dark ablative) with better detail
   colorCtx.fillStyle = '#2a2a2e';
   colorCtx.fillRect(0, H * 0.78, W, H * 0.22);
 
-  // Ablative texture dots
-  for (let i = 0; i < 1500; i++) {
+  // Tiled pattern (Shuttle-style tiles)
+  colorCtx.strokeStyle = 'rgba(40,40,45,0.5)';
+  colorCtx.lineWidth = 1;
+  for (let x = 0; x < W; x += 32) {
+    colorCtx.beginPath(); colorCtx.moveTo(x, H * 0.78); colorCtx.lineTo(x, H); colorCtx.stroke();
+  }
+  for (let y = H * 0.78; y < H; y += 32) {
+    colorCtx.beginPath(); colorCtx.moveTo(0, y); colorCtx.lineTo(W, y); colorCtx.stroke();
+  }
+
+  // Ablative texture dots with color variation
+  for (let i = 0; i < 2000; i++) {
     const x = rng() * W;
     const y = H * 0.78 + rng() * H * 0.22;
-    const r = 1 + rng() * 4;
-    const b = 25 + rng() * 45;
-    colorCtx.fillStyle = `rgb(${b},${b},${b + 3})`;
+    const r = 1 + rng() * 3;
+    const b = 25 + rng() * 50;
+    const warmth = rng() * 15;
+    colorCtx.fillStyle = `rgb(${b + warmth},${b},${b - warmth})`;
     colorCtx.beginPath();
     colorCtx.arc(x, y, r, 0, Math.PI * 2);
     colorCtx.fill();
   }
 
-  // Reentry char streaks
-  colorCtx.strokeStyle = 'rgba(10,10,12,0.35)';
-  colorCtx.lineWidth = 1 + rng() * 2;
-  for (let i = 0; i < 50; i++) {
-    const x = rng() * W;
-    const y = H * 0.78 + rng() * H * 0.18;
-    const len = 30 + rng() * 120;
+  // Reentry char streaks with more variation
+  for (let i = 0; i < 60; i++) {
+    const sx = rng() * W;
+    const sy = H * 0.78 + rng() * H * 0.15;
+    const len = 30 + rng() * 150;
+    const drift = (rng() - 0.5) * 50;
+    colorCtx.strokeStyle = `rgba(20,15,10,${0.2 + rng() * 0.3})`;
+    colorCtx.lineWidth = 1 + rng() * 3;
     colorCtx.beginPath();
-    colorCtx.moveTo(x, y);
-    colorCtx.lineTo(x + (rng() - 0.5) * 40, y + len);
+    colorCtx.moveTo(sx, sy);
+    colorCtx.lineTo(sx + drift, sy + len);
+    colorCtx.stroke();
+
+    // Glowing streak edge
+    colorCtx.strokeStyle = `rgba(60,40,20,${0.05 + rng() * 0.1})`;
+    colorCtx.lineWidth = 3 + rng() * 5;
+    colorCtx.beginPath();
+    colorCtx.moveTo(sx - drift * 0.1, sy + len * 0.2);
+    colorCtx.lineTo(sx + drift, sy + len);
     colorCtx.stroke();
   }
 
@@ -857,15 +935,15 @@ export function generateEngineTexture(): TextureSet {
   const rng = seededRandomFast(54321);
 
   // === COLOR MAP ===
-  // Upper engine body - Inconel/stainless steel
+  // Upper engine body - dark inconel/steel
   colorCtx.fillStyle = '#3a3a40';
-  colorCtx.fillRect(0, 0, W, H * 0.35);
+  colorCtx.fillRect(0, 0, W, H * 0.30);
 
   // Subtle brushed metal texture on body
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 150; i++) {
     const x = rng() * W;
-    const y = rng() * H * 0.35;
-    const len = 5 + rng() * 30;
+    const y = rng() * H * 0.30;
+    const len = 5 + rng() * 25;
     colorCtx.strokeStyle = `rgba(255,255,255,${0.02 + rng() * 0.03})`;
     colorCtx.lineWidth = 0.5;
     colorCtx.beginPath();
@@ -876,136 +954,144 @@ export function generateEngineTexture(): TextureSet {
 
   // Mid flange (bolted connection)
   colorCtx.fillStyle = '#4a4a50';
-  colorCtx.fillRect(0, H * 0.35, W, H * 0.06);
+  colorCtx.fillRect(0, H * 0.30, W, H * 0.05);
 
-  // Bolt holes on flange
+  // Bolt pattern on flange
   colorCtx.fillStyle = '#2a2a2e';
-  for (let x = 16; x < W; x += 32) {
+  for (let x = 20; x < W; x += 30) {
     colorCtx.beginPath();
-    colorCtx.arc(x, H * 0.38, 5, 0, Math.PI * 2);
+    colorCtx.arc(x, H * 0.325, 4, 0, Math.PI * 2);
+    colorCtx.fill();
+    colorCtx.strokeStyle = '#5a5a60';
+    colorCtx.lineWidth = 0.5;
+    colorCtx.stroke();
+  }
+
+  // Nozzle - copper alloy with regenerative cooling channels
+  for (let py = H * 0.35; py < H * 0.92; py++) {
+    const t = (py - H * 0.35) / (H * 0.57);
+    const r = Math.round(180 + 60 * (1 - t));
+    const g = Math.round(100 + 30 * (1 - t));
+    const b = Math.round(40 + 15 * (1 - t));
+    colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    colorCtx.fillRect(0, py, W, 1);
+  }
+
+  // Cooling channel ridges (vertical lines)
+  colorCtx.strokeStyle = 'rgba(100,60,25,0.3)';
+  colorCtx.lineWidth = 1;
+  for (let x = 6; x < W; x += 12) {
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, H * 0.35);
+    colorCtx.lineTo(x, H * 0.92);
+    colorCtx.stroke();
+  }
+
+  // Soot/carbon buildup
+  const sootGrad = colorCtx.createLinearGradient(0, H * 0.80, 0, H);
+  if (sootGrad) {
+    sootGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    sootGrad.addColorStop(0.4, 'rgba(0,0,0,0.2)');
+    sootGrad.addColorStop(0.8, 'rgba(0,0,0,0.5)');
+    sootGrad.addColorStop(1, 'rgba(0,0,0,0.7)');
+    colorCtx.fillStyle = sootGrad;
+    colorCtx.fillRect(0, H * 0.80, W, H * 0.20);
+  }
+
+  // Nozzle exit rim - lighter metal
+  colorCtx.fillStyle = '#6a6a70';
+  colorCtx.fillRect(0, H * 0.92, W, H * 0.03);
+  colorCtx.fillStyle = '#8a8a90';
+  colorCtx.fillRect(0, H * 0.95, W, H * 0.02);
+
+  // Fuel/oxidizer inlet pipes on upper body
+  colorCtx.fillStyle = '#2a2a30';
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const px = W * 0.5 + Math.cos(a) * W * 0.38;
+    const py = H * 0.15 + Math.sin(a) * H * 0.04;
+    colorCtx.beginPath();
+    colorCtx.arc(px, py, W * 0.04, 0, Math.PI * 2);
     colorCtx.fill();
     colorCtx.strokeStyle = '#5a5a60';
     colorCtx.lineWidth = 1;
     colorCtx.stroke();
   }
 
-  // Nozzle - copper alloy (regenerative cooling channels visible)
-  // Gradient from copper to dark copper
-  for (let py = H * 0.41; py < H * 0.95; py++) {
-    const t = (py - H * 0.41) / (H * 0.54);
-    // Copper color shifting to darker oxidized copper
-    const r = Math.round(180 + 40 * (1 - t));
-    const g = Math.round(100 + 20 * (1 - t));
-    const b = Math.round(40 + 10 * (1 - t));
-    colorCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    colorCtx.fillRect(0, py, W, 1);
-  }
-
-  // Cooling channel ridges (vertical lines)
-  colorCtx.strokeStyle = 'rgba(120,70,30,0.4)';
-  colorCtx.lineWidth = 1;
-  for (let x = 8; x < W; x += 16) {
-    colorCtx.beginPath();
-    colorCtx.moveTo(x, H * 0.41);
-    colorCtx.lineTo(x, H * 0.95);
-    colorCtx.stroke();
-  }
-
-  // Soot/carbon buildup near exit (darker)
-  const sootGrad = colorCtx.createLinearGradient(0, H * 0.85, 0, H);
-  if (sootGrad) {
-    sootGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    sootGrad.addColorStop(0.5, 'rgba(0,0,0,0.3)');
-    sootGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
-    colorCtx.fillStyle = sootGrad;
-    colorCtx.fillRect(0, H * 0.85, W, H * 0.15);
-  }
-
-  // Nozzle exit rim - Inconel (high temp alloy)
-  colorCtx.fillStyle = '#5a5a60';
-  colorCtx.fillRect(0, H * 0.95, W, H * 0.025);
-  colorCtx.fillStyle = '#7a7a80';
-  colorCtx.fillRect(0, H * 0.975, W, H * 0.025);
-
-  // Gimbal mounting points (4 lugs)
-  colorCtx.fillStyle = '#4a4a50';
-  for (let i = 0; i < 4; i++) {
-    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const x = W * 0.5 + Math.cos(angle) * W * 0.42;
-    const y = H * 0.25 + Math.sin(angle) * H * 0.05;
-    colorCtx.fillRect(x - 15, y - 15, 30, 30);
-    colorCtx.strokeStyle = '#6a6a70';
-    colorCtx.lineWidth = 2;
-    colorCtx.strokeRect(x - 15, y - 15, 30, 30);
-  }
+  // Gimbal mounting ring
+  colorCtx.strokeStyle = '#6a6a70';
+  colorCtx.lineWidth = 3;
+  colorCtx.beginPath();
+  colorCtx.arc(W / 2, H * 0.12, W * 0.3, 0, Math.PI * 2);
+  colorCtx.stroke();
 
   // === NORMAL MAP ===
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
-  // Body brushed texture
+  // Brushed texture on body
   normalCtx.strokeStyle = '#909090';
   normalCtx.lineWidth = 1;
-  for (let x = 0; x < W; x += 4) {
+  for (let x = 0; x < W; x += 3) {
     normalCtx.beginPath();
     normalCtx.moveTo(x, 0);
-    normalCtx.lineTo(x, H * 0.35);
+    normalCtx.lineTo(x, H * 0.30);
     normalCtx.stroke();
   }
 
   // Flange bolts
   normalCtx.fillStyle = '#c0c0c0';
-  for (let x = 16; x < W; x += 32) {
+  for (let x = 20; x < W; x += 30) {
     normalCtx.beginPath();
-    normalCtx.arc(x, H * 0.38, 5, 0, Math.PI * 2);
+    normalCtx.arc(x, H * 0.325, 4, 0, Math.PI * 2);
     normalCtx.fill();
   }
 
-  // Cooling channels
+  // Cooling channels (more prominent)
   normalCtx.strokeStyle = '#606060';
-  normalCtx.lineWidth = 3;
-  for (let x = 8; x < W; x += 16) {
+  normalCtx.lineWidth = 2;
+  for (let x = 6; x < W; x += 12) {
     normalCtx.beginPath();
-    normalCtx.moveTo(x, H * 0.41);
-    normalCtx.lineTo(x, H * 0.95);
+    normalCtx.moveTo(x, H * 0.35);
+    normalCtx.lineTo(x, H * 0.92);
     normalCtx.stroke();
   }
 
-  // Nozzle seams
+  // Seams
   normalCtx.strokeStyle = '#a0a0a0';
-  normalCtx.lineWidth = 6;
+  normalCtx.lineWidth = 5;
   normalCtx.beginPath();
-  normalCtx.moveTo(0, H * 0.41);
-  normalCtx.lineTo(W, H * 0.41);
+  normalCtx.moveTo(0, H * 0.30);
+  normalCtx.lineTo(W, H * 0.30);
   normalCtx.stroke();
   normalCtx.beginPath();
-  normalCtx.moveTo(0, H * 0.95);
-  normalCtx.lineTo(W, H * 0.95);
+  normalCtx.moveTo(0, H * 0.92);
+  normalCtx.lineTo(W, H * 0.92);
   normalCtx.stroke();
 
   // === ROUGHNESS MAP ===
-  roughCtx.fillStyle = '#505050'; // Polished metal body
-  roughCtx.fillRect(0, 0, W, H * 0.35);
+  roughCtx.fillStyle = '#404040'; // Smooth polished body
+  roughCtx.fillRect(0, 0, W, H * 0.30);
 
   roughCtx.fillStyle = '#606060'; // Flange
-  roughCtx.fillRect(0, H * 0.35, W, H * 0.06);
+  roughCtx.fillRect(0, H * 0.30, W, H * 0.05);
 
-  roughCtx.fillStyle = '#808080'; // Copper nozzle - somewhat rough
-  roughCtx.fillRect(0, H * 0.41, W, H * 0.54);
+  roughCtx.fillStyle = '#707070'; // Copper nozzle
+  roughCtx.fillRect(0, H * 0.35, W, H * 0.57);
 
-  roughCtx.fillStyle = '#b0b0b0'; // Soot - very rough
-  roughCtx.fillRect(0, H * 0.85, W, H * 0.15);
+  roughCtx.fillStyle = '#c0c0c0'; // Soot area very rough
+  roughCtx.fillRect(0, H * 0.80, W, H * 0.20);
 
-  roughCtx.fillStyle = '#404040'; // Inconel rim - smoother
-  roughCtx.fillRect(0, H * 0.95, W, H * 0.05);
+  roughCtx.fillStyle = '#303030'; // Exit rim smoother
+  roughCtx.fillRect(0, H * 0.92, W, H * 0.08);
 
   // === METALNESS MAP ===
   metalCtx.fillStyle = '#e0e0e0'; // All metallic
   metalCtx.fillRect(0, 0, W, H);
 
-  // Slightly less metallic where soot covers
-  metalCtx.fillStyle = '#808080';
-  metalCtx.fillRect(0, H * 0.85, W, H * 0.15);
+  // Less metallic where soot covers
+  metalCtx.fillStyle = '#606060';
+  metalCtx.fillRect(0, H * 0.80, W, H * 0.20);
 
   // === AO MAP ===
   aoCtx.fillStyle = '#ffffff';
@@ -1013,32 +1099,32 @@ export function generateEngineTexture(): TextureSet {
 
   // Flange shadow
   aoCtx.strokeStyle = '#606060';
-  aoCtx.lineWidth = 12;
+  aoCtx.lineWidth = 10;
+  aoCtx.beginPath();
+  aoCtx.moveTo(0, H * 0.30);
+  aoCtx.lineTo(W, H * 0.30);
+  aoCtx.stroke();
   aoCtx.beginPath();
   aoCtx.moveTo(0, H * 0.35);
   aoCtx.lineTo(W, H * 0.35);
   aoCtx.stroke();
-  aoCtx.beginPath();
-  aoCtx.moveTo(0, H * 0.41);
-  aoCtx.lineTo(W, H * 0.41);
-  aoCtx.stroke();
 
-  // Cooling channel shadows
+  // Cooling channels shadows
   aoCtx.strokeStyle = '#808080';
-  aoCtx.lineWidth = 4;
-  for (let x = 8; x < W; x += 16) {
+  aoCtx.lineWidth = 3;
+  for (let x = 6; x < W; x += 12) {
     aoCtx.beginPath();
-    aoCtx.moveTo(x, H * 0.41);
-    aoCtx.lineTo(x, H * 0.95);
+    aoCtx.moveTo(x, H * 0.35);
+    aoCtx.lineTo(x, H * 0.92);
     aoCtx.stroke();
   }
 
-  // Nozzle exit rim
+  // Exit rim shadow
   aoCtx.strokeStyle = '#707070';
-  aoCtx.lineWidth = 10;
+  aoCtx.lineWidth = 8;
   aoCtx.beginPath();
-  aoCtx.moveTo(0, H * 0.95);
-  aoCtx.lineTo(W, H * 0.95);
+  aoCtx.moveTo(0, H * 0.92);
+  aoCtx.lineTo(W, H * 0.92);
   aoCtx.stroke();
 
   addFilmGrain(colorCtx, W, H, 0.01);
@@ -1727,80 +1813,149 @@ export function generateGoldTexture(): TextureSet {
   const rng = seededRandomFast(44444);
 
   // === COLOR MAP ===
-  // Gold/mylar foil — uneven, creased, oxidized
+  // Multi-layer gold/mylar foil: richer, more reflective
+  // Base: warm golden gradient with subtle vertical variation
   const goldGrad = colorCtx.createLinearGradient(0, 0, 0, H);
   if (goldGrad) {
-    goldGrad.addColorStop(0, '#c49a38');
-    goldGrad.addColorStop(0.15, '#daad4a');
-    goldGrad.addColorStop(0.3, '#b8842a');
-    goldGrad.addColorStop(0.5, '#d4a843');
-    goldGrad.addColorStop(0.65, '#c49030');
-    goldGrad.addColorStop(0.8, '#d8b050');
-    goldGrad.addColorStop(1, '#c49a38');
+    goldGrad.addColorStop(0, '#b8862e');
+    goldGrad.addColorStop(0.08, '#dba44a');
+    goldGrad.addColorStop(0.15, '#e8b858');
+    goldGrad.addColorStop(0.22, '#cf9a3e');
+    goldGrad.addColorStop(0.3, '#b0802e');
+    goldGrad.addColorStop(0.38, '#d8a84a');
+    goldGrad.addColorStop(0.45, '#eac05e');
+    goldGrad.addColorStop(0.52, '#c89838');
+    goldGrad.addColorStop(0.6, '#b0802e');
+    goldGrad.addColorStop(0.68, '#d8a84a');
+    goldGrad.addColorStop(0.75, '#e8b858');
+    goldGrad.addColorStop(0.85, '#c89838');
+    goldGrad.addColorStop(1, '#b8862e');
     colorCtx.fillStyle = goldGrad;
     colorCtx.fillRect(0, 0, W, H);
   }
 
-  // Foil crinkle patches (light and dark creases)
-  for (let i = 0; i < 400; i++) {
-    const x = rng() * W;
-    const y = rng() * H;
-    const w = 5 + rng() * 60;
-    const h = 3 + rng() * 30;
-    const bright = rng() > 0.5;
-    if (bright) {
-      colorCtx.fillStyle = `rgba(255,225,150,${0.05 + rng() * 0.1})`;
-    } else {
-      colorCtx.fillStyle = `rgba(80,60,20,${0.04 + rng() * 0.08})`;
-    }
-    colorCtx.fillRect(x, y, w, h);
+  // Large foil panel divisions (simulating blanket patches)
+  for (let i = 0; i < 12; i++) {
+    const x = 50 + rng() * (W - 100);
+    const y = 50 + rng() * (H - 100);
+    const pw = 80 + rng() * 300;
+    const ph = 80 + rng() * 300;
+    // Seam border
+    colorCtx.strokeStyle = `rgba(80,55,15,${0.15 + rng() * 0.15})`;
+    colorCtx.lineWidth = 1 + rng() * 2;
+    colorCtx.strokeRect(x, y, pw, ph);
+    // Slight color shift inside each patch
+    const shift = (rng() - 0.5) * 0.06;
+    colorCtx.fillStyle = `rgba(200,160,60,${shift > 0 ? shift : 0})`;
+    colorCtx.fillRect(x + 2, y + 2, pw - 4, ph - 4);
   }
 
-  // Sharp crease lines
-  colorCtx.strokeStyle = 'rgba(60,40,10,0.3)';
-  colorCtx.lineWidth = 0.5;
-  for (let i = 0; i < 150; i++) {
+  // Complex crinkles: multiple generations
+  // Generation 1: large rolling creases
+  colorCtx.strokeStyle = 'rgba(70,50,15,0.12)';
+  colorCtx.lineWidth = 3 + rng() * 4;
+  for (let i = 0; i < 60; i++) {
     const x = rng() * W;
     const y = rng() * H;
     const angle = rng() * Math.PI * 2;
-    const len = 5 + rng() * 40;
+    const len = 40 + rng() * 150;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    const cx1 = x + Math.cos(angle + 0.3) * len * 0.5;
+    const cy1 = y + Math.sin(angle + 0.3) * len * 0.5;
+    colorCtx.quadraticCurveTo(cx1, cy1, x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    colorCtx.stroke();
+  }
+
+  // Generation 2: medium folding creases
+  colorCtx.strokeStyle = 'rgba(60,40,10,0.18)';
+  colorCtx.lineWidth = 1.5;
+  for (let i = 0; i < 120; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 15 + rng() * 60;
     colorCtx.beginPath();
     colorCtx.moveTo(x, y);
     colorCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     colorCtx.stroke();
   }
 
-  // Oxidation / dirt spots
-  for (let i = 0; i < 80; i++) {
+  // Generation 3: tiny sharp creases (bright edges for specular)
+  colorCtx.strokeStyle = 'rgba(255,230,160,0.15)';
+  colorCtx.lineWidth = 0.5;
+  for (let i = 0; i < 250; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 3 + rng() * 20;
-    const b = 60 + rng() * 60;
-    const g = 50 + rng() * 40;
-    colorCtx.fillStyle = `rgba(${b + 30}, ${g}, ${b / 2}, ${0.1 + rng() * 0.2})`;
+    const angle = rng() * Math.PI * 2;
+    const len = 3 + rng() * 25;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x, y);
+    colorCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    colorCtx.stroke();
+  }
+
+  // Dark crease shadows
+  colorCtx.strokeStyle = 'rgba(30,20,5,0.1)';
+  colorCtx.lineWidth = 0.5;
+  for (let i = 0; i < 200; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 4 + rng() * 30;
+    colorCtx.beginPath();
+    colorCtx.moveTo(x + 1, y + 1);
+    colorCtx.lineTo(x + Math.cos(angle) * len + 1, y + Math.sin(angle) * len + 1);
+    colorCtx.stroke();
+  }
+
+  // Oxidation / dirt spots (more varied colors)
+  for (let i = 0; i < 120; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 2 + rng() * 18;
+    const t = rng();
+    if (t < 0.33) {
+      // Brown oxidation
+      colorCtx.fillStyle = `rgba(80,50,20,${0.08 + rng() * 0.15})`;
+    } else if (t < 0.66) {
+      // Dark spot
+      colorCtx.fillStyle = `rgba(30,25,15,${0.06 + rng() * 0.12})`;
+    } else {
+      // Green-ish tarnish (rare)
+      colorCtx.fillStyle = `rgba(60,80,40,${0.04 + rng() * 0.08})`;
+    }
     colorCtx.beginPath();
     colorCtx.arc(x, y, r, 0, Math.PI * 2);
     colorCtx.fill();
   }
 
-  // Bright specular highlights (foil hotspots)
-  for (let i = 0; i < 30; i++) {
+  // Bright specular hotspots (foil flash)
+  for (let i = 0; i < 50; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 2 + rng() * 15;
-    colorCtx.fillStyle = `rgba(255,240,200,${0.1 + rng() * 0.15})`;
+    const r = 1 + rng() * 8;
+    const bright = 240 + Math.floor(rng() * 15);
+    colorCtx.fillStyle = `rgba(${bright}, ${bright - 20}, ${bright - 80}, ${0.15 + rng() * 0.2})`;
     colorCtx.beginPath();
     colorCtx.arc(x, y, r, 0, Math.PI * 2);
     colorCtx.fill();
+    // Glow spread
+    colorCtx.fillStyle = `rgba(255,240,180,${0.03 + rng() * 0.05})`;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, r * 3, 0, Math.PI * 2);
+    colorCtx.fill();
   }
 
-  // Horizontal banding (from handling/rolling)
-  colorCtx.strokeStyle = 'rgba(160,120,40,0.2)';
-  colorCtx.lineWidth = 1 + rng() * 2;
-  for (let y = 0; y < H; y += 20 + rng() * 30) {
+  // Horizontal banding from rolling
+  colorCtx.strokeStyle = 'rgba(160,120,40,0.12)';
+  colorCtx.lineWidth = 1;
+  for (let y = 0; y < H; y += 15 + rng() * 25) {
     colorCtx.beginPath();
     colorCtx.moveTo(0, y);
-    colorCtx.lineTo(W, y);
+    for (let x = 0; x < W; x += 10) {
+      colorCtx.lineTo(x + rng() * 5, y + (rng() - 0.5) * 3);
+    }
     colorCtx.stroke();
   }
 
@@ -1808,14 +1963,30 @@ export function generateGoldTexture(): TextureSet {
   normalCtx.fillStyle = '#808080';
   normalCtx.fillRect(0, 0, W, H);
 
-  // Deep crinkle ridges
-  normalCtx.strokeStyle = '#b0b0b0';
-  normalCtx.lineWidth = 1 + rng() * 2;
-  for (let i = 0; i < 500; i++) {
+  // Large rolling creases (bright/dark edges)
+  normalCtx.strokeStyle = '#a0a0a0';
+  normalCtx.lineWidth = 2;
+  for (let i = 0; i < 120; i++) {
     const x = rng() * W;
     const y = rng() * H;
     const angle = rng() * Math.PI * 2;
-    const len = 3 + rng() * 40;
+    const len = 20 + rng() * 100;
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, y);
+    const cx1 = x + Math.cos(angle + 0.2) * len * 0.4;
+    const cy1 = y + Math.sin(angle + 0.2) * len * 0.4;
+    normalCtx.quadraticCurveTo(cx1, cy1, x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    normalCtx.stroke();
+  }
+
+  // Sharp medium creases
+  normalCtx.strokeStyle = '#c0c0c0';
+  normalCtx.lineWidth = 1;
+  for (let i = 0; i < 300; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const angle = rng() * Math.PI * 2;
+    const len = 5 + rng() * 40;
     normalCtx.beginPath();
     normalCtx.moveTo(x, y);
     normalCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
@@ -1824,35 +1995,35 @@ export function generateGoldTexture(): TextureSet {
 
   // Oxidation pits
   normalCtx.fillStyle = '#606060';
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 100; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 3 + rng() * 20;
+    const r = 2 + rng() * 16;
     normalCtx.beginPath();
     normalCtx.arc(x, y, r, 0, Math.PI * 2);
     normalCtx.fill();
   }
 
   // === ROUGHNESS MAP ===
-  roughCtx.fillStyle = '#808080';
+  roughCtx.fillStyle = '#606060';
   roughCtx.fillRect(0, 0, W, H);
 
-  // Crinkles are rougher
-  roughCtx.fillStyle = '#b0b0b0';
-  for (let i = 0; i < 300; i++) {
+  // Foil is generally smooth (dark = smooth), creases are slightly rough
+  roughCtx.fillStyle = '#909090';
+  for (let i = 0; i < 400; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const w = 5 + rng() * 60;
-    const h = 3 + rng() * 30;
+    const w = 5 + rng() * 50;
+    const h = 3 + rng() * 20;
     roughCtx.fillRect(x, y, w, h);
   }
 
-  // Oxidation is rough
-  roughCtx.fillStyle = '#d0d0d0';
-  for (let i = 0; i < 80; i++) {
+  // Oxidation spots are rough
+  roughCtx.fillStyle = '#c0c0c0';
+  for (let i = 0; i < 100; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 3 + rng() * 20;
+    const r = 2 + rng() * 16;
     roughCtx.beginPath();
     roughCtx.arc(x, y, r, 0, Math.PI * 2);
     roughCtx.fill();
@@ -1863,14 +2034,25 @@ export function generateGoldTexture(): TextureSet {
   metalCtx.fillRect(0, 0, W, H);
 
   // Oxidation spots lower metalness
-  metalCtx.fillStyle = '#404040';
-  for (let i = 0; i < 80; i++) {
+  metalCtx.fillStyle = '#303030';
+  for (let i = 0; i < 100; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 3 + rng() * 20;
+    const r = 2 + rng() * 16;
     metalCtx.beginPath();
     metalCtx.arc(x, y, r, 0, Math.PI * 2);
     metalCtx.fill();
+  }
+
+  // Seam edges are less metallic
+  metalCtx.strokeStyle = '#808080';
+  metalCtx.lineWidth = 2;
+  for (let i = 0; i < 12; i++) {
+    const x = 50 + rng() * (W - 100);
+    const y = 50 + rng() * (H - 100);
+    const pw = 80 + rng() * 300;
+    const ph = 80 + rng() * 300;
+    metalCtx.strokeRect(x, y, pw, ph);
   }
 
   // === AO MAP ===
@@ -1878,31 +2060,47 @@ export function generateGoldTexture(): TextureSet {
   aoCtx.fillRect(0, 0, W, H);
 
   // Deep creases shadow
-  aoCtx.strokeStyle = '#707070';
+  aoCtx.strokeStyle = '#606060';
   aoCtx.lineWidth = 3;
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 400; i++) {
     const x = rng() * W;
     const y = rng() * H;
     const angle = rng() * Math.PI * 2;
-    const len = 5 + rng() * 40;
+    const len = 5 + rng() * 50;
     aoCtx.beginPath();
     aoCtx.moveTo(x, y);
     aoCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     aoCtx.stroke();
   }
 
-  // Oxidation patch shadows
-  aoCtx.fillStyle = '#808080';
-  for (let i = 0; i < 80; i++) {
+  // Crinkle valley shadows
+  aoCtx.strokeStyle = '#808080';
+  aoCtx.lineWidth = 2;
+  for (let i = 0; i < 200; i++) {
     const x = rng() * W;
     const y = rng() * H;
-    const r = 5 + rng() * 22;
+    const angle = rng() * Math.PI * 2;
+    const len = 10 + rng() * 80;
+    aoCtx.beginPath();
+    aoCtx.moveTo(x, y);
+    const cx1 = x + Math.cos(angle + 0.3) * len * 0.5;
+    const cy1 = y + Math.sin(angle + 0.3) * len * 0.5;
+    aoCtx.quadraticCurveTo(cx1, cy1, x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+    aoCtx.stroke();
+  }
+
+  // Oxidation patch shadows
+  aoCtx.fillStyle = '#888888';
+  for (let i = 0; i < 100; i++) {
+    const x = rng() * W;
+    const y = rng() * H;
+    const r = 3 + rng() * 18;
     aoCtx.beginPath();
     aoCtx.arc(x, y, r, 0, Math.PI * 2);
     aoCtx.fill();
   }
 
-  addFilmGrain(colorCtx, W, H, 0.025);
+  addFilmGrain(colorCtx, W, H, 0.02);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
@@ -2057,4 +2255,254 @@ export function generateFabricTexture(): TextureSet {
   addFilmGrain(colorCtx, W, H, 0.02);
 
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
+}
+
+// ---------------------------------------------------------------------------
+// Procedural planet textures for gas giants (fallback when .jpg is missing)
+// ---------------------------------------------------------------------------
+
+interface PlanetBand {
+  y: number;   // 0-1 vertical position
+  width: number;
+  color: string;
+  turbulence: number;
+}
+
+function bandedGasGiantTexture(
+  W: number, H: number, bands: PlanetBand[],
+  turbFreq: number, turbAmp: number, seed: number,
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const rng = seededRandomFast(seed);
+  const imgData = ctx.createImageData(W, H);
+
+  for (let py = 0; py < H; py++) {
+    const v = py / H;
+    let baseR = 0, baseG = 0, baseB = 0, weightTotal = 0;
+    for (const b of bands) {
+      const dist = Math.abs(v - b.y) / b.width;
+      if (dist < 1) {
+        const w = 1 - dist * dist;
+        const c = parseHexColor(b.color);
+        baseR += c[0] * w; baseG += c[1] * w; baseB += c[2] * w;
+        weightTotal += w;
+      }
+    }
+    if (weightTotal > 0) {
+      baseR /= weightTotal; baseG /= weightTotal; baseB /= weightTotal;
+    }
+
+    for (let px = 0; px < W; px++) {
+      const u = px / W;
+      const turb = Math.sin(u * turbFreq + v * turbFreq * 0.5 + seed) * turbAmp
+                + Math.sin(u * turbFreq * 2.3 + v * turbFreq * 0.7 + seed * 2) * turbAmp * 0.5;
+
+      let r = baseR, g = baseG, b = baseB;
+
+      const tv = turb * 30;
+      r += tv; g += tv * 0.7; b += tv * 0.3;
+
+      const n = (rng() - 0.5) * 8;
+
+      const idx = (py * W + px) * 4;
+      imgData.data[idx]     = clampByte(r + n);
+      imgData.data[idx + 1] = clampByte(g + n);
+      imgData.data[idx + 2] = clampByte(b + n);
+      imgData.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function parseHexColor(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return [r, g, b];
+}
+
+function clampByte(v: number): number {
+  return Math.min(255, Math.max(0, Math.round(v)));
+}
+
+export function generateJupiterTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const bands: PlanetBand[] = [
+    { y: 0.0, width: 0.08, color: '#5a4a3a', turbulence: 0.3 },
+    { y: 0.05, width: 0.06, color: '#6a4c36', turbulence: 0.3 },
+    { y: 0.1, width: 0.04, color: '#8a6a48', turbulence: 0.4 },
+    { y: 0.18, width: 0.06, color: '#c4a46a', turbulence: 0.5 },
+    { y: 0.24, width: 0.04, color: '#d4b880', turbulence: 0.5 },
+    { y: 0.3, width: 0.05, color: '#8a6a3a', turbulence: 0.6 },
+    { y: 0.38, width: 0.04, color: '#e4d0a0', turbulence: 0.7 },
+    { y: 0.42, width: 0.03, color: '#f0e0b8', turbulence: 0.8 },
+    { y: 0.46, width: 0.03, color: '#e8d4a8', turbulence: 0.7 },
+    { y: 0.5, width: 0.03, color: '#dcc89c', turbulence: 0.7 },
+    { y: 0.54, width: 0.03, color: '#e4d0a0', turbulence: 0.8 },
+    { y: 0.58, width: 0.03, color: '#f0e0b8', turbulence: 0.7 },
+    { y: 0.62, width: 0.04, color: '#e4d0a0', turbulence: 0.6 },
+    { y: 0.7, width: 0.05, color: '#8a6a3a', turbulence: 0.6 },
+    { y: 0.76, width: 0.04, color: '#c4a46a', turbulence: 0.5 },
+    { y: 0.82, width: 0.06, color: '#d4b880', turbulence: 0.5 },
+    { y: 0.9, width: 0.04, color: '#7a5a3a', turbulence: 0.4 },
+    { y: 0.94, width: 0.06, color: '#6a4c36', turbulence: 0.3 },
+    { y: 1.0, width: 0.08, color: '#5a4a3a', turbulence: 0.3 },
+  ];
+
+  const tex = bandedGasGiantTexture(W, H, bands, 40, 0.015, 777);
+
+  // Add Great Red Spot
+  const canvas = tex.image as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const gx = 0.33 * W, gy = 0.56 * H;
+  const gr = 40 + seededRandomFast(888)() * 10;
+  const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+  grad.addColorStop(0, '#c04830');
+  grad.addColorStop(0.3, '#b04028');
+  grad.addColorStop(0.6, '#a05030');
+  grad.addColorStop(0.8, '#8a4830');
+  grad.addColorStop(1, 'rgba(120,60,40,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
+
+  // Oval BA (smaller storm)
+  const ox = 0.55 * W, oy = 0.48 * H;
+  const or = 15 + seededRandomFast(889)() * 5;
+  const grad2 = ctx.createRadialGradient(ox, oy, 0, ox, oy, or);
+  grad2.addColorStop(0, '#d06040');
+  grad2.addColorStop(0.5, '#b05038');
+  grad2.addColorStop(1, 'rgba(120,60,40,0)');
+  ctx.fillStyle = grad2;
+  ctx.beginPath(); ctx.arc(ox, oy, or, 0, Math.PI * 2); ctx.fill();
+
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function generateSaturnTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const bands: PlanetBand[] = [
+    { y: 0.0, width: 0.08, color: '#a09070', turbulence: 0.2 },
+    { y: 0.06, width: 0.06, color: '#b8a888', turbulence: 0.2 },
+    { y: 0.12, width: 0.05, color: '#a89878', turbulence: 0.3 },
+    { y: 0.18, width: 0.06, color: '#c8b898', turbulence: 0.3 },
+    { y: 0.25, width: 0.05, color: '#b8a888', turbulence: 0.4 },
+    { y: 0.32, width: 0.05, color: '#d4c8a8', turbulence: 0.4 },
+    { y: 0.38, width: 0.04, color: '#c0b090', turbulence: 0.5 },
+    { y: 0.42, width: 0.03, color: '#e8dcc0', turbulence: 0.5 },
+    { y: 0.46, width: 0.03, color: '#d4c8a8', turbulence: 0.5 },
+    { y: 0.5, width: 0.03, color: '#f0e4d0', turbulence: 0.5 },
+    { y: 0.54, width: 0.03, color: '#d4c8a8', turbulence: 0.5 },
+    { y: 0.58, width: 0.04, color: '#e8dcc0', turbulence: 0.5 },
+    { y: 0.64, width: 0.05, color: '#c0b090', turbulence: 0.4 },
+    { y: 0.7, width: 0.05, color: '#b8a888', turbulence: 0.4 },
+    { y: 0.76, width: 0.06, color: '#a89878', turbulence: 0.3 },
+    { y: 0.85, width: 0.05, color: '#b8a888', turbulence: 0.2 },
+    { y: 0.92, width: 0.08, color: '#a09070', turbulence: 0.2 },
+  ];
+  return bandedGasGiantTexture(W, H, bands, 30, 0.01, 333);
+}
+
+export function generateUranusTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const rng = seededRandomFast(222);
+  const imgData = ctx.createImageData(W, H);
+
+  for (let py = 0; py < H; py++) {
+    const v = py / H;
+    const bandPattern = Math.sin(v * 12) * 0.3 + Math.sin(v * 24) * 0.15 + Math.sin(v * 6) * 0.4;
+    const bright = 0.6 + bandPattern * 0.1;
+
+    for (let px = 0; px < W; px++) {
+      const u = px / W;
+      const lonVar = Math.sin(u * 8 + v * 4) * 0.03;
+      const n = (rng() - 0.5) * 0.04;
+
+      const r = (0.48 + bright * 0.12 + lonVar + n) * 255;
+      const g = (0.70 + bright * 0.18 + lonVar * 0.5 + n) * 255;
+      const b = (0.75 + bright * 0.20 + n) * 255;
+
+      const idx = (py * W + px) * 4;
+      imgData.data[idx]     = clampByte(r);
+      imgData.data[idx + 1] = clampByte(g);
+      imgData.data[idx + 2] = clampByte(b);
+      imgData.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function generateNeptuneTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const rng = seededRandomFast(444);
+  const imgData = ctx.createImageData(W, H);
+
+  for (let py = 0; py < H; py++) {
+    const v = py / H;
+    const bandPattern = Math.sin(v * 14) * 0.5 + Math.sin(v * 28) * 0.2 + Math.sin(v * 7) * 0.3;
+    const bright = 0.5 + bandPattern * 0.08;
+
+    for (let px = 0; px < W; px++) {
+      const u = px / W;
+      const lonVar = Math.sin(u * 10 + v * 5) * 0.04;
+      const n = (rng() - 0.5) * 0.03;
+
+      const r = (0.18 + bright * 0.08 + lonVar + n) * 255;
+      const g = (0.25 + bright * 0.12 + lonVar * 0.7 + n) * 255;
+      const b = (0.70 + bright * 0.20 + n) * 255;
+
+      const idx = (py * W + px) * 4;
+      imgData.data[idx]     = clampByte(r);
+      imgData.data[idx + 1] = clampByte(g);
+      imgData.data[idx + 2] = clampByte(b);
+      imgData.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  // Add Great Dark Spot
+  const gx = 0.30 * W, gy = 0.65 * H;
+  const gr = 30;
+  const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+  grad.addColorStop(0, '#0a0a2a');
+  grad.addColorStop(0.3, '#101040');
+  grad.addColorStop(0.6, '#1a2050');
+  grad.addColorStop(1, 'rgba(30,40,80,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
+
+  // Bright companion cloud
+  const cx = 0.30 * W + 35, cy = 0.65 * H - 15;
+  const cr = 15;
+  const grad2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+  grad2.addColorStop(0, 'rgba(200,220,255,0.4)');
+  grad2.addColorStop(0.5, 'rgba(180,200,240,0.2)');
+  grad2.addColorStop(1, 'rgba(180,200,240,0)');
+  ctx.fillStyle = grad2;
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
