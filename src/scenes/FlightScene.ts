@@ -81,6 +81,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamPos = new THREE.Vector3(0, 2, 5);
   private freeCamLook = new THREE.Vector3(0, 0, 0);
+  private hudVisible = true;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -731,6 +732,11 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
         this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
         toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
         e.preventDefault();
+      } else if (e.key === 'F1') {
+        e.preventDefault();
+        this.hudVisible = !this.hudVisible;
+        this.hud.setVisible(this.hudVisible);
+        toast.show(this.hudVisible ? 'HUD shown' : 'HUD hidden');
       }
     });
 
@@ -1359,6 +1365,7 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
     const gForce = baseDt > 0 ? dv / (baseDt * 9.80665) : 1;
     this.hud.setGForce(gForce);
     this.hud.setGForceEnabled(gForce > 1.1);
+    this.hud.setDebris(this.debris.length);
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     // Screen shake from high G-force or mach effects
