@@ -101,6 +101,8 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">T to Pe</span><span class="hud-value ttp-val" style="font-size:9px;color:#44DD88;">—</span></div>
       <div class="hud-row"><span class="hud-label">Heading</span><span class="hud-value hdg-val" style="font-size:9px;color:#88CCFF;">—</span></div>
       <div class="hud-row"><span class="hud-label">AoA</span><span class="hud-value aoa-val" style="font-size:9px;color:#FF8844;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Lat</span><span class="hud-value lat-val" style="font-size:9px;color:#aaaacc;">—</span></div>
+      <div class="hud-row"><span class="hud-label">Lon</span><span class="hud-value lon-val" style="font-size:9px;color:#aaaacc;">—</span></div>
       <div class="btn-bar">
         <button class="btn btn--action" data-action="stage">STAGE</button>
         <button class="btn btn--action" data-action="parachute">CHUTE</button>
@@ -218,6 +220,13 @@ export class HUD {
   setAoA(aoa: number): void {
     const el = this.root.querySelector('.aoa-val');
     if (el) el.textContent = `${aoa.toFixed(1)}°`;
+  }
+
+  setLatLon(lat: number, lon: number): void {
+    const latEl = this.root.querySelector('.lat-val');
+    const lonEl = this.root.querySelector('.lon-val');
+    if (latEl) latEl.textContent = `${lat.toFixed(2)}°${lat >= 0 ? 'N' : 'S'}`;
+    if (lonEl) lonEl.textContent = `${lon.toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
   }
 
   setTWR(twr: number): void {
