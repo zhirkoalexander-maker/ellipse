@@ -280,6 +280,28 @@ export class VABScene {
       });
       this.rocketGroup.add(mesh);
 
+      // Draw stage separator discs at decoupler positions
+      let sepY = 0;
+      for (const root of this.assembly.roots) {
+        const walkNodes = (node: AssemblyNode, y: number) => {
+          if (node.part.kind === 'decoupler') {
+            const sepGeom = new THREE.RingGeometry(0.15, 0.25, 16);
+            const sepMat = new THREE.MeshBasicMaterial({
+              color: 0xFF6644, side: THREE.DoubleSide, transparent: true, opacity: 0.5
+            });
+            const sep = new THREE.Mesh(sepGeom, sepMat);
+            sep.position.set(0, y, 0);
+            sep.rotation.x = -Math.PI / 2;
+            this.rocketGroup.add(sep);
+          }
+          const h = PART_HEIGHT[node.part.size] || 0.6 * PART_SCALE;
+          for (const child of node.children) walkNodes(child, y - h);
+        };
+        const h0 = PART_HEIGHT[root.part.size] || 0.6 * PART_SCALE;
+        walkNodes(root, sepY + h0 / 2);
+        sepY += h0;
+      }
+
       // Auto-frame camera to fit the assembled rocket
       const box = new THREE.Box3().setFromObject(this.rocketGroup);
       const size = box.getSize(new THREE.Vector3());
