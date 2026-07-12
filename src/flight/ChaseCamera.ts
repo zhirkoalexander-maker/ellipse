@@ -25,6 +25,8 @@ export class ChaseCamera {
   private initialized = false;
   private orbitKeys = { left: false, right: false, up: false, down: false };
   private zoomKeys = { in: false, out: false };
+  private inertiaAzimuth = 0;
+  private inertiaPolar = 0;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -93,14 +95,18 @@ export class ChaseCamera {
       if (e.button !== 0) return;
       this.isDragging = true;
       this.prevMouse = { x: e.clientX, y: e.clientY };
+      this.inertiaAzimuth = 0;
+      this.inertiaPolar = 0;
     });
 
     window.addEventListener('mousemove', (e) => {
       if (!this.isDragging) return;
       const dx = e.clientX - this.prevMouse.x;
       const dy = e.clientY - this.prevMouse.y;
-      this.targetAzimuth -= dx * 0.005;
-      this.targetPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.targetPolar + dy * 0.005));
+      this.inertiaAzimuth = -dx * 0.005;
+      this.inertiaPolar = dy * 0.005;
+      this.targetAzimuth += this.inertiaAzimuth;
+      this.targetPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.targetPolar + this.inertiaPolar));
       this.prevMouse = { x: e.clientX, y: e.clientY };
     });
 
@@ -126,6 +132,14 @@ export class ChaseCamera {
     if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.05, this.targetPolar + dt * ORBIT_SPEED * 0.5);
     if (this.zoomKeys.in) this.targetDist = Math.max(MIN_DIST, this.targetDist * (1 - dt * ZOOM_SPEED));
     if (this.zoomKeys.out) this.targetDist = Math.min(MAX_DIST, this.targetDist * (1 + dt * ZOOM_SPEED));
+
+    // Apply inertia when not dragging
+    if (!this.isDragging) {
+      this.targetAzimuth += this.inertiaAzimuth * dt * 2;
+      this.targetPolar += this.inertiaPolar * dt * 2;
+      this.inertiaAzimuth *= Math.exp(-3 * dt);
+      this.inertiaPolar *= Math.exp(-3 * dt);
+    }
 
     // Smooth interpolation
     this.dist += (this.targetDist - this.dist) * Math.min(1, LERP_SPEED * dt);
