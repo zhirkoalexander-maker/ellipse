@@ -15,6 +15,7 @@ export class HUD {
   private throtPct!: HTMLSpanElement;
   private heatFill!: HTMLSpanElement;
   private heatPct!: HTMLSpanElement;
+  private gforceVal!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -51,6 +52,7 @@ export class HUD {
       <div class="hud-row"><span class="hud-label">V/S</span><span class="hud-value"><span class="vs-val" style="color:#44FF44;">0</span> <span style="font-size:11px;color:var(--text-muted);">m/s</span></span></div>
       <div class="hud-row"><span class="hud-label">Altitude</span><span class="hud-value"><span class="alt-val">0</span> <span class="alt-unit" style="font-size:11px;color:var(--text-muted);">m</span></span></div>
       <div class="hud-row"><span class="hud-label">Angle</span><span class="hud-value"><span class="angle-val">0</span><span style="font-size:11px;color:var(--text-muted);">°</span></span></div>
+      <div class="hud-row"><span class="hud-label">G-Force</span><span class="hud-value"><span class="gforce-val" style="color:#88CCFF;">1.0</span><span style="font-size:11px;color:var(--text-muted);">G</span></span></div>
       <div class="hud-row"><span class="hud-label">Warp</span><span class="hud-value"><span class="warp-val" style="color:var(--accent-gold);">x1</span></span></div>
       <div class="separator"></div>
       <div style="display:flex;flex-direction:column;gap:var(--space-1);">
@@ -88,6 +90,7 @@ export class HUD {
     this.throtPct = this.root.querySelector('.throt-pct')!;
     this.heatFill = this.root.querySelector('.heat-fill')!;
     this.heatPct = this.root.querySelector('.heat-pct')!;
+    this.gforceVal = this.root.querySelector('.gforce-val')!;
     this.root.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
@@ -109,6 +112,13 @@ export class HUD {
   setWarpLabel(label: string): void {
     const el = this.root.querySelector('.warp-val');
     if (el) el.textContent = label;
+  }
+
+  setGForce(g: number): void {
+    this.gforceVal.textContent = g.toFixed(2);
+    if (g > 5) this.gforceVal.style.color = '#FF4444';
+    else if (g > 3) this.gforceVal.style.color = '#FFAA44';
+    else this.gforceVal.style.color = '#88CCFF';
   }
 
   setPaused(paused: boolean): void {

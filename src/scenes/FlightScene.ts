@@ -63,6 +63,7 @@ export class FlightScene {
   private warpLevels = [1, 3, 5, 10, 100, 10000, 1000000];
   private warpIndex = 0;
   private crashOverlay: HTMLDivElement | null = null;
+  private prevVel: [number, number, number] = [0, 0, 0];
 
   onCrashAction: ((action: 'menu' | 'restart') => void) | null = null;
 
@@ -948,6 +949,15 @@ for (const b of this.system.bodies) {
 
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     this.hud.update(this.state, this.system);
+
+    // Compute G-force from velocity change
+    const dvx = this.state.velocity[0] - this.prevVel[0];
+    const dvy = this.state.velocity[1] - this.prevVel[1];
+    const dvz = this.state.velocity[2] - this.prevVel[2];
+    const dv = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
+    const gForce = baseDt > 0 ? dv / (baseDt * 9.80665) : 1;
+    this.hud.setGForce(gForce);
+    this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
