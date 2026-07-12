@@ -158,4 +158,13 @@ export class ChaseCamera {
     this.camera.up.copy(upVec);
     this.camera.lookAt(targetLook);
   }
+
+  reset(): void {
+    this.targetDist = 2.5;
+    this.dist = 2.5;
+    this.targetAzimuth = 0;
+    this.azimuth = 0;
+    this.targetPolar = Math.PI / 2;
+    this.polar = Math.PI / 2;
+  }
 }

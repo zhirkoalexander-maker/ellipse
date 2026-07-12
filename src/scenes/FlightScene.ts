@@ -653,6 +653,10 @@ ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed
           toast.show('SAS disabled');
         }
         e.preventDefault();
+      } else if (e.key === 'f') {
+        this.chase.reset();
+        toast.show('Camera view reset');
+        e.preventDefault();
       }
     });
 
