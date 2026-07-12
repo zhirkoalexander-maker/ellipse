@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
-import { fbm3D, lerp } from '../utils/noise';
+import { generateNeptuneTexture } from '../effects/ProceduralTextures';
+import { fbm3D } from '../utils/noise';
 
-const VS = 1e-9 * 37500;
+const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 64;
 
 export class Neptune extends Planet {
@@ -16,11 +17,7 @@ export class Neptune extends Planet {
 
     const visualR = this.visualRadius;
 
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load(assetUrl('/textures/neptune.jpg'), (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
-    });
+    const tex = generateNeptuneTexture();
 
     const geom = new THREE.SphereGeometry(visualR, 64, 32);
     const posAttr = geom.attributes.position!;
@@ -51,11 +48,11 @@ export class Neptune extends Planet {
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
-      color: 0x4b70dd,
+      color: 0xffffff,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.set(0, 0, 0);
+    this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
     this.mesh.rotation.z = 28.3 * Math.PI / 180;
 
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4b70dd, 0.15);
