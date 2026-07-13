@@ -353,12 +353,26 @@ export class Earth extends Planet {
   /** Update cloud rotation + day/night cycle driven by sun direction */
   updateClouds(dt: number, sunPosWC?: [number, number, number]): void {
     this.cloudMesh.rotation.y += dt * 0.008;
-    if (sunPosWC) {
-      const mat = this.mesh.material as THREE.MeshStandardMaterial;
-      const sl = Math.sqrt(sunPosWC[0]*sunPosWC[0] + sunPosWC[1]*sunPosWC[1] + sunPosWC[2]*sunPosWC[2]) || 1;
-      const dx = sunPosWC[0] / sl, dy = sunPosWC[1] / sl, dz = sunPosWC[2] / sl;
-      this.mesh.lookAt(this.mesh.position.x + dx * 100, this.mesh.position.y + dy * 100, this.mesh.position.z + dz * 100);
-    }
+    if (!sunPosWC) return;
+
+    const mat = this.mesh.material as THREE.MeshStandardMaterial;
+    const sl = Math.sqrt(sunPosWC[0]*sunPosWC[0] + sunPosWC[1]*sunPosWC[1] + sunPosWC[2]*sunPosWC[2]) || 1;
+    const sx = sunPosWC[0] / sl, sy = sunPosWC[1] / sl, sz = sunPosWC[2] / sl;
+
+    // Turn Earth day side towards sun
+    this.mesh.lookAt(
+      this.mesh.position.x + sx * 100,
+      this.mesh.position.y + sy * 100,
+      this.mesh.position.z + sz * 100
+    );
+
+    // Compute camera position relative to Earth center
+    const ex = this.mesh.position.x, ey = this.mesh.position.y, ez = this.mesh.position.z;
+    // Get global sun light direction in world space
+    // Night side = dot(camera→earthCenter, sun→earthCenter) < 0 means camera is on night side
+    // emissive = city lights visible at night
+    // Simple: emissiveIntensity = city lights intensity modulated by day/night
+    mat.emissiveIntensity = 0.08; // Always faint city lights
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
