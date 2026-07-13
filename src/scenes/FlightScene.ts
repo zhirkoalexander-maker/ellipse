@@ -1081,8 +1081,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     // Angular velocity with damping and engine gimbal (torque from engine when thrust is active)
     const engineActive = this.state.throttle > 0;
-    const pitchInput = warpActive ? 0 : this.controls.getPitch();
-    const yawInput = warpActive ? 0 : this.controls.getYaw();
+    // In freecam mode, arrow keys control camera, not rocket
+    const inFreeCam = this.cameraMode === 'free';
+    const pitchInput = (warpActive || inFreeCam) ? 0 : this.controls.getPitch();
+    const yawInput = (warpActive || inFreeCam) ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
     this.angularVel.x += pitchInput * this.ANGULAR_ACCEL * baseDt;
     this.angularVel.y += yawInput * this.ANGULAR_ACCEL * baseDt;
@@ -1480,10 +1482,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
-    // Animate Earth cloud layer
+    // Animate Earth cloud layer + day/night illumination
     const earthBody = this.system.bodyByName('earth');
     if (earthBody && 'updateClouds' in earthBody) {
-      (earthBody as any).updateClouds(baseDt);
+      const sunBody = this.system.bodyByName('sun');
+      const sunPosWC = sunBody ? sunBody.position : undefined;
+      (earthBody as any).updateClouds(baseDt, sunPosWC);
     }
 
     // Update debris physics
