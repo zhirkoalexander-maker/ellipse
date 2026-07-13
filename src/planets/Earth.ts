@@ -226,11 +226,11 @@ function generateEarthTextureFallback(): THREE.CanvasTexture {
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // Deep ocean
+  // Ocean (deeper blue, more vibrant)
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, '#1a3a6a');
-  grad.addColorStop(0.5, '#2a6daa');
-  grad.addColorStop(1, '#1a4a8a');
+  grad.addColorStop(0, '#1a3a8c');
+  grad.addColorStop(0.5, '#2266cc');
+  grad.addColorStop(1, '#1a4a9a');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
