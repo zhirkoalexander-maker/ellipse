@@ -361,8 +361,8 @@ export class Earth extends Planet {
     const n3 = Math.sin(nx * 12.0 + nz * 8.0) * 0.1 + Math.cos(ny * 10.0 + nx * 5.0) * 0.08;
     const n4 = Math.sin(nx * 25.0 + ny * 20.0 + nz * 30.0) * 0.05;
     const elev = ((n1 + n2 + n3 + n4) * 0.3 + 0.5) * 1.2;
-    const maxDisp = this.visualRadius * 0.025;
-    const oceanDepth = this.visualRadius * 0.005;
+    const maxDisp = this.visualRadius * 0.08;
+    const oceanDepth = this.visualRadius * 0.012;
     if (elev > 0.4) {
       const h = (elev - 0.4) / 0.6;
       return h * h * maxDisp;
