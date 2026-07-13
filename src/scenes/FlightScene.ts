@@ -88,12 +88,8 @@ export class FlightScene {
   private orbitLine: THREE.Line | null = null;
   private exhaustLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
-  private freeCamAzimuth = 0;
-  private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 5;
-  private freeCamKeys = { left: false, right: false, up: false, down: false };
-  private freeCamDragging = false;
-  private freeCamPrevMouse = { x: 0, y: 0 };
+  private freeCamPos = new THREE.Vector3(0, 2, 5);
+  private freeCamLook = new THREE.Vector3(0, 0, 0);
   private hudVisible = true;
   private lastAltMilestone = 0;
   private sonicBoomRing: THREE.Mesh | null = null;
@@ -810,11 +806,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (this.paused) return;
         this.warpIndex = Math.max(0, this.warpIndex - 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.timeWarp);
         e.preventDefault();
       } else if (e.key === 'e' || e.key === ']') {
         if (this.paused) return;
         this.warpIndex = Math.min(this.warpLevels.length - 1, this.warpIndex + 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.timeWarp);
         e.preventDefault();
       } else if (e.key === 'p') {
         const hasChute = rocket.assembly.roots.some(r => r.part.kind === 'parachute') ||
@@ -853,16 +851,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       } else if (e.key === 'c') {
         this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
         this.hud.setFreeCamera(this.cameraMode === 'free');
-        toast.show(this.cameraMode === 'free' ? 'Free camera (WASD)' : 'Chase camera');
+        toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
         e.preventDefault();
-      } else if (this.cameraMode === 'free' && (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')) {
-        this.freeCamKeys.up = true; e.preventDefault();
-      } else if (this.cameraMode === 'free' && (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')) {
-        this.freeCamKeys.down = true; e.preventDefault();
-      } else if (this.cameraMode === 'free' && (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft')) {
-        this.freeCamKeys.left = true; e.preventDefault();
-      } else if (this.cameraMode === 'free' && (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight')) {
-        this.freeCamKeys.right = true; e.preventDefault();
       } else if (e.key === 'F1') {
         e.preventDefault();
         this.hudVisible = !this.hudVisible;
@@ -871,37 +861,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     });
 
-    window.addEventListener('keyup', (e: KeyboardEvent) => {
-      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.freeCamKeys.up = false;
-      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.freeCamKeys.down = false;
-      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') this.freeCamKeys.left = false;
-      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.freeCamKeys.right = false;
-    });
-
     this.achievements.unlock('first_launch');
     toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, T SAS, Esc pause.');
-
-    // Freecam mouse drag + scroll zoom
-    const rendererDom = this.renderer.domElement;
-    rendererDom.addEventListener('mousedown', (e: MouseEvent) => {
-      if (this.cameraMode === 'free') { this.freeCamDragging = true; this.freeCamPrevMouse = { x: e.clientX, y: e.clientY }; }
-    });
-    window.addEventListener('mousemove', (e: MouseEvent) => {
-      if (!this.freeCamDragging || this.cameraMode !== 'free') return;
-      const dx = e.clientX - this.freeCamPrevMouse.x;
-      const dy = e.clientY - this.freeCamPrevMouse.y;
-      this.freeCamAzimuth -= dx * 0.005;
-      this.freeCamPolar = Math.max(0.01, Math.min(Math.PI - 0.01, this.freeCamPolar + dy * 0.005));
-      this.freeCamPrevMouse = { x: e.clientX, y: e.clientY };
-    });
-    window.addEventListener('mouseup', () => { this.freeCamDragging = false; });
-    rendererDom.addEventListener('wheel', (e: WheelEvent) => {
-      if (this.cameraMode === 'free') {
-        e.preventDefault();
-        this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
-        this.freeCamDist = Math.max(0.5, Math.min(200, this.freeCamDist));
-      }
-    }, { passive: false });
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1522,27 +1483,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       );
 
       if (this.cameraMode === 'free') {
-        // Free camera: orbit around rocket using WASD/arrows
-        const orbitSpeed = 3;
-        if (this.freeCamKeys.left) this.freeCamAzimuth += orbitSpeed * baseDt;
-        if (this.freeCamKeys.right) this.freeCamAzimuth -= orbitSpeed * baseDt;
-        if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
-        if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
-
         const rocketWorld = new THREE.Vector3(
           this.state.position[0] * VISUAL_SCALE,
           this.state.position[1] * VISUAL_SCALE,
           this.state.position[2] * VISUAL_SCALE
         );
-        const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
-        const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
-        const oz = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.sin(this.freeCamAzimuth);
-        this.sceneMgr.camera.position.set(rocketWorld.x + ox, rocketWorld.y + oy, rocketWorld.z + oz);
-        const upVec = Math.abs(this.freeCamPolar) < 0.1 ? new THREE.Vector3(0, 0, 1) :
-                      Math.abs(this.freeCamPolar - Math.PI) < 0.1 ? new THREE.Vector3(0, 0, -1) :
-                      new THREE.Vector3(0, 1, 0);
-        this.sceneMgr.camera.up.copy(upVec);
-        this.sceneMgr.camera.lookAt(rocketWorld);
+        this.freeCamPos.lerp(rocketWorld.clone().add(new THREE.Vector3(0, 2, 5)), baseDt * 2);
+        this.freeCamLook.lerp(rocketWorld, baseDt * 2);
+        this.sceneMgr.camera.position.copy(this.freeCamPos);
+        this.sceneMgr.camera.lookAt(this.freeCamLook);
       } else {
         this.chase.follow(this.state, baseDt, camUp, warpActive);
       }
@@ -1677,18 +1626,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
     const mach = speedMs / 340;
     this.hud.setMass(this.state.rocket.totalMass());
-
-    // Sonic boom trigger — when crossing Mach 1 in atmosphere
-    if (mach > 1 && this.prevMach < 1 && !this.sonicBoomTriggered) {
-      this.sonicBoomTriggered = true;
-      this.sonicBoomTimer = 1.0;
-      toast.show(`💥 MACH 1 — Sonic boom!`);
-      this.sound.playStaging(); // reuse loud burst sound
-      // Spawn a shock ring
-      this.spawnShockRing(0xaaccff);
-    }
-    if (this.sonicBoomTimer > 0) this.sonicBoomTimer -= baseDt;
-    if (this.sonicBoomTriggered && mach < 0.7) this.sonicBoomTriggered = false;
     this.prevMach = mach;
 
     // Local gravitational acceleration (keep for internal use, no HUD)
@@ -1699,31 +1636,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const gdz = this.state.position[2] - gravRefBody.position[2];
       const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
       const localG = (G * (gravRefBody as any).mass) / (gr * gr);
-    }
-
-    // Sonic boom ring when crossing mach 1
-    if (mach > 0.98 && mach < 1.02 && !this.sonicBoomRing && nearestAlt < 15000) {
-      const ringGeom = new THREE.RingGeometry(0.5, 1.5, 32);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false
-      });
-      this.sonicBoomRing = new THREE.Mesh(ringGeom, ringMat);
-      this.sonicBoomRing.position.set(0, 0, 0);
-      this.rocketGroup.add(this.sonicBoomRing);
-      this.sonicBoomLife = 0;
-      toast.show('Sonic boom!');
-    }
-    if (this.sonicBoomRing) {
-      this.sonicBoomLife += baseDt;
-      const scale = 1 + this.sonicBoomLife * 40;
-      this.sonicBoomRing.scale.setScalar(scale);
-      (this.sonicBoomRing.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.4 * (1 - this.sonicBoomLife));
-      if (this.sonicBoomLife > 2) {
-        this.rocketGroup.remove(this.sonicBoomRing);
-        this.sonicBoomRing.geometry.dispose();
-        (this.sonicBoomRing.material as THREE.Material).dispose();
-        this.sonicBoomRing = null;
-      }
     }
 
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
