@@ -88,8 +88,12 @@ export class FlightScene {
   private orbitLine: THREE.Line | null = null;
   private exhaustLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
-  private freeCamPos = new THREE.Vector3(0, 2, 5);
-  private freeCamLook = new THREE.Vector3(0, 0, 0);
+  private freeCamAzimuth = 0;
+  private freeCamPolar = Math.PI / 2;
+  private freeCamDist = 5;
+  private freeCamKeys = { left: false, right: false, up: false, down: false };
+  private freeCamDragging = false;
+  private freeCamPrevMouse = { x: 0, y: 0 };
   private hudVisible = true;
   private lastAltMilestone = 0;
   private sonicBoomRing: THREE.Mesh | null = null;
@@ -158,11 +162,10 @@ export class FlightScene {
       earth.position[1] + dirNorm[1] * earthR,
       earth.position[2] + dirNorm[2] * earthR,
     ];
-    const surfaceR = (earth as any).getSurfaceRadiusAt?.(surfacePos) ?? earthR;
     const spawnPos: [number, number, number] = [
-      earth.position[0] + dirNorm[0] * (surfaceR + 10),
-      earth.position[1] + dirNorm[1] * (surfaceR + 10),
-      earth.position[2] + dirNorm[2] * (surfaceR + 10),
+      earth.position[0] + dirNorm[0] * (earthR + 50),
+      earth.position[1] + dirNorm[1] * (earthR + 50),
+      earth.position[2] + dirNorm[2] * (earthR + 50),
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
     this.groundedDir = dirNorm;
@@ -807,13 +810,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (this.paused) return;
         this.warpIndex = Math.max(0, this.warpIndex - 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarpLabel(`x${this.timeWarp}`);
         e.preventDefault();
       } else if (e.key === 'e' || e.key === ']') {
         if (this.paused) return;
         this.warpIndex = Math.min(this.warpLevels.length - 1, this.warpIndex + 1);
         this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarpLabel(`x${this.timeWarp}`);
         e.preventDefault();
       } else if (e.key === 'p') {
         const hasChute = rocket.assembly.roots.some(r => r.part.kind === 'parachute') ||
@@ -852,8 +853,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       } else if (e.key === 'c') {
         this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
         this.hud.setFreeCamera(this.cameraMode === 'free');
-        toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
+        toast.show(this.cameraMode === 'free' ? 'Free camera (WASD)' : 'Chase camera');
         e.preventDefault();
+      } else if (this.cameraMode === 'free' && (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')) {
+        this.freeCamKeys.up = true; e.preventDefault();
+      } else if (this.cameraMode === 'free' && (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown')) {
+        this.freeCamKeys.down = true; e.preventDefault();
+      } else if (this.cameraMode === 'free' && (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft')) {
+        this.freeCamKeys.left = true; e.preventDefault();
+      } else if (this.cameraMode === 'free' && (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight')) {
+        this.freeCamKeys.right = true; e.preventDefault();
       } else if (e.key === 'F1') {
         e.preventDefault();
         this.hudVisible = !this.hudVisible;
@@ -862,8 +871,37 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     });
 
+    window.addEventListener('keyup', (e: KeyboardEvent) => {
+      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.freeCamKeys.up = false;
+      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.freeCamKeys.down = false;
+      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') this.freeCamKeys.left = false;
+      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.freeCamKeys.right = false;
+    });
+
     this.achievements.unlock('first_launch');
     toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, T SAS, Esc pause.');
+
+    // Freecam mouse drag + scroll zoom
+    const rendererDom = this.renderer.domElement;
+    rendererDom.addEventListener('mousedown', (e: MouseEvent) => {
+      if (this.cameraMode === 'free') { this.freeCamDragging = true; this.freeCamPrevMouse = { x: e.clientX, y: e.clientY }; }
+    });
+    window.addEventListener('mousemove', (e: MouseEvent) => {
+      if (!this.freeCamDragging || this.cameraMode !== 'free') return;
+      const dx = e.clientX - this.freeCamPrevMouse.x;
+      const dy = e.clientY - this.freeCamPrevMouse.y;
+      this.freeCamAzimuth -= dx * 0.005;
+      this.freeCamPolar = Math.max(0.01, Math.min(Math.PI - 0.01, this.freeCamPolar + dy * 0.005));
+      this.freeCamPrevMouse = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('mouseup', () => { this.freeCamDragging = false; });
+    rendererDom.addEventListener('wheel', (e: WheelEvent) => {
+      if (this.cameraMode === 'free') {
+        e.preventDefault();
+        this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
+        this.freeCamDist = Math.max(0.5, Math.min(200, this.freeCamDist));
+      }
+    }, { passive: false });
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1084,10 +1122,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const fwd = getFwd();
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
-    // Apply thrust
+    // Apply thrust — always allowed after countdown finishes, no weight gate
     let canLiftOff = false;
     if (engineActive && this.grounded) {
-      // Countdown on first throttle-up when grounded
+      // Countdown — start once
       if (!this.countdownActive && !this.launched) {
         this.countdownActive = true;
         this.countdownTimer = 0;
@@ -1099,28 +1137,18 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         else if (this.countdownTimer >= 2 && this.countdownTimer < 3) this.showCountdown('1');
         else if (this.countdownTimer >= 3) {
           this.countdownActive = false;
-          this.countdownTimer = 0;
           this.launched = true;
+          canLiftOff = true; // thrust allowed regardless of weight after countdown
           this.showCountdown('LIFTOFF!');
           setTimeout(() => this.hideCountdown(), 1500);
         }
       }
-      // Compute if thrust exceeds weight before actually applying thrust
-      const eng = findFirstEngine(this.state.rocket.assembly.roots);
-      if (eng && eng.thrust) {
-        const thrustN = eng.thrust * 1000 * this.state.throttle;
-        const refBody = getReferenceBody(this.state.position, this.system);
-        const dx = this.state.position[0] - refBody.position[0];
-        const dy = this.state.position[1] - refBody.position[1];
-        const dz = this.state.position[2] - refBody.position[2];
-        const r = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
-        const localG = (G * refBody.mass) / (r * r);
-        const weight = this.state.rocket.totalMass() * localG;
-        canLiftOff = thrustN > weight * 0.95;
-      }
     }
     if (engineActive && (!this.grounded || canLiftOff)) {
-      applyThrust(this.state, _dt, [tx, ty, tz]);
+      const mass = this.state.rocket.totalMass();
+      const massFactor = Math.min(1, 30000 / Math.max(mass, 1000));
+      const adjustedDt = _dt * massFactor;
+      applyThrust(this.state, adjustedDt, [tx, ty, tz]);
       this.sanitize(this.state.velocity);
     }
     if (engineActive && canLiftOff && this.grounded) {
@@ -1243,7 +1271,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (alt > 0 && alt < 300000) {
           const rho = 1.225 * Math.exp(-alt / 8500);
           const q = 0.5 * rho * speed * speed;
-          this.hud.setQ(q);
           const dragForce = q * CdA;
           const dragAccel = dragForce / mass;
           const dragDelta = dragAccel * baseDt;
@@ -1495,15 +1522,27 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       );
 
       if (this.cameraMode === 'free') {
+        // Free camera: orbit around rocket using WASD/arrows
+        const orbitSpeed = 3;
+        if (this.freeCamKeys.left) this.freeCamAzimuth += orbitSpeed * baseDt;
+        if (this.freeCamKeys.right) this.freeCamAzimuth -= orbitSpeed * baseDt;
+        if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
+        if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
+
         const rocketWorld = new THREE.Vector3(
           this.state.position[0] * VISUAL_SCALE,
           this.state.position[1] * VISUAL_SCALE,
           this.state.position[2] * VISUAL_SCALE
         );
-        this.freeCamPos.lerp(rocketWorld.clone().add(new THREE.Vector3(0, 2, 5)), baseDt * 2);
-        this.freeCamLook.lerp(rocketWorld, baseDt * 2);
-        this.sceneMgr.camera.position.copy(this.freeCamPos);
-        this.sceneMgr.camera.lookAt(this.freeCamLook);
+        const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
+        const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
+        const oz = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.sin(this.freeCamAzimuth);
+        this.sceneMgr.camera.position.set(rocketWorld.x + ox, rocketWorld.y + oy, rocketWorld.z + oz);
+        const upVec = Math.abs(this.freeCamPolar) < 0.1 ? new THREE.Vector3(0, 0, 1) :
+                      Math.abs(this.freeCamPolar - Math.PI) < 0.1 ? new THREE.Vector3(0, 0, -1) :
+                      new THREE.Vector3(0, 1, 0);
+        this.sceneMgr.camera.up.copy(upVec);
+        this.sceneMgr.camera.lookAt(rocketWorld);
       } else {
         this.chase.follow(this.state, baseDt, camUp, warpActive);
       }
@@ -1521,26 +1560,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
     const stageCount = this.countStages(this.rocket.assembly.roots);
 
-    // Compute stage info for HUD
+    // Stage info (internal only, no display)
     const stageData = this.computeStageData();
     this.stageInfo = stageData;
-    this.hud.setStageData(stageData);
-
-    // Compute TWR
-    const eng = findFirstEngine(this.state.rocket.assembly.roots);
-    if (eng && eng.thrust) {
-      const thrustN = eng.thrust * 1000 * this.state.throttle;
-      const refBodyTwr = getReferenceBody(this.state.position, this.system);
-      const dx_t = this.state.position[0] - refBodyTwr.position[0];
-      const dy_t = this.state.position[1] - refBodyTwr.position[1];
-      const dz_t = this.state.position[2] - refBodyTwr.position[2];
-      const r_t = Math.sqrt(dx_t*dx_t + dy_t*dy_t + dz_t*dz_t) || 1;
-      const localG = (G * refBodyTwr.mass) / (r_t * r_t);
-      const weight = this.state.rocket.totalMass() * localG;
-      this.hud.setTWR(thrustN / (weight || 1));
-    } else {
-      this.hud.setTWR(0);
-    }
 
     // Compute Ap/Pe from orbit prediction
     let ape: number | undefined;
@@ -1601,8 +1623,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const activeStage = this.stageInfo.filter(s => s.active).length > 0
       ? this.stageInfo.findIndex(s => s.active) + 1
       : 1;
-    this.hud.update(this.state, this.system, this.heatEnergy, stageCount, activeStage);
-    this.hud.setSAS(this.sasMode);
+    this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle);
 
     // Draw 3D orbit path
     const refBodyOrbit = getReferenceBody(this.state.position, this.system);
@@ -1641,7 +1662,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Track personal records
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
     if (speed > this.maxSpeed) this.maxSpeed = speed;
-    this.hud.setRecord(`Alt ${(this.maxAlt/1000).toFixed(0)}km Spd ${this.maxSpeed.toFixed(0)}m/s`);
 
     // Altitude milestone notifications
     const milestones = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000];
@@ -1653,65 +1673,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
-    // Compute approximate delta-v remaining
-    const engDv = findFirstEngine(this.state.rocket.assembly.roots);
-    if (engDv && engDv.thrust) {
-      const massWet = this.state.rocket.totalMass();
-      const massDry = massWet - this.state.rocket.totalFuelMass();
-      const isp = 320;
-      if (massDry > 0 && massWet > massDry) {
-        const ve = isp * 9.80665;
-        const dv = ve * Math.log(massWet / massDry);
-        this.hud.setDeltaV(dv);
-      } else {
-        this.hud.setDeltaV(0);
-      }
-      this.hud.setIsp(isp);
-    } else {
-      this.hud.setDeltaV(-1);
-      this.hud.setIsp(0);
-    }
-
-    // Compute G-force from velocity change
-    const dvx = this.state.velocity[0] - this.prevVel[0];
-    const dvy = this.state.velocity[1] - this.prevVel[1];
-    const dvz = this.state.velocity[2] - this.prevVel[2];
-    const dv = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
-    const gForce = baseDt > 0 ? dv / (baseDt * 9.80665) : 1;
-    this.hud.setGForce(gForce);
-    this.hud.setGForceEnabled(gForce > 1.1);
-    this.hud.setDebris(this.debris.length);
-
-    // Compute heading from velocity horizontal component
-    const velH = Math.sqrt(this.state.velocity[0] * this.state.velocity[0] + this.state.velocity[2] * this.state.velocity[2]);
-    if (velH > 0.5) {
-      const hdg = (Math.atan2(this.state.velocity[0], this.state.velocity[2]) * 180 / Math.PI + 360) % 360;
-      this.hud.setHeading(hdg);
-    }
-
-    // Angle of Attack: angle between rocket forward and velocity
-    const rocketForward = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-    const velMagAoa = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
-    if (velMagAoa > 1) {
-      const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
-      const aoa = Math.acos(Math.min(1, Math.max(-1, rocketForward.dot(velDir)))) * 180 / Math.PI;
-      this.hud.setAoA(aoa);
-    }
-
-    // Compute latitude/longitude relative to reference body
-    const refBodyLatLon = getReferenceBody(this.state.position, this.system);
-    const rdx = this.state.position[0] - refBodyLatLon.position[0];
-    const rdy = this.state.position[1] - refBodyLatLon.position[1];
-    const rdz = this.state.position[2] - refBodyLatLon.position[2];
-    const rdl = Math.sqrt(rdx*rdx + rdy*rdy + rdz*rdz) || 1;
-    const lat = Math.asin(rdy / rdl) * 180 / Math.PI;
-    const lon = Math.atan2(rdx, rdz) * 180 / Math.PI;
-    this.hud.setLatLon(lat, (lon + 360) % 360);
-
-    // Mach number (simple: mach1 ≈ 340 m/s at sea level, increases with sqrt(T))
+    // Mach number + sonic boom (visual only, no HUD display)
     const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
     const mach = speedMs / 340;
-    this.hud.setMach(mach);
     this.hud.setMass(this.state.rocket.totalMass());
 
     // Sonic boom trigger — when crossing Mach 1 in atmosphere
@@ -1727,7 +1691,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.sonicBoomTriggered && mach < 0.7) this.sonicBoomTriggered = false;
     this.prevMach = mach;
 
-    // Local gravitational acceleration (g = G*M/r²)
+    // Local gravitational acceleration (keep for internal use, no HUD)
     const gravRefBody = getReferenceBody(this.state.position, this.system);
     if (gravRefBody && (gravRefBody as any).mass > 0) {
       const gdx = this.state.position[0] - gravRefBody.position[0];
@@ -1735,7 +1699,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const gdz = this.state.position[2] - gravRefBody.position[2];
       const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
       const localG = (G * (gravRefBody as any).mass) / (gr * gr);
-      this.hud.setGravity(localG);
     }
 
     // Sonic boom ring when crossing mach 1
@@ -1765,6 +1728,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
+    // Compute G-force from velocity change (for screen shake, no HUD display)
+    const dvx = this.state.velocity[0] - this.prevVel[0];
+    const dvy = this.state.velocity[1] - this.prevVel[1];
+    const dvz = this.state.velocity[2] - this.prevVel[2];
+    const dvgf = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
+    const gForce = baseDt > 0 ? dvgf / (baseDt * 9.80665) : 1;
+
     // Screen shake from high G-force or mach effects
     if (gForce > 2.5) {
       this.screenShake = Math.min(1, (gForce - 2.5) / 5);
@@ -1784,12 +1754,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.sceneMgr.camera.fov += (targetFov - this.sceneMgr.camera.fov) * baseDt * 2;
     this.sceneMgr.camera.updateProjectionMatrix();
 
-    // Dynamic sky color (blue near surface, black in space)
+    // Dynamic sky color — smooth blue→black transition from surface to space
     const nearestAltSky = nearestAlt ?? 0;
-    const skyBlend = Math.min(1, Math.max(0, (nearestAltSky - 20000) / 80000));
-    const skyR = 0.02 + (1 - skyBlend) * 0.35;
-    const skyG = 0.05 + (1 - skyBlend) * 0.55;
-    const skyB = 0.12 + (1 - skyBlend) * 0.85;
+    // Blend from 0m (bright blue) -> 100km (pure black)
+    const skyBlend = Math.min(1, Math.max(0, nearestAltSky / 100000));
+    const skyR = 0.35 * (1 - skyBlend) + 0.01 * skyBlend;
+    const skyG = 0.55 * (1 - skyBlend) + 0.01 * skyBlend;
+    const skyB = 0.85 * (1 - skyBlend) + 0.02 * skyBlend;
     this.sceneMgr.scene.background = new THREE.Color(skyR, skyG, skyB);
 
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);

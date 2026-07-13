@@ -106,7 +106,7 @@ export class ChaseCamera {
       this.inertiaAzimuth = -dx * 0.005;
       this.inertiaPolar = dy * 0.005;
       this.targetAzimuth += this.inertiaAzimuth;
-      this.targetPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.targetPolar + this.inertiaPolar));
+      this.targetPolar = Math.max(0.01, Math.min(Math.PI - 0.01, this.targetPolar + this.inertiaPolar));
       this.prevMouse = { x: e.clientX, y: e.clientY };
     });
 
@@ -128,8 +128,8 @@ export class ChaseCamera {
     // Handle keyboard orbit
     if (this.orbitKeys.left) this.targetAzimuth += dt * ORBIT_SPEED;
     if (this.orbitKeys.right) this.targetAzimuth -= dt * ORBIT_SPEED;
-    if (this.orbitKeys.up) this.targetPolar = Math.max(0.05, this.targetPolar - dt * ORBIT_SPEED * 0.5);
-    if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.05, this.targetPolar + dt * ORBIT_SPEED * 0.5);
+    if (this.orbitKeys.up) this.targetPolar = Math.max(0.01, this.targetPolar - dt * ORBIT_SPEED * 0.5);
+    if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.01, this.targetPolar + dt * ORBIT_SPEED * 0.5);
     if (this.zoomKeys.in) this.targetDist = Math.max(MIN_DIST, this.targetDist * (1 - dt * ZOOM_SPEED));
     if (this.zoomKeys.out) this.targetDist = Math.min(MAX_DIST, this.targetDist * (1 + dt * ZOOM_SPEED));
 
