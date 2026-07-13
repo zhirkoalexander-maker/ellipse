@@ -88,8 +88,12 @@ export class FlightScene {
   private orbitLine: THREE.Line | null = null;
   private exhaustLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
-  private freeCamPos = new THREE.Vector3(0, 2, 5);
-  private freeCamLook = new THREE.Vector3(0, 0, 0);
+  private freeCamAzimuth = 0;
+  private freeCamPolar = Math.PI / 2;
+  private freeCamDist = 5;
+  private freeCamKeys = { left: false, right: false, up: false, down: false };
+  private freeCamDragging = false;
+  private freeCamPrevMouse = { x: 0, y: 0 };
   private hudVisible = true;
   private lastAltMilestone = 0;
   private sonicBoomRing: THREE.Mesh | null = null;
@@ -859,10 +863,60 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.hud.setVisible(this.hudVisible);
         toast.show(this.hudVisible ? 'HUD shown' : 'HUD hidden');
       }
+      // Free cam orbit on arrow keys + Shift+C active
+      if (this.cameraMode === 'free') {
+        if (e.key === 'ArrowUp') { this.freeCamKeys.up = true; e.preventDefault(); }
+        if (e.key === 'ArrowDown') { this.freeCamKeys.down = true; e.preventDefault(); }
+        if (e.key === 'ArrowLeft') { this.freeCamKeys.left = true; e.preventDefault(); }
+        if (e.key === 'ArrowRight') { this.freeCamKeys.right = true; e.preventDefault(); }
+      }
     });
 
+    window.addEventListener('keyup', (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') this.freeCamKeys.up = false;
+      if (e.key === 'ArrowDown') this.freeCamKeys.down = false;
+      if (e.key === 'ArrowLeft') this.freeCamKeys.left = false;
+      if (e.key === 'ArrowRight') this.freeCamKeys.right = false;
+    });
+
+    // Free cam mouse + touch drag (touchpad)
+    const dom = this.renderer.domElement;
+    const startDrag = (clientX: number, clientY: number) => {
+      if (this.cameraMode === 'free') {
+        this.freeCamDragging = true;
+        this.freeCamPrevMouse = { x: clientX, y: clientY };
+      }
+    };
+    const moveDrag = (clientX: number, clientY: number) => {
+      if (!this.freeCamDragging || this.cameraMode !== 'free') return;
+      const dx = clientX - this.freeCamPrevMouse.x;
+      const dy = clientY - this.freeCamPrevMouse.y;
+      this.freeCamAzimuth -= dx * 0.005;
+      this.freeCamPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.freeCamPolar + dy * 0.005));
+      this.freeCamPrevMouse = { x: clientX, y: clientY };
+    };
+    const endDrag = () => { this.freeCamDragging = false; };
+
+    dom.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
+    window.addEventListener('mouseup', endDrag);
+    dom.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1 && e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    dom.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && e.touches[0]) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    dom.addEventListener('touchend', endDrag);
+    dom.addEventListener('wheel', (e) => {
+      if (this.cameraMode === 'free') {
+        e.preventDefault();
+        this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
+        this.freeCamDist = Math.max(0.5, Math.min(200, this.freeCamDist));
+      }
+    }, { passive: false });
+
     this.achievements.unlock('first_launch');
-    toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, T SAS, Esc pause.');
+    toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, C camera, T SAS, Esc pause.');
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1483,15 +1537,27 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       );
 
       if (this.cameraMode === 'free') {
+        // Free camera: orbit around rocket - WASD keys + mouse/touch drag
+        const orbitSpeed = 3;
+        if (this.freeCamKeys.left) this.freeCamAzimuth += orbitSpeed * baseDt;
+        if (this.freeCamKeys.right) this.freeCamAzimuth -= orbitSpeed * baseDt;
+        if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
+        if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
+
         const rocketWorld = new THREE.Vector3(
           this.state.position[0] * VISUAL_SCALE,
           this.state.position[1] * VISUAL_SCALE,
           this.state.position[2] * VISUAL_SCALE
         );
-        this.freeCamPos.lerp(rocketWorld.clone().add(new THREE.Vector3(0, 2, 5)), baseDt * 2);
-        this.freeCamLook.lerp(rocketWorld, baseDt * 2);
-        this.sceneMgr.camera.position.copy(this.freeCamPos);
-        this.sceneMgr.camera.lookAt(this.freeCamLook);
+        const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
+        const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
+        const oz = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.sin(this.freeCamAzimuth);
+        this.sceneMgr.camera.position.set(rocketWorld.x + ox, rocketWorld.y + oy, rocketWorld.z + oz);
+        const upVec = Math.abs(this.freeCamPolar - Math.PI / 2) > (Math.PI / 2 - 0.15)
+          ? new THREE.Vector3(0, 0, Math.sin(this.freeCamPolar) > 0 ? 1 : -1)
+          : new THREE.Vector3(0, 1, 0);
+        this.sceneMgr.camera.up.copy(upVec);
+        this.sceneMgr.camera.lookAt(rocketWorld);
       } else {
         this.chase.follow(this.state, baseDt, camUp, warpActive);
       }
