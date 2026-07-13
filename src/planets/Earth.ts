@@ -350,9 +350,15 @@ export class Earth extends Planet {
     mat.needsUpdate = true;
   }
 
-  /** Update cloud rotation for animation */
-  updateClouds(dt: number): void {
+  /** Update cloud rotation + day/night cycle driven by sun direction */
+  updateClouds(dt: number, sunPosWC?: [number, number, number]): void {
     this.cloudMesh.rotation.y += dt * 0.008;
+    if (sunPosWC) {
+      const mat = this.mesh.material as THREE.MeshStandardMaterial;
+      const sl = Math.sqrt(sunPosWC[0]*sunPosWC[0] + sunPosWC[1]*sunPosWC[1] + sunPosWC[2]*sunPosWC[2]) || 1;
+      const dx = sunPosWC[0] / sl, dy = sunPosWC[1] / sl, dz = sunPosWC[2] / sl;
+      this.mesh.lookAt(this.mesh.position.x + dx * 100, this.mesh.position.y + dy * 100, this.mesh.position.z + dz * 100);
+    }
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
