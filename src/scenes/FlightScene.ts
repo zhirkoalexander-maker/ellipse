@@ -852,7 +852,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.chase.reset();
         toast.show('Camera view reset');
         e.preventDefault();
-      } else if (e.key === 'c') {
+      } else if (e.key === 'c' && !e.ctrlKey && !e.metaKey) {
         this.cameraMode = this.cameraMode === 'chase' ? 'free' : 'chase';
         this.hud.setFreeCamera(this.cameraMode === 'free');
         toast.show(this.cameraMode === 'free' ? 'Free camera' : 'Chase camera');
@@ -1155,17 +1155,20 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         else if (this.countdownTimer >= 3) {
           this.countdownActive = false;
           this.launched = true;
-          canLiftOff = true; // thrust allowed regardless of weight after countdown
+          canLiftOff = true;
+          // Check thrust-to-weight ratio
+          const eng = findFirstEngine(this.state.rocket.assembly.roots);
+          if (eng && eng.thrust) {
+            const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * 9.81);
+            if (twr < 0.5) toast.show(`TWR low: ${twr.toFixed(1)} — slow ascent`);
+          }
           this.showCountdown('LIFTOFF!');
           setTimeout(() => this.hideCountdown(), 1500);
         }
       }
     }
     if (engineActive && (!this.grounded || canLiftOff)) {
-      const mass = this.state.rocket.totalMass();
-      const massFactor = Math.min(1, 30000 / Math.max(mass, 1000));
-      const adjustedDt = _dt * massFactor;
-      applyThrust(this.state, adjustedDt, [tx, ty, tz]);
+      applyThrust(this.state, _dt, [tx, ty, tz]);
       this.sanitize(this.state.velocity);
     }
     if (engineActive && canLiftOff && this.grounded) {
