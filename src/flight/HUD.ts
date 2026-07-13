@@ -10,6 +10,7 @@ export class HUD {
   private heatPct!: HTMLSpanElement;
   private throttleFill!: HTMLDivElement;
   private throttlePct!: HTMLSpanElement;
+  private warpLabel!: HTMLSpanElement;
   private pauseOverlay!: HTMLDivElement;
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
@@ -79,6 +80,10 @@ export class HUD {
         <button data-action="chute" style="flex:1;padding:3px 4px;font-size:9px;background:rgba(100,120,200,0.2);color:#88aacc;border:1px solid rgba(100,120,200,0.3);border-radius:3px;cursor:pointer;">CHUTE</button>
         <button data-action="map" style="flex:1;padding:3px 4px;font-size:9px;background:rgba(100,200,100,0.2);color:#88cc88;border:1px solid rgba(100,200,100,0.3);border-radius:3px;cursor:pointer;">MAP</button>
       </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;">
+        <span style="color:rgba(244,245,242,0.5);">WARP</span>
+        <span class="warp-val" style="color:#c89838;font-size:10px;">x1</span>
+      </div>
     `;
     this.root.appendChild(panel);
 
@@ -89,6 +94,7 @@ export class HUD {
     this.heatPct = panel.querySelector('.heat-pct')!;
     this.throttleFill = panel.querySelector('.throt-fill')!;
     this.throttlePct = panel.querySelector('.throt-pct')!;
+    this.warpLabel = panel.querySelector('.warp-val')!;
 
     panel.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
@@ -123,10 +129,14 @@ export class HUD {
     if (this.massVal) this.massVal.textContent = `${(kg / 1000).toFixed(1)}`;
   }
 
-  setFreeCamera(active: boolean): void {
+setFreeCamera(active: boolean): void {
     if (this.camModeEl) {
-      this.camModeEl.textContent = active ? 'FREE CAM (WASD)' : '';
+      this.camModeEl.textContent = active ? 'FREE CAM' : '';
     }
+  }
+
+  setWarp(value: number): void {
+    if (this.warpLabel) this.warpLabel.textContent = `x${value}`;
   }
 
   setPaused(paused: boolean): void {
