@@ -228,9 +228,9 @@ function generateEarthTextureFallback(): THREE.CanvasTexture {
 
   // Ocean (deeper blue, more vibrant)
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, '#1a3a8c');
-  grad.addColorStop(0.5, '#2266cc');
-  grad.addColorStop(1, '#1a4a9a');
+  grad.addColorStop(0, '#3377cc');
+  grad.addColorStop(0.5, '#4499ee');
+  grad.addColorStop(1, '#3377cc');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
@@ -297,14 +297,14 @@ export class Earth extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const roughnessMap = generateRoughnessMap();
     const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.9,
+      roughness: 0.6,
       roughnessMap,
       metalness: 0.0,
       bumpMap: generateEarthBumpMap(),
       bumpScale: 0.5,
       emissiveMap: generateNightLightsTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.15,
+      emissiveIntensity: 0.3,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
