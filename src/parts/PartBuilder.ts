@@ -183,8 +183,8 @@ function createMaterialFromTextureSet(
     normalMap: texSet.normal,
     roughnessMap: texSet.roughness,
     metalnessMap: texSet.metalness,
-    roughness: 1.0,
-    metalness: 1.0,
+    roughness: 0.6,
+    metalness: 0.3,
     ...overrides,
   };
   if (texSet.ao) {
