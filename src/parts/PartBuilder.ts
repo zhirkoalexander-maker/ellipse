@@ -169,7 +169,16 @@ const textureCache = new Map<string, TextureSet>();
 
 function getTextureSet(key: string, generator: () => TextureSet): TextureSet {
   if (!textureCache.has(key)) {
-    textureCache.set(key, generator());
+    const set = generator();
+    // Set proper filtering on all textures
+    const textures = [set.color, set.normal, set.roughness, set.metalness, set.ao, set.emissive].filter(Boolean) as THREE.Texture[];
+    for (const tex of textures) {
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+    }
+    textureCache.set(key, set);
   }
   return textureCache.get(key)!;
 }
