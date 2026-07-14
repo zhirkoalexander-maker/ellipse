@@ -99,6 +99,7 @@ export class FlightScene {
   private sonicBoomRing: THREE.Mesh | null = null;
   private sonicBoomLife = 0;
   private reentryGlowMesh: THREE.Mesh | null = null;
+  private rocketBottomY = 0; // lowest point of rocket mesh in local space
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -157,9 +158,7 @@ export class FlightScene {
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
     // Compute spawn above displaced surface
-    // Need enough physics offset so the visual offset (×VISUAL_SCALE) exceeds the
-    // rocket's visual half-height (~0.4 visual units).  2000m / VISUAL_SCALE ≈ 1.1 visual units.
-    const SPAWN_OFFSET_M = 2000;
+    const SPAWN_OFFSET_M = 50;
     const surfacePos: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
       earth.position[1] + dirNorm[1] * earthR,
@@ -299,7 +298,11 @@ export class FlightScene {
     this.chase = new ChaseCamera(sceneMgr.camera);
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
-    this.chase.initialiseAt(this.state, this.rocketQuat, upDir);
+    // Compute visual offset for initial camera placement
+    const initOffX = upDir.x * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
+    const initOffY = upDir.y * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
+    const initOffZ = upDir.z * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
+    this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
     this.controls = new Controls(this.state);
 
     // Auto-detect touch device
@@ -1396,7 +1399,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // Penetration check — inside the planet = always crash
         if (d < surfaceR - 1) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 2010 && d > 0.001 && this.liftoffFrames <= 0) {
+        } else if (d < surfaceR + 60 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
@@ -1414,10 +1417,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
             this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 2000) ||
-                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 2000) ||
-                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 2000)) {
-              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 2000), nearestBody.position[1] + dy / d * (surfaceR + 2000), nearestBody.position[2] + dz / d * (surfaceR + 2000)];
+            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 50) ||
+                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 50) ||
+                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 50)) {
+              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 50), nearestBody.position[1] + dy / d * (surfaceR + 50), nearestBody.position[2] + dz / d * (surfaceR + 50)];
               this.sound.playLand();
               this.sound.stopEngine();
               const bodyName = nearestBody.name;
@@ -1429,7 +1432,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
               else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
             }
           }
-        } else if (d < surfaceR + 2200 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
+        } else if (d < surfaceR + 250 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
           // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
           this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         }
@@ -1451,7 +1454,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         refBody.position[2] + this.groundedDir[2],
       ];
       const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
-      const targetDist = surfaceR + 2000; // match SPAWN_OFFSET_M so rocket sits above surface visually
+      const targetDist = surfaceR + 50; // match SPAWN_OFFSET_M
       this.state.position[0] = refBody.position[0] + this.groundedDir[0] * targetDist;
       this.state.position[1] = refBody.position[1] + this.groundedDir[1] * targetDist;
       this.state.position[2] = refBody.position[2] + this.groundedDir[2] * targetDist;
@@ -1466,9 +1469,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const bodyR = (refBody as any).radius ?? 6.371e6;
       if (d > bodyR * 1.1) {
         this.state.velocity = [0, 0, 0];
-        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 2000);
-        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 2000);
-        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 2000);
+        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 50);
+        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 50);
+        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 50);
       }
     }
 
@@ -1540,10 +1543,20 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.rocketShadow) this.rocketShadow.visible = this.grounded && !this.crashed;
 
     if (!this.crashed) {
+      // Visual offset: shift rocket up so its bottom touches the surface.
+      // Physics spawn is 50m above surface = 50*VISUAL_SCALE visual units.
+      // Rocket bottom in local space = rocketBottomY (negative), scaled by ROCKET_VISUAL_SCALE.
+      // Need: visualOffset = -rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE
+      const refBodyVis = getReferenceBody(this.state.position, this.system);
+      const upXv = this.state.position[0] - refBodyVis.position[0];
+      const upYv = this.state.position[1] - refBodyVis.position[1];
+      const upZv = this.state.position[2] - refBodyVis.position[2];
+      const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
+      const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE;
       this.rocketGroup.position.set(
-        this.state.position[0] * VISUAL_SCALE,
-        this.state.position[1] * VISUAL_SCALE,
-        this.state.position[2] * VISUAL_SCALE
+        this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
+        this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
+        this.state.position[2] * VISUAL_SCALE + (upZv / upLenV) * visualOffset
       );
 
       if (this.cameraMode === 'free') {
@@ -1555,9 +1568,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
 
         const rocketWorld = new THREE.Vector3(
-          this.state.position[0] * VISUAL_SCALE,
-          this.state.position[1] * VISUAL_SCALE,
-          this.state.position[2] * VISUAL_SCALE
+          this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
+          this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
+          this.state.position[2] * VISUAL_SCALE + (upZv / upLenV) * visualOffset
         );
         const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
         const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
@@ -1569,7 +1582,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.sceneMgr.camera.up.copy(upVec);
         this.sceneMgr.camera.lookAt(rocketWorld);
       } else {
-        this.chase.follow(this.state, baseDt, camUp, warpActive);
+        const lookOffset = {
+          x: (upXv / upLenV) * visualOffset,
+          y: (upYv / upLenV) * visualOffset,
+          z: (upZv / upLenV) * visualOffset,
+        };
+        this.chase.follow(this.state, baseDt, camUp, warpActive, lookOffset);
       }
 
       if (this.deployedChuteMesh) {
@@ -2144,12 +2162,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   private positionFlameAtNozzle(): void {
     // Find the lowest point of all rocket meshes (engine nozzle)
     let minY = Infinity;
+    let maxY = -Infinity;
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         const box = new THREE.Box3().setFromObject(obj);
         if (box.min.y < minY) minY = box.min.y;
+        if (box.max.y > maxY) maxY = box.max.y;
       }
     });
+    this.rocketBottomY = minY === Infinity ? -0.1 : minY;
     // Position flame at the bottom center, in local space
     const flameY = minY === Infinity ? -0.1 : minY - 0.01;
     this.engineFlame.getMesh().position.set(0, flameY, 0);
