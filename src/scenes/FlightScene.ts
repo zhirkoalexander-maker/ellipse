@@ -1542,7 +1542,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const cd = Math.sqrt(cdx*cdx + cdy*cdy + cdz*cdz) || 1;
     const camUp = new THREE.Vector3(cdx / cd, cdy / cd, cdz / cd);
 
-    if (this.rocketShadow) this.rocketShadow.visible = this.grounded && !this.crashed;
+    if (this.rocketShadow) {
+      this.rocketShadow.visible = this.grounded && !this.crashed;
+      if (this.rocketShadow.visible) {
+        this.rocketShadow.position.y = this.rocketBottomY - 0.02;
+      }
+    }
 
     if (!this.crashed) {
       // Visual offset: shift rocket up so its bottom touches the surface.
