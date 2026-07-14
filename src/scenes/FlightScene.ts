@@ -311,7 +311,7 @@ export class FlightScene {
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
     // Compute visual offset for initial camera placement (rocketBottomY already scaled)
-    const initVisualOff = this._spawnTerrainDisp - 50 * VISUAL_SCALE - this.rocketBottomY;
+    const initVisualOff = -this.rocketBottomY - 50 * VISUAL_SCALE;
     const initOffX = upDir.x * initVisualOff;
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
@@ -1561,17 +1561,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     if (!this.crashed) {
-      // Visual offset: shift rocket up so its bottom touches the terrain-displaced surface.
-      // Physics spawn is 50m above terrain. Compute current terrain disp at rocket position.
+      // Visual offset: rocketBottomY is already in group's scaled coords.
+      // Physics pos already accounts for terrain (getSurfaceRadiusAt at spawn).
+      // Terrain disp cancels out — only need to lift rocket's own height.
+      const visualOffset = -this.rocketBottomY - 50 * VISUAL_SCALE;
+
+      // Direction from reference body center to rocket (up vector = surface normal)
       const refBodyVis = getReferenceBody(this.state.position, this.system);
       const upXv = this.state.position[0] - refBodyVis.position[0];
       const upYv = this.state.position[1] - refBodyVis.position[1];
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
-      const bodyR = (refBodyVis as any).radius ?? 6371000;
-      const currentSurfaceR = (refBodyVis as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR;
-      const terrainVDisp = (currentSurfaceR - bodyR) * VISUAL_SCALE;
-      const visualOffset = terrainVDisp - 50 * VISUAL_SCALE - this.rocketBottomY;
 
       // Debug overlay — shows once then fades
       if (!this._debugShown) {
