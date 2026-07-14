@@ -102,6 +102,7 @@ export class FlightScene {
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugShown = false;
+  private _debugMarker: THREE.Mesh | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -192,6 +193,13 @@ export class FlightScene {
       this.state.position[2] * VISUAL_SCALE
     );
     sceneMgr.scene.add(this.rocketGroup);
+
+    // DEBUG: add visible marker sphere at rocket position
+    const dbgMarkerGeom = new THREE.SphereGeometry(5, 16, 12);
+    const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    this._debugMarker = new THREE.Mesh(dbgMarkerGeom, dbgMarkerMat);
+    this._debugMarker.position.copy(this.rocketGroup.position);
+    sceneMgr.scene.add(this._debugMarker);
 
     // Landing gear legs (retracted initially)
     for (let i = 0; i < 3; i++) {
@@ -1555,6 +1563,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (this.rocketShadow.visible) {
         this.rocketShadow.position.y = this.rocketBottomY - 0.02;
       }
+    }
+
+    // Update debug marker position
+    if (this._debugMarker) {
+      this._debugMarker.position.copy(this.rocketGroup.position);
     }
 
     if (!this.crashed) {
