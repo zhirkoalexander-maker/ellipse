@@ -195,7 +195,7 @@ export class FlightScene {
     sceneMgr.scene.add(this.rocketGroup);
 
     // DEBUG: add visible marker sphere at rocket position
-    const dbgMarkerGeom = new THREE.SphereGeometry(12, 16, 12);
+    const dbgMarkerGeom = new THREE.SphereGeometry(200, 16, 12);
     const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false });
     this._debugMarker = new THREE.Mesh(dbgMarkerGeom, dbgMarkerMat);
     this._debugMarker.position.copy(this.rocketGroup.position);
