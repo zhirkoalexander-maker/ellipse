@@ -90,7 +90,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 5;
+  private freeCamDist = 15;
   private freeCamKeys = { left: false, right: false, up: false, down: false };
   private freeCamDragging = false;
   private freeCamPrevMouse = { x: 0, y: 0 };
