@@ -102,7 +102,6 @@ export class FlightScene {
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugShown = false;
-  private _spawnTerrainDisp = 0; // visual units of terrain displacement at spawn direction
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -174,8 +173,6 @@ export class FlightScene {
       earth.position[1] + dirNorm[1] * (surfaceR + SPAWN_OFFSET_M),
       earth.position[2] + dirNorm[2] * (surfaceR + SPAWN_OFFSET_M),
     ];
-    // Terrain visual displacement at spawn direction (for visual offset calc)
-    this._spawnTerrainDisp = (surfaceR - earthR) * VISUAL_SCALE;
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
     this.groundedDir = dirNorm;
 
