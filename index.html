@@ -11,6 +11,7 @@
       @media screen and (orientation:portrait) {
         #rotate-hint { display: flex !important; }
         #app { display: none !important; }
+        #loading-screen { display: none !important; }
       }
       #rotate-hint {
         display: none; position: fixed; inset: 0; z-index: 9999;
@@ -18,15 +19,97 @@
         justify-content: center; align-items: center; text-align: center;
         flex-direction: column; gap: 16px;
       }
+      #loading-screen {
+        position: fixed; inset: 0; z-index: 900;
+        background: #06080f;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        transition: opacity 0.8s ease-out;
+      }
+      #loading-screen.hidden { opacity: 0; pointer-events: none; }
+      #loading-screen .logo {
+        font: 600 48px/1 sans-serif;
+        letter-spacing: 0.1em;
+        color: #c89838;
+        margin-bottom: 24px;
+        text-shadow: 0 0 40px rgba(200,152,56,0.2);
+        animation: pulse-logo 2s ease-in-out infinite;
+      }
+      @keyframes pulse-logo {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+      .loader-spinner {
+        width: 48px; height: 48px;
+        border: 2px solid rgba(200,152,56,0.15);
+        border-top-color: #c89838;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .loader-label {
+        font: 400 13px/1.4 sans-serif;
+        color: #556;
+        letter-spacing: 0.05em;
+        margin-top: 20px;
+        text-align: center;
+      }
+      .star-field {
+        position: fixed; inset: 0; z-index: -1;
+        overflow: hidden;
+      }
+      .star-field .star {
+        position: absolute;
+        width: 2px; height: 2px;
+        background: #fff;
+        border-radius: 50%;
+        animation: twinkle 3s ease-in-out infinite alternate;
+      }
+      @keyframes twinkle {
+        0% { opacity: 0.2; }
+        100% { opacity: 0.9; }
+      }
     </style>
-    <script type="module" crossorigin src="/ellipse/assets/index-Bzl5jwcu.js"></script>
+    <script type="module" crossorigin src="/ellipse/assets/index-B0ElRhMb.js"></script>
     <link rel="stylesheet" crossorigin href="/ellipse/assets/index-C2Q20jdt.css">
   </head>
   <body>
+    <div id="loading-screen">
+      <div class="star-field" id="loading-stars"></div>
+      <div class="logo">ELLIPSE</div>
+      <div class="loader-spinner"></div>
+      <div class="loader-label" id="loading-label">INITIALIZING</div>
+    </div>
     <div id="rotate-hint">
       <div style="font-size:48px">↻</div>
       <div>Please rotate your device to landscape</div>
     </div>
     <div id="app" style="position:fixed;inset:0;z-index:1;"></div>
+    <script>
+      (function() {
+        var el = document.getElementById('loading-stars');
+        if (el) {
+          for (var i = 0; i < 120; i++) {
+            var s = document.createElement('div');
+            s.className = 'star';
+            s.style.left = (Math.random() * 100) + '%';
+            s.style.top = (Math.random() * 100) + '%';
+            s.style.width = s.style.height = (0.5 + Math.random() * 1.5) + 'px';
+            s.style.animationDelay = (Math.random() * 3) + 's';
+            s.style.animationDuration = (2 + Math.random() * 3) + 's';
+            el.appendChild(s);
+          }
+        }
+        var label = document.getElementById('loading-label');
+        var msgs = ['INITIALIZING', 'LOADING SOLAR SYSTEM', 'GENERATING TEXTURES', 'PREPARING VEHICLES', 'CALIBRATING SENSORS'];
+        var idx = 0;
+        setInterval(function() {
+          if (label && !label.dataset.done) {
+            idx = (idx + 1) % msgs.length;
+            label.textContent = msgs[idx];
+          }
+        }, 3000);
+      })();
+    </script>
   </body>
 </html>
