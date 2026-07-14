@@ -304,7 +304,7 @@ export class Earth extends Planet {
       bumpScale: 0.5,
       emissiveMap: generateNightLightsTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.5,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
@@ -386,7 +386,7 @@ export class Earth extends Planet {
     // Night side = dot(camera→earthCenter, sun→earthCenter) < 0 means camera is on night side
     // emissive = city lights visible at night
     // Simple: emissiveIntensity = city lights intensity modulated by day/night
-    mat.emissiveIntensity = 0.08; // Always faint city lights
+    mat.emissiveIntensity = 0.6; // Day/night city lights brighter
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
