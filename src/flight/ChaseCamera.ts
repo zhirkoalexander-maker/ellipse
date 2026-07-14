@@ -63,10 +63,10 @@ export class ChaseCamera {
     });
   }
 
-  initialiseAt(state: FlightState, _quat: THREE.Quaternion, upDir?: THREE.Vector3): void {
-    const vx = state.position[0] * VISUAL_SCALE;
-    const vy = state.position[1] * VISUAL_SCALE;
-    const vz = state.position[2] * VISUAL_SCALE;
+  initialiseAt(state: FlightState, _quat: THREE.Quaternion, upDir?: THREE.Vector3, lookOffset?: { x: number; y: number; z: number }): void {
+    const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
+    const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
+    const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
     const look = new THREE.Vector3(vx, vy, vz);
     const ox = this.targetDist * Math.sin(this.polar) * Math.cos(this.azimuth);
     const oy = this.targetDist * Math.cos(this.polar);
@@ -123,10 +123,10 @@ export class ChaseCamera {
     }, { passive: false });
   }
 
-  follow(state: FlightState, dt: number, _upDir?: THREE.Vector3, snap = false): void {
-    const vx = state.position[0] * VISUAL_SCALE;
-    const vy = state.position[1] * VISUAL_SCALE;
-    const vz = state.position[2] * VISUAL_SCALE;
+  follow(state: FlightState, dt: number, _upDir?: THREE.Vector3, snap = false, lookOffset?: { x: number; y: number; z: number }): void {
+    const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
+    const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
+    const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
     const targetLook = new THREE.Vector3(vx, vy, vz);
 
     // Handle keyboard orbit
