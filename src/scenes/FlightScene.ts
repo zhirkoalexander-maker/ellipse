@@ -201,14 +201,17 @@ export class FlightScene {
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
 
-    // Make ALL rocket parts visibly bright — set emissive on every material
+    // Make ALL rocket parts WHITE for visibility
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const mat of mats) {
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.emissive = new THREE.Color(0x444444);
+            mat.color = new THREE.Color(0xffffff);
+            mat.emissive = new THREE.Color(0x333333);
             mat.emissiveIntensity = 0.5;
+            mat.roughness = 0.5;
+            mat.metalness = 0.1;
             mat.needsUpdate = true;
           }
         }
