@@ -1805,7 +1805,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     // Dynamic FOV based on speed (warp effect at high speeds)
     const speedKms = speed / 1000;
-    const targetFov = 50 + Math.min(30, speedKms * 0.1);
+    const targetFov = 40 + Math.min(30, speedKms * 0.1);
     this.sceneMgr.camera.fov += (targetFov - this.sceneMgr.camera.fov) * baseDt * 2;
     this.sceneMgr.camera.updateProjectionMatrix();
 
