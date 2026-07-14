@@ -91,7 +91,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 15;
+  private freeCamDist = 10;
   private freeCamKeys = { left: false, right: false, up: false, down: false };
   private freeCamDragging = false;
   private freeCamPrevMouse = { x: 0, y: 0 };
@@ -200,6 +200,20 @@ export class FlightScene {
     this._debugMarker = new THREE.Mesh(dbgMarkerGeom, dbgMarkerMat);
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
+
+    // Make ALL rocket parts visibly bright — set emissive on every material
+    this.rocketGroup.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial) {
+            mat.emissive = new THREE.Color(0x444444);
+            mat.emissiveIntensity = 0.5;
+            mat.needsUpdate = true;
+          }
+        }
+      }
+    });
 
     // Landing gear legs (retracted initially)
     for (let i = 0; i < 3; i++) {
