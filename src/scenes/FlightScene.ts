@@ -87,6 +87,7 @@ export class FlightScene {
   private maxSpeed = 0;
   private orbitLine: THREE.Line | null = null;
   private exhaustLight: THREE.PointLight | null = null;
+  private followLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
@@ -238,6 +239,11 @@ export class FlightScene {
     const fillLight = new THREE.DirectionalLight(0x8899cc, 1.5);
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
+
+    // Follow light — small point light on rocket so it's always visible
+    this.followLight = new THREE.PointLight(0xffddcc, 3, 10);
+    this.followLight.position.set(0, 2, 0);
+    this.rocketGroup.add(this.followLight);
 
     this.engineFlame = new EngineFlame();
     this.positionFlameAtNozzle();
