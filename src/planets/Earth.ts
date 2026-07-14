@@ -220,7 +220,7 @@ function generateRoughnessMap(): THREE.CanvasTexture {
 
 /** Generate a procedural Earth texture as a synchronous fallback. */
 function generateEarthTextureFallback(): THREE.CanvasTexture {
-  const W = 4096, H = 2048;
+  const W = 6144, H = 3072;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -355,13 +355,21 @@ export class Earth extends Planet {
   }
 
   private async loadHighResTexture(): Promise<void> {
-    const loader = new THREE.TextureLoader();
-    const tex = await loader.loadAsync(assetUrl('/textures/earth_daymap.jpg'));
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    const mat = this.mesh.material as THREE.MeshStandardMaterial;
-    mat.map = tex;
-    mat.needsUpdate = true;
+    try {
+      const loader = new THREE.TextureLoader();
+      const tex = await loader.loadAsync(assetUrl('/textures/earth_daymap.jpg'));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 16;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      const mat = this.mesh.material as THREE.MeshStandardMaterial;
+      mat.map = tex;
+      mat.needsUpdate = true;
+      console.log('Earth high-res texture loaded');
+    } catch(e) {
+      console.warn('Earth texture load failed, using fallback:', e);
+    }
   }
 
   /** Update cloud rotation + day/night cycle driven by sun direction */
