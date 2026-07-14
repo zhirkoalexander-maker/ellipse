@@ -1206,15 +1206,28 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         else if (this.countdownTimer >= 3) {
           this.countdownActive = false;
           this.launched = true;
-          canLiftOff = true;
-          // Check thrust-to-weight ratio
+          // Check thrust-to-weight ratio using actual local gravity
           const eng = findFirstEngine(this.state.rocket.assembly.roots);
-          if (eng && eng.thrust) {
-            const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * 9.81);
-            if (twr < 0.5) toast.show(`TWR low: ${twr.toFixed(1)} — slow ascent`);
+          const refBody = getReferenceBody(this.state.position, this.system);
+          const gdx = this.state.position[0] - refBody.position[0];
+          const gdy = this.state.position[1] - refBody.position[1];
+          const gdz = this.state.position[2] - refBody.position[2];
+          const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
+          const localGrav = (G * refBody.mass) / (gr * gr);
+          if (eng && eng.thrust && localGrav > 0) {
+            const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * localGrav);
+            if (twr >= 1) {
+              canLiftOff = true;
+            } else {
+              toast.show(`TWR ${twr.toFixed(2)} — insufficient for liftoff!`);
+              this.launched = false;
+              this.countdownTimer = 0; // Allow retry
+            }
           }
-          this.showCountdown('LIFTOFF!');
-          setTimeout(() => this.hideCountdown(), 1500);
+          if (canLiftOff) {
+            this.showCountdown('LIFTOFF!');
+            setTimeout(() => this.hideCountdown(), 1500);
+          }
         }
       }
     }

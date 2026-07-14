@@ -324,7 +324,7 @@ setFreeCamera(active: boolean): void {
       const dy = state.position[1] - body.position[1];
       const dz = state.position[2] - body.position[2];
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const r = (body as any).radius ?? 0;
+      const r = (body as any).getSurfaceRadiusAt?.(state.position) ?? (body as any).radius ?? 0;
       const alt = d - r;
       if (alt < nearestAlt) nearestAlt = alt;
     }
