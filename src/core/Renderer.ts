@@ -7,7 +7,7 @@ export class Renderer {
   constructor() {
     this.three = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', logarithmicDepthBuffer: true });
     this.domElement = this.three.domElement;
-    this.three.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.three.setPixelRatio(1);
     this.three.setClearColor(0x000010, 1);
     this.three.toneMapping = THREE.LinearToneMapping;
     this.three.toneMappingExposure = 1.2;
@@ -16,6 +16,8 @@ export class Renderer {
 
   setSize(width: number, height: number): void {
     this.three.setSize(width, height);
+    this.domElement.style.width = width + 'px';
+    this.domElement.style.height = height + 'px';
   }
 
   dispose(): void {

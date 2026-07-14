@@ -5,7 +5,7 @@ export const G = 6.67430e-11;
 export const ORBIT_SCALE = 1e-9;
 
 /** Visual planet size multiplier */
-export const VISUAL_PLANET_MULT = 562500 * 3;
+export const VISUAL_PLANET_MULT = 562500;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
@@ -20,7 +20,7 @@ export const EARTH_MASS = 8.92e24;
 export const PART_SCALE = 0.05;
 
 /** Rocket visual scale multiplier */
-export const ROCKET_VISUAL_SCALE = 150;
+export const ROCKET_VISUAL_SCALE = 50;
 
 /** Terrain displacement fraction of visual radius */
 export const TERRAIN_DISP_FRAC = 0.0005;
@@ -33,7 +33,6 @@ export const TERRAIN_SEA_LEVEL = 0.35;
 
 /** Resolve asset URL with correct base path for GitHub Pages. */
 export function assetUrl(path: string): string {
-  // In dev mode, public/ files are served at root (no prefix)
   if (import.meta.env.DEV) return path;
   const base = (import.meta as any).env?.BASE_URL ?? '/';
   return (base + path.replace(/^\//, '')).replace(/\/\//g, '/');
