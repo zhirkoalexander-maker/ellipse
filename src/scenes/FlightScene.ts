@@ -230,7 +230,7 @@ export class FlightScene {
       if (pbody.mesh) sceneMgr.scene.add(pbody.mesh);
       if (pbody.light) sceneMgr.scene.add(pbody.light);
     }
-    const fillLight = new THREE.DirectionalLight(0x8899cc, 0.5);
+    const fillLight = new THREE.DirectionalLight(0x8899cc, 1.5);
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
 
