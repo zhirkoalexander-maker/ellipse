@@ -1577,10 +1577,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (!this._debugShown) {
         this._debugShown = true;
         const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#ff0;background:rgba(0,0,0,0.7);padding:8px;border-radius:4px;pointer-events:none;';
-        dbg.innerHTML = `rocketBottomY=${this.rocketBottomY.toFixed(4)}<br>visualOffset=${visualOffset.toFixed(4)}<br>VISUAL_SCALE=${VISUAL_SCALE}<br>VISUAL_SCALE=ORBIT_SCALE*VISUAL_PLANET_MULT=${1e-9}*${562500}<br>earthVisualR=${(6.371e6*VISUAL_SCALE).toFixed(2)}<br>rocketGroup.scale=${ROCKET_VISUAL_SCALE}<br>physicsY=${(this.state.position[1]).toFixed(0)}<br>visualY=${(this.state.position[1]*VISUAL_SCALE).toFixed(4)}<br>upDir=(${(upXv/upLenV).toFixed(3)},${(upYv/upLenV).toFixed(3)},${(upZv/upLenV).toFixed(3)})`;
+        dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
+        dbg.id = 'rocket-debug';
+        dbg.innerHTML = `v0.48<br>rocketBottomY=${this.rocketBottomY.toFixed(4)}<br>visualOffset=${visualOffset.toFixed(4)}<br>VISUAL_SCALE=${VISUAL_SCALE.toExponential(2)}<br>ROCKET_VISUAL_SCALE=${ROCKET_VISUAL_SCALE}<br>earthVisualR=${(6.371e6*VISUAL_SCALE).toFixed(2)}<br>physicsY=${(this.state.position[1]).toFixed(0)}<br>visualY=${(this.state.position[1]*VISUAL_SCALE).toFixed(4)}<br>upDir=(${(upXv/upLenV).toFixed(3)},${(upYv/upLenV).toFixed(3)},${(upZv/upLenV).toFixed(3)})`;
         document.body.appendChild(dbg);
-        setTimeout(() => { dbg.style.transition = 'opacity 2s'; dbg.style.opacity = '0'; setTimeout(()=>dbg.remove(), 2000); }, 8000);
+        console.log('ROCKET DEBUG:', {
+          rocketBottomY: this.rocketBottomY,
+          visualOffset,
+          VISUAL_SCALE,
+          ROCKET_VISUAL_SCALE,
+          earthVisualR: 6.371e6 * VISUAL_SCALE,
+          rocketGroupPos: this.rocketGroup.position.toArray(),
+          statePos: this.state.position,
+        });
       }
 
       this.rocketGroup.position.set(
