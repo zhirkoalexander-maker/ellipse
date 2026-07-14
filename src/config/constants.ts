@@ -4,8 +4,8 @@ export const G = 6.67430e-11;
 /** Orbit compression factor (1:10⁹) */
 export const ORBIT_SCALE = 1e-9;
 
-/** Visual planet size multiplier — ×562500 = 15x from original 37500 */
-export const VISUAL_PLANET_MULT = 562500;
+/** Visual planet size multiplier */
+export const VISUAL_PLANET_MULT = 562500 * 17;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
@@ -14,7 +14,7 @@ export const FIXED_DT = 1 / 60;
 export const G0 = 9.80665;
 
 /** Earth mass (kg) — 20x real for heavy gravity (196 m/s² surface) */
-export const EARTH_MASS = 1.1944e26;
+export const EARTH_MASS = 1.1944e26 * 20;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
