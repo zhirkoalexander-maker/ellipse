@@ -110,6 +110,7 @@
           }
         }, 3000);
       })();
+      window.onerror = function(m) { alert('JS Error: '+m); };
     </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
