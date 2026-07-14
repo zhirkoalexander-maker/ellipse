@@ -334,7 +334,7 @@ export class Earth extends Planet {
     this.loadHighResTexture().catch(() => {});
 
     // Atmosphere glow
-    this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 0.6);
+    this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 1.5);
     this.mesh.add(this.atmosphereGlow.getMesh());
 
     // Cloud layer
