@@ -20,10 +20,10 @@ export const EARTH_MASS = 1.1944e26 * 20;
 export const PART_SCALE = 0.05;
 
 /** Rocket visual scale multiplier — large enough to be visible against planet */
-export const ROCKET_VISUAL_SCALE = 50;
+export const ROCKET_VISUAL_SCALE = 850;
 
 /** Terrain displacement fraction of visual radius */
-export const TERRAIN_DISP_FRAC = 0.02;
+export const TERRAIN_DISP_FRAC = 0.001;
 
 /** Ocean depression */
 export const TERRAIN_OCEAN_FRAC = 0;
