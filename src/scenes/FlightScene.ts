@@ -1107,6 +1107,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (warpActive) {
       this.state.throttle = 0;
     }
+    // In freecam mode, disable rocket throttle and rotation
+    if (this.cameraMode === 'free') {
+      this.state.throttle = 0;
+    }
     if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
     // Auto-stage when engine has no fuel and there's a decoupler
@@ -1609,7 +1613,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v0.48<br>rocketBottomY=${this.rocketBottomY.toFixed(4)}<br>visualOffset=${visualOffset.toFixed(4)}<br>VISUAL_SCALE=${VISUAL_SCALE.toExponential(2)}<br>ROCKET_VISUAL_SCALE=${ROCKET_VISUAL_SCALE}<br>earthVisualR=${(6.371e6*VISUAL_SCALE).toFixed(2)}<br>physicsY=${(this.state.position[1]).toFixed(0)}<br>visualY=${(this.state.position[1]*VISUAL_SCALE).toFixed(4)}<br>upDir=(${(upXv/upLenV).toFixed(3)},${(upYv/upLenV).toFixed(3)},${(upZv/upLenV).toFixed(3)})`;
+        dbg.innerHTML = `v0.62<br>C=freecam F=reset T=SAS W=throttle<br>rocketBottomY=${this.rocketBottomY.toFixed(4)}<br>visualOffset=${visualOffset.toFixed(4)}<br>VS=${VISUAL_SCALE.toExponential(2)}<br>RVS=${ROCKET_VISUAL_SCALE}`;
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
