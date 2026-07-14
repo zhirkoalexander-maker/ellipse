@@ -220,7 +220,7 @@ function generateRoughnessMap(): THREE.CanvasTexture {
 
 /** Generate a procedural Earth texture as a synchronous fallback. */
 function generateEarthTextureFallback(): THREE.CanvasTexture {
-  const W = 1024, H = 512;
+  const W = 2048, H = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -314,8 +314,22 @@ export class Earth extends Planet {
     this.generateTerrain(visualR);
 
     const fallbackTex = generateEarthTextureFallback();
+    fallbackTex.minFilter = THREE.LinearMipmapLinearFilter;
+    fallbackTex.magFilter = THREE.LinearFilter;
+    fallbackTex.generateMipmaps = true;
+    fallbackTex.colorSpace = THREE.SRGBColorSpace;
     mat.map = fallbackTex;
     mat.needsUpdate = true;
+
+    // Set proper texture filtering on all Earth textures
+    const earthTextures = [fallbackTex, roughnessMap, mat.bumpMap, mat.emissiveMap]
+      .filter(Boolean) as THREE.Texture[];
+    for (const tex of earthTextures) {
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+    }
 
     this.loadHighResTexture().catch(() => {});
 
