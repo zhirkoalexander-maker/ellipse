@@ -1833,9 +1833,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const nearestAltSky = nearestAlt ?? 0;
     // Blend from 0m (bright blue) -> 100km (pure black)
     const skyBlend = Math.min(1, Math.max(0, nearestAltSky / 100000));
-    const skyR = 0.35 * (1 - skyBlend) + 0.01 * skyBlend;
-    const skyG = 0.55 * (1 - skyBlend) + 0.01 * skyBlend;
-    const skyB = 0.85 * (1 - skyBlend) + 0.02 * skyBlend;
+    const skyR = 0.45 * (1 - skyBlend) + 0.01 * skyBlend;
+    const skyG = 0.65 * (1 - skyBlend) + 0.01 * skyBlend;
+    const skyB = 0.95 * (1 - skyBlend) + 0.02 * skyBlend;
     this.sceneMgr.scene.background = new THREE.Color(skyR, skyG, skyB);
 
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
