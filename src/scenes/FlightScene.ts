@@ -90,7 +90,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 15;
+  private freeCamDist = 5;
   private freeCamKeys = { left: false, right: false, up: false, down: false };
   private freeCamDragging = false;
   private freeCamPrevMouse = { x: 0, y: 0 };
@@ -298,10 +298,11 @@ export class FlightScene {
     this.chase = new ChaseCamera(sceneMgr.camera);
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
-    // Compute visual offset for initial camera placement
-    const initOffX = upDir.x * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
-    const initOffY = upDir.y * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
-    const initOffZ = upDir.z * (-this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE);
+    // Compute visual offset for initial camera placement (rocketBottomY already scaled)
+    const initVisualOff = -this.rocketBottomY - 50 * VISUAL_SCALE;
+    const initOffX = upDir.x * initVisualOff;
+    const initOffY = upDir.y * initVisualOff;
+    const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
     this.controls = new Controls(this.state);
 
@@ -1545,14 +1546,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (!this.crashed) {
       // Visual offset: shift rocket up so its bottom touches the surface.
       // Physics spawn is 50m above surface = 50*VISUAL_SCALE visual units.
-      // Rocket bottom in local space = rocketBottomY (negative), scaled by ROCKET_VISUAL_SCALE.
-      // Need: visualOffset = -rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE
+      // rocketBottomY is already in scaled coordinates (group is scaled).
+      // Need: visualOffset = -rocketBottomY - 50 * VISUAL_SCALE
       const refBodyVis = getReferenceBody(this.state.position, this.system);
       const upXv = this.state.position[0] - refBodyVis.position[0];
       const upYv = this.state.position[1] - refBodyVis.position[1];
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
-      const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE - 50 * VISUAL_SCALE;
+      const visualOffset = -this.rocketBottomY - 50 * VISUAL_SCALE;
       this.rocketGroup.position.set(
         this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
         this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
