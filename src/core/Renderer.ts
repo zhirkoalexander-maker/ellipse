@@ -5,7 +5,7 @@ export class Renderer {
   readonly three: THREE.WebGLRenderer;
 
   constructor() {
-    this.three = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    this.three = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.domElement = this.three.domElement;
     this.three.setPixelRatio(window.devicePixelRatio);
     this.three.setClearColor(0x000010, 1);
