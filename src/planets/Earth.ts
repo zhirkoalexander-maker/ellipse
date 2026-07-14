@@ -297,14 +297,14 @@ export class Earth extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const roughnessMap = generateRoughnessMap();
     const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.6,
+      roughness: 0.7,
       roughnessMap,
       metalness: 0.0,
       bumpMap: generateEarthBumpMap(),
-      bumpScale: 0.5,
+      bumpScale: 0.3,
       emissiveMap: generateNightLightsTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.5,
+      emissiveIntensity: 0.15,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
@@ -386,7 +386,7 @@ export class Earth extends Planet {
     // Night side = dot(camera→earthCenter, sun→earthCenter) < 0 means camera is on night side
     // emissive = city lights visible at night
     // Simple: emissiveIntensity = city lights intensity modulated by day/night
-    mat.emissiveIntensity = 0.6; // Day/night city lights brighter
+    mat.emissiveIntensity = 0.15;
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
@@ -395,8 +395,8 @@ export class Earth extends Planet {
     const n3 = Math.sin(nx * 12.0 + nz * 8.0) * 0.1 + Math.cos(ny * 10.0 + nx * 5.0) * 0.08;
     const n4 = Math.sin(nx * 25.0 + ny * 20.0 + nz * 30.0) * 0.05;
     const elev = ((n1 + n2 + n3 + n4) * 0.3 + 0.5) * 1.2;
-    const maxDisp = this.visualRadius * 0.001;
-    const oceanDepth = this.visualRadius * 0.012;
+    const maxDisp = this.visualRadius * 0.0005;
+    const oceanDepth = this.visualRadius * 0.0002;
     if (elev > 0.4) {
       const h = (elev - 0.4) / 0.6;
       return h * h * maxDisp;
