@@ -101,6 +101,7 @@ export class FlightScene {
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugShown = false;
+  private _spawnTerrainDisp = 0; // visual units of terrain displacement at spawn direction
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -158,18 +159,22 @@ export class FlightScene {
     const dirMag = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
-    // Compute spawn above displaced surface
     const SPAWN_OFFSET_M = 50;
-    const surfacePos: [number, number, number] = [
+    // Compute nominal surface position (for terrain lookup)
+    const nominalSurface: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
       earth.position[1] + dirNorm[1] * earthR,
       earth.position[2] + dirNorm[2] * earthR,
     ];
+    // Get actual surface radius including terrain displacement
+    const surfaceR = (earth as any).getSurfaceRadiusAt?.(nominalSurface) ?? earthR;
     const spawnPos: [number, number, number] = [
-      earth.position[0] + dirNorm[0] * (earthR + SPAWN_OFFSET_M),
-      earth.position[1] + dirNorm[1] * (earthR + SPAWN_OFFSET_M),
-      earth.position[2] + dirNorm[2] * (earthR + SPAWN_OFFSET_M),
+      earth.position[0] + dirNorm[0] * (surfaceR + SPAWN_OFFSET_M),
+      earth.position[1] + dirNorm[1] * (surfaceR + SPAWN_OFFSET_M),
+      earth.position[2] + dirNorm[2] * (surfaceR + SPAWN_OFFSET_M),
     ];
+    // Terrain visual displacement at spawn direction (for visual offset calc)
+    this._spawnTerrainDisp = (surfaceR - earthR) * VISUAL_SCALE;
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
     this.groundedDir = dirNorm;
 
@@ -300,7 +305,7 @@ export class FlightScene {
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
     // Compute visual offset for initial camera placement (rocketBottomY already scaled)
-    const initVisualOff = -this.rocketBottomY - 50 * VISUAL_SCALE;
+    const initVisualOff = this._spawnTerrainDisp - 50 * VISUAL_SCALE - this.rocketBottomY;
     const initOffX = upDir.x * initVisualOff;
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
@@ -1550,16 +1555,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     if (!this.crashed) {
-      // Visual offset: shift rocket up so its bottom touches the surface.
-      // Physics spawn is 50m above surface = 50*VISUAL_SCALE visual units.
-      // rocketBottomY is already in scaled coordinates (group is scaled).
-      // Need: visualOffset = -rocketBottomY - 50 * VISUAL_SCALE
+      // Visual offset: shift rocket up so its bottom touches the terrain-displaced surface.
+      // Physics spawn is 50m above terrain. Compute current terrain disp at rocket position.
       const refBodyVis = getReferenceBody(this.state.position, this.system);
       const upXv = this.state.position[0] - refBodyVis.position[0];
       const upYv = this.state.position[1] - refBodyVis.position[1];
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
-      const visualOffset = -this.rocketBottomY - 50 * VISUAL_SCALE;
+      const bodyR = (refBodyVis as any).radius ?? 6371000;
+      const currentSurfaceR = (refBodyVis as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR;
+      const terrainVDisp = (currentSurfaceR - bodyR) * VISUAL_SCALE;
+      const visualOffset = terrainVDisp - 50 * VISUAL_SCALE - this.rocketBottomY;
 
       // Debug overlay — shows once then fades
       if (!this._debugShown) {
