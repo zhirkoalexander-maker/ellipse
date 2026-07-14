@@ -120,6 +120,11 @@
           sessionStorage.setItem('ellipse_ver', v);
         }
       })();
+      if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/ellipse/sw.js').then(function(reg) {
+          reg.update();
+        }).catch(function(){});
+      }
     </script>
   </body>
 </html>
