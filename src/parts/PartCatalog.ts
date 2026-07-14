@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 88,           // kN (TWR ≈ 1.5) — realistic acceleration
+    thrust: 35200,           // kN ×400 for ×20 gravity (TWR≈1.5)
     isp: 350,             // s
     fuelType: 'LFO'
   },
@@ -70,7 +70,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 400,
-    thrust: 800,
+    thrust: 320000,
     isp: 340,
     fuelType: 'LFO'
   },
@@ -80,7 +80,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 1200,
-    thrust: 2000,
+    thrust: 800000,
     isp: 330,
     fuelType: 'LFO'
   },
@@ -90,7 +90,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'XL',
     mass: 3000,
-    thrust: 5000,
+    thrust: 2000000,
     isp: 310,
     fuelType: 'LFO'
   },
