@@ -91,7 +91,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 170;
+  private freeCamDist = 10;
   private freeCamKeys = { left: false, right: false, up: false, down: false };
   private freeCamDragging = false;
   private freeCamPrevMouse = { x: 0, y: 0 };
@@ -194,10 +194,11 @@ export class FlightScene {
     );
     sceneMgr.scene.add(this.rocketGroup);
 
-    // DEBUG: add visible marker sphere at rocket position
-    const dbgMarkerGeom = new THREE.SphereGeometry(200, 16, 12);
-    const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false });
+    // DEBUG: hidden by default — green marker for position verification
+    const dbgMarkerGeom = new THREE.SphereGeometry(1, 8, 6);
+    const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3, depthTest: false, depthWrite: false, visible: false });
     this._debugMarker = new THREE.Mesh(dbgMarkerGeom, dbgMarkerMat);
+    this._debugMarker.visible = false;
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
 
@@ -263,7 +264,7 @@ export class FlightScene {
     sceneMgr.scene.add(fillLight);
 
     // Follow light — small point light on rocket so it's always visible
-    this.followLight = new THREE.PointLight(0xffddcc, 3, 200);
+    this.followLight = new THREE.PointLight(0xffddcc, 3, 15);
     this.followLight.position.set(0, 2, 0);
     this.rocketGroup.add(this.followLight);
 
@@ -958,7 +959,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (this.cameraMode === 'free') {
         e.preventDefault();
         this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
-        this.freeCamDist = Math.max(5, Math.min(3000, this.freeCamDist));
+        this.freeCamDist = Math.max(0.5, Math.min(500, this.freeCamDist));
       }
     }, { passive: false });
 

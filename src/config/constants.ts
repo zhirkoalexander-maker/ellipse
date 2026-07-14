@@ -1,11 +1,11 @@
-/** Gravitational constant (m³/(kg·s²)) */
+/* Gravitational constant (m³/(kg·s²)) */
 export const G = 6.67430e-11;
 
 /** Orbit compression factor (1:10⁹) */
 export const ORBIT_SCALE = 1e-9;
 
 /** Visual planet size multiplier */
-export const VISUAL_PLANET_MULT = 562500 * 17;
+export const VISUAL_PLANET_MULT = 562500;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
@@ -13,17 +13,17 @@ export const FIXED_DT = 1 / 60;
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
 
-/** Earth mass (kg) — 20x real for heavy gravity (196 m/s² surface) */
-export const EARTH_MASS = 1.1944e26 * 20;
+/** Earth mass (kg) — g≈14.67 m/s² (max for Ant engine TWR≈1) */
+export const EARTH_MASS = 8.92e24;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
 
-/** Rocket visual scale multiplier — large enough to be visible against planet */
-export const ROCKET_VISUAL_SCALE = 850;
+/** Rocket visual scale multiplier */
+export const ROCKET_VISUAL_SCALE = 50;
 
 /** Terrain displacement fraction of visual radius */
-export const TERRAIN_DISP_FRAC = 0.001;
+export const TERRAIN_DISP_FRAC = 0.0005;
 
 /** Ocean depression */
 export const TERRAIN_OCEAN_FRAC = 0;
