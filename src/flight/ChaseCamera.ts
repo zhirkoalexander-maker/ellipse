@@ -10,7 +10,7 @@ const LERP_SPEED = 4;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
-const DEFAULT_DIST = 30;
+const DEFAULT_DIST = 20;
 const DEFAULT_AZIMUTH = 0;
 const DEFAULT_POLAR = Math.PI / 2;
 

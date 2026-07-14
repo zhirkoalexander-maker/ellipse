@@ -316,18 +316,18 @@ export class Earth extends Planet {
     const fallbackTex = generateEarthTextureFallback();
     fallbackTex.minFilter = THREE.LinearMipmapLinearFilter;
     fallbackTex.magFilter = THREE.LinearFilter;
-    fallbackTex.generateMipmaps = true;
+    fallbackTex.generateMipmaps = false;
     fallbackTex.colorSpace = THREE.SRGBColorSpace;
     mat.map = fallbackTex;
     mat.needsUpdate = true;
 
-    // Set proper texture filtering on all Earth textures
+    // Set proper texture filtering on all Earth textures — NO mipmaps for sharpness
     const earthTextures = [fallbackTex, roughnessMap, mat.bumpMap, mat.emissiveMap]
       .filter(Boolean) as THREE.Texture[];
     for (const tex of earthTextures) {
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = true;
+      tex.generateMipmaps = false;
       tex.needsUpdate = true;
     }
 
