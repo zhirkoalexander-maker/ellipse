@@ -20,7 +20,7 @@ import { findPart } from '../parts/PartCatalog';
 import { Achievements } from './Achievements';
 import { toast } from '../ui/Toast';
 import { loadSettings, SettingsPanel } from '../ui/Settings';
-import { PART_SCALE } from '../config/constants';
+import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
 import * as THREE from 'three';
 import { loadGLTF } from '../parts/PartBuilder';
@@ -95,7 +95,13 @@ this.system = new System();
       '/models/crawler.glb',
     ];
     await Promise.allSettled(models.map(url => loadGLTF(url, 1.0)));
-    console.log('GLTF models preloaded:', models.length);
+    // Preload Earth texture so it's cached before Earth constructor
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load(assetUrl('/textures/earth_daymap.jpg'), 
+      () => console.log('Earth texture preloaded'),
+      undefined,
+      () => console.warn('Earth texture preload failed, using procedural fallback')
+    );
   }
 
   start(): void {
