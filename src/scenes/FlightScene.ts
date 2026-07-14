@@ -195,8 +195,8 @@ export class FlightScene {
     sceneMgr.scene.add(this.rocketGroup);
 
     // DEBUG: add visible marker sphere at rocket position
-    const dbgMarkerGeom = new THREE.SphereGeometry(5, 16, 12);
-    const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const dbgMarkerGeom = new THREE.SphereGeometry(12, 16, 12);
+    const dbgMarkerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false });
     this._debugMarker = new THREE.Mesh(dbgMarkerGeom, dbgMarkerMat);
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
@@ -335,6 +335,12 @@ export class FlightScene {
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
+    // OVERRIDE: force camera to guaranteed visible position
+    const rocketVisX = this.state.position[0] * VISUAL_SCALE + upDir.x * initVisualOff;
+    const rocketVisY = this.state.position[1] * VISUAL_SCALE + upDir.y * initVisualOff;
+    const rocketVisZ = this.state.position[2] * VISUAL_SCALE + upDir.z * initVisualOff;
+    sceneMgr.camera.position.set(rocketVisX + 10, rocketVisY + 3, rocketVisZ + 10);
+    sceneMgr.camera.lookAt(rocketVisX, rocketVisY, rocketVisZ);
     this.controls = new Controls(this.state);
 
     // Auto-detect touch device
