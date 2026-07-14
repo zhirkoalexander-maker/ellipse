@@ -99,7 +99,8 @@ this.system = new System();
   }
 
   start(): void {
-    this.showMainMenu();
+    // Skip main menu — launch directly into flight
+    this.showFlight();
     this.loop();
   }
 
