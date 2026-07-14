@@ -5,11 +5,12 @@ export class Renderer {
   readonly three: THREE.WebGLRenderer;
 
   constructor() {
-    this.three = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.three = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.domElement = this.three.domElement;
-    this.three.setPixelRatio(window.devicePixelRatio);
+    this.three.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.three.setClearColor(0x000010, 1);
-    this.three.toneMapping = THREE.NoToneMapping;
+    this.three.toneMapping = THREE.LinearToneMapping;
+    this.three.toneMappingExposure = 1.2;
   }
 
   setSize(width: number, height: number): void {
