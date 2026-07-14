@@ -100,6 +100,7 @@ export class FlightScene {
   private sonicBoomLife = 0;
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
+  private _debugShown = false;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1554,6 +1555,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
       const visualOffset = -this.rocketBottomY - 50 * VISUAL_SCALE;
+
+      // Debug overlay — shows once then fades
+      if (!this._debugShown) {
+        this._debugShown = true;
+        const dbg = document.createElement('div');
+        dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#ff0;background:rgba(0,0,0,0.7);padding:8px;border-radius:4px;pointer-events:none;';
+        dbg.innerHTML = `rocketBottomY=${this.rocketBottomY.toFixed(4)}<br>visualOffset=${visualOffset.toFixed(4)}<br>VISUAL_SCALE=${VISUAL_SCALE}<br>VISUAL_SCALE=ORBIT_SCALE*VISUAL_PLANET_MULT=${1e-9}*${562500}<br>earthVisualR=${(6.371e6*VISUAL_SCALE).toFixed(2)}<br>rocketGroup.scale=${ROCKET_VISUAL_SCALE}<br>physicsY=${(this.state.position[1]).toFixed(0)}<br>visualY=${(this.state.position[1]*VISUAL_SCALE).toFixed(4)}<br>upDir=(${(upXv/upLenV).toFixed(3)},${(upYv/upLenV).toFixed(3)},${(upZv/upLenV).toFixed(3)})`;
+        document.body.appendChild(dbg);
+        setTimeout(() => { dbg.style.transition = 'opacity 2s'; dbg.style.opacity = '0'; setTimeout(()=>dbg.remove(), 2000); }, 8000);
+      }
+
       this.rocketGroup.position.set(
         this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
         this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
