@@ -3734,7 +3734,7 @@ void main() {
 
           gl_FragColor = vec4(col, 1.0);
         }
-      `,uniforms:{},side:an,depthWrite:!1}),this.group.add(new ut(t,this.skyMat))}update(t){}getMesh(){return this.group}}class U_{scene;camera;clock=new M_;frames=0;lastFpsUpdate=0;fps=0;stars;constructor(){this.scene=new tu,this.scene.background=new Mt(0),this.stars=new D_,this.scene.add(this.stars.getMesh()),this.scene.add(new hu(16777215,1.2)),this.scene.add(new cu(16777215,4478310,1)),this.camera=new en(45,window.innerWidth/window.innerHeight,.5,5e7),this.camera.position.set(0,0,10),this.camera.lookAt(0,0,0)}update(t){const e=this.clock.getElapsedTime();this.frames++,e-this.lastFpsUpdate>=1&&(this.fps=this.frames/(e-this.lastFpsUpdate),this.frames=0,this.lastFpsUpdate=e),this.stars.getMesh().position.copy(this.camera.position),this.stars.update(t)}getFps(){return this.fps}}class N_{root;helpOverlay=null;onPlay;onVab;onSettings;constructor(t,e,n){this.onPlay=t,this.onVab=e,this.onSettings=n,this.root=document.createElement("div"),this.root.className="panel",this.root.style.cssText=`
+      `,uniforms:{},side:an,depthWrite:!1}),this.group.add(new ut(t,this.skyMat))}update(t){}getMesh(){return this.group}}class U_{scene;camera;clock=new M_;frames=0;lastFpsUpdate=0;fps=0;stars;constructor(){this.scene=new tu,this.scene.background=new Mt(0),this.stars=new D_,this.scene.add(this.stars.getMesh()),this.scene.add(new hu(16777215,1.2)),this.scene.add(new cu(16777215,4478310,1)),this.camera=new en(45,window.innerWidth/window.innerHeight,1,5e7),this.camera.position.set(0,0,10),this.camera.lookAt(0,0,0)}update(t){const e=this.clock.getElapsedTime();this.frames++,e-this.lastFpsUpdate>=1&&(this.fps=this.frames/(e-this.lastFpsUpdate),this.frames=0,this.lastFpsUpdate=e),this.stars.getMesh().position.copy(this.camera.position),this.stars.update(t)}getFps(){return this.fps}}class N_{root;helpOverlay=null;onPlay;onVab;onSettings;constructor(t,e,n){this.onPlay=t,this.onVab=e,this.onSettings=n,this.root=document.createElement("div"),this.root.className="panel",this.root.style.cssText=`
       position: fixed; inset: 0; z-index: 200;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       background: transparent;
@@ -4056,4 +4056,4 @@ void main() {
       <h1>Failed to start</h1>
       <pre>${String(r)}</pre>
     </div>`}
-//# sourceMappingURL=index-B8Ce6sUp.js.map
+//# sourceMappingURL=index-CKk9BIUf.js.map
