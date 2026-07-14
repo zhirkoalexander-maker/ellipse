@@ -296,6 +296,7 @@ export class Earth extends Planet {
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const roughnessMap = generateRoughnessMap();
+    // Push Earth slightly back with polygon offset to prevent z-fight with rocket
     const mat = new THREE.MeshStandardMaterial({
       roughness: 0.7,
       roughnessMap,
@@ -305,6 +306,9 @@ export class Earth extends Planet {
       emissiveMap: generateNightLightsTexture(),
       emissive: new THREE.Color(0xffdd66),
       emissiveIntensity: 0.15,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
