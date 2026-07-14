@@ -19,11 +19,11 @@ export const EARTH_MASS = 1.1944e26;
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
 
-/** Rocket visual scale multiplier — 2x smaller for proper planet ratio */
-export const ROCKET_VISUAL_SCALE = 5;
+/** Rocket visual scale multiplier — large enough to be visible against planet */
+export const ROCKET_VISUAL_SCALE = 50;
 
-/** Terrain displacement (0 = smooth sphere with texture) */
-export const TERRAIN_DISP_FRAC = 0;
+/** Terrain displacement fraction of visual radius */
+export const TERRAIN_DISP_FRAC = 0.02;
 
 /** Ocean depression */
 export const TERRAIN_OCEAN_FRAC = 0;
