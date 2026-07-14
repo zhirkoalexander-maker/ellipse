@@ -14,7 +14,7 @@ export const FIXED_DT = 1 / 60;
 export const G0 = 9.80665;
 
 /** Earth mass (kg) — 20x real for heavy gravity (196 m/s² surface) */
-export const EARTH_MASS = 5.972e24;
+export const EARTH_MASS = 1.1944e26;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;

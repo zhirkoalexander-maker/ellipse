@@ -10,14 +10,18 @@ const LERP_SPEED = 4;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
+const DEFAULT_DIST = 5;
+const DEFAULT_AZIMUTH = 0;
+const DEFAULT_POLAR = Math.PI / 2;
+
 export class ChaseCamera {
   camera: THREE.PerspectiveCamera;
-  private dist = 2.5;
-  private targetDist = 2.5;
-  private azimuth = 0;
-  private targetAzimuth = 0;
-  private polar = Math.PI / 2;
-  private targetPolar = Math.PI / 2;
+  private dist = DEFAULT_DIST;
+  private targetDist = DEFAULT_DIST;
+  private azimuth = DEFAULT_AZIMUTH;
+  private targetAzimuth = DEFAULT_AZIMUTH;
+  private polar = DEFAULT_POLAR;
+  private targetPolar = DEFAULT_POLAR;
   isDragging = false;
   private prevMouse = { x: 0, y: 0 };
   private canvas: HTMLElement | null = null;
@@ -174,11 +178,11 @@ export class ChaseCamera {
   }
 
   reset(): void {
-    this.targetDist = 2.5;
-    this.dist = 2.5;
-    this.targetAzimuth = 0;
-    this.azimuth = 0;
-    this.targetPolar = Math.PI / 2;
-    this.polar = Math.PI / 2;
+    this.targetDist = DEFAULT_DIST;
+    this.dist = DEFAULT_DIST;
+    this.targetAzimuth = DEFAULT_AZIMUTH;
+    this.azimuth = DEFAULT_AZIMUTH;
+    this.targetPolar = DEFAULT_POLAR;
+    this.polar = DEFAULT_POLAR;
   }
 }
