@@ -2173,11 +2173,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
   private positionFlameAtNozzle(): void {
-    // Find the lowest point of all rocket meshes (engine nozzle)
+    // Find the lowest point of rocket meshes (engine nozzle)
+    // Skip landing gear and other non-rocket parts that were added separately
     let minY = Infinity;
     let maxY = -Infinity;
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
+        // Skip gear meshes (they're tracked in gearMeshes and can be far below)
+        if (this.gearMeshes.includes(obj)) return;
+        if (obj === this.rocketShadow) return;
+        if (obj === this.reentryGlow) return;
+        if (obj === this.reentryGlowMesh) return;
         const box = new THREE.Box3().setFromObject(obj);
         if (box.min.y < minY) minY = box.min.y;
         if (box.max.y > maxY) maxY = box.max.y;
