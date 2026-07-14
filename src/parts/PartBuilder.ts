@@ -173,9 +173,9 @@ function getTextureSet(key: string, generator: () => TextureSet): TextureSet {
     // Set proper filtering on all textures
     const textures = [set.color, set.normal, set.roughness, set.metalness, set.ao, set.emissive].filter(Boolean) as THREE.Texture[];
     for (const tex of textures) {
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = true;
+      tex.generateMipmaps = false;
       tex.needsUpdate = true;
     }
     textureCache.set(key, set);
