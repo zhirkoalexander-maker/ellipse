@@ -90,7 +90,7 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 5;
+  private freeCamDist = 15;
   private freeCamKeys = { left: false, right: false, up: false, down: false };
   private freeCamDragging = false;
   private freeCamPrevMouse = { x: 0, y: 0 };
@@ -157,15 +157,18 @@ export class FlightScene {
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
     // Compute spawn above displaced surface
+    // Need enough physics offset so the visual offset (×VISUAL_SCALE) exceeds the
+    // rocket's visual half-height (~0.4 visual units).  2000m / VISUAL_SCALE ≈ 1.1 visual units.
+    const SPAWN_OFFSET_M = 2000;
     const surfacePos: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
       earth.position[1] + dirNorm[1] * earthR,
       earth.position[2] + dirNorm[2] * earthR,
     ];
     const spawnPos: [number, number, number] = [
-      earth.position[0] + dirNorm[0] * (earthR + 50),
-      earth.position[1] + dirNorm[1] * (earthR + 50),
-      earth.position[2] + dirNorm[2] * (earthR + 50),
+      earth.position[0] + dirNorm[0] * (earthR + SPAWN_OFFSET_M),
+      earth.position[1] + dirNorm[1] * (earthR + SPAWN_OFFSET_M),
+      earth.position[2] + dirNorm[2] * (earthR + SPAWN_OFFSET_M),
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
     this.groundedDir = dirNorm;
@@ -1393,7 +1396,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // Penetration check — inside the planet = always crash
         if (d < surfaceR - 1) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 5 && d > 0.001 && this.liftoffFrames <= 0) {
+        } else if (d < surfaceR + 2010 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
@@ -1411,10 +1414,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
             this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 0.5) ||
-                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 0.5) ||
-                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 0.5)) {
-              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 0.5), nearestBody.position[1] + dy / d * (surfaceR + 0.5), nearestBody.position[2] + dz / d * (surfaceR + 0.5)];
+            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 2000) ||
+                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 2000) ||
+                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 2000)) {
+              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 2000), nearestBody.position[1] + dy / d * (surfaceR + 2000), nearestBody.position[2] + dz / d * (surfaceR + 2000)];
               this.sound.playLand();
               this.sound.stopEngine();
               const bodyName = nearestBody.name;
@@ -1426,7 +1429,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
               else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
             }
           }
-        } else if (d < surfaceR + 200 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
+        } else if (d < surfaceR + 2200 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
           // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
           this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         }
@@ -1448,7 +1451,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         refBody.position[2] + this.groundedDir[2],
       ];
       const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
-      const targetDist = surfaceR + 0.5;
+      const targetDist = surfaceR + 2000; // match SPAWN_OFFSET_M so rocket sits above surface visually
       this.state.position[0] = refBody.position[0] + this.groundedDir[0] * targetDist;
       this.state.position[1] = refBody.position[1] + this.groundedDir[1] * targetDist;
       this.state.position[2] = refBody.position[2] + this.groundedDir[2] * targetDist;
@@ -1463,9 +1466,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const bodyR = (refBody as any).radius ?? 6.371e6;
       if (d > bodyR * 1.1) {
         this.state.velocity = [0, 0, 0];
-        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 10);
-        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 10);
-        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 10);
+        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 2000);
+        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 2000);
+        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 2000);
       }
     }
 
@@ -1945,9 +1948,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.screenShake = 3.0;
 
     this.state.position = [
-      body.position[0] + dx / d * bodyR,
-      body.position[1] + dy / d * bodyR,
-      body.position[2] + dz / d * bodyR,
+      body.position[0] + dx / d * (bodyR + 50),
+      body.position[1] + dy / d * (bodyR + 50),
+      body.position[2] + dz / d * (bodyR + 50),
     ];
     this.state.velocity = [0, 0, 0];
     this.state.throttle = 0;
