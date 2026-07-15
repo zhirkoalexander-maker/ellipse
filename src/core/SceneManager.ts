@@ -17,7 +17,7 @@ export class SceneManager {
     this.stars = new Stars();
     this.scene.add(this.stars.getMesh());
 
-    this.scene.add(new THREE.AmbientLight(0x8888cc, 0.5));
+    this.scene.add(new THREE.AmbientLight(0x9999cc, 0.55));
     this.scene.add(new THREE.HemisphereLight(0x8899cc, 0x334466, 0.6));
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 5e7);
