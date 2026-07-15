@@ -20,7 +20,7 @@ export class SceneManager {
     this.scene.add(new THREE.AmbientLight(0x8888cc, 0.5));
     this.scene.add(new THREE.HemisphereLight(0x8899cc, 0x334466, 0.6));
 
-    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 5e7);
+    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 5e7);
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
   }
