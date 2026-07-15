@@ -378,7 +378,7 @@ export class Earth extends Planet {
 
   /** Update cloud rotation + day/night cycle driven by sun direction */
   updateClouds(dt: number, sunPosWC?: [number, number, number]): void {
-    this.cloudMesh.rotation.y += dt * 0.008;
+    this.cloudMesh.rotation.y += dt * 0.012;
     if (!sunPosWC) return;
 
     const mat = this.mesh.material as THREE.MeshStandardMaterial;
