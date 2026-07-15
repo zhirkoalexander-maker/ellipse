@@ -348,7 +348,7 @@ setFreeCamera(active: boolean): void {
     const heatPct = Math.min(100, (heat / 300000) * 100);
 
     this.speedVal.textContent = speed > 1000 ? (speed/1000).toFixed(1)+'k' : speed.toFixed(1);
-    this.speedVal.style.color = speed > 1000 ? '#ffaa44' : '#ddd';
+    this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
     const nearestAltKm = nearestAlt / 1000; this.altVal.textContent = nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0);
     const fuelKg = state.rocket.totalFuelMass();
     if (fuelKg > 1000) {
