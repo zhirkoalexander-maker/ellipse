@@ -15,8 +15,9 @@ export class MainMenuScene {
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 200;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: transparent;
-      backdrop-filter: blur(2px);
+      background: rgba(6,8,20,0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border: none;
       border-radius: 0;
     `;
