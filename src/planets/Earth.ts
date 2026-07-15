@@ -228,9 +228,9 @@ function generateEarthTextureFallback(): THREE.CanvasTexture {
 
   // Ocean (deeper blue, more vibrant)
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, '#3377cc');
-  grad.addColorStop(0.5, '#4499ee');
-  grad.addColorStop(1, '#3377cc');
+  grad.addColorStop(0, '#2255aa');
+  grad.addColorStop(0.5, '#3399ee');
+  grad.addColorStop(1, '#2255aa');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
@@ -338,7 +338,7 @@ export class Earth extends Planet {
     this.loadHighResTexture().catch(() => {});
 
     // Atmosphere glow
-    this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 1.5);
+    this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 3.0);
     this.mesh.add(this.atmosphereGlow.getMesh());
 
     // Cloud layer
