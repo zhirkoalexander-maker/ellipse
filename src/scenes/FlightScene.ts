@@ -202,8 +202,7 @@ export class FlightScene {
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
 
-    // Make ALL rocket parts WHITE for visibility
-    // Also push rocket slightly forward (polygon offset) to prevent z-fight with terrain
+    // Enhance rocket materials — lighter colors, subsurface-like emissive
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -212,11 +211,10 @@ export class FlightScene {
           mat.polygonOffsetFactor = -1;
           mat.polygonOffsetUnits = -1;
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.color = new THREE.Color(0xffffff);
-            mat.emissive = new THREE.Color(0x333333);
-            mat.emissiveIntensity = 0.5;
-            mat.roughness = 0.5;
-            mat.metalness = 0.1;
+            mat.emissive = new THREE.Color(0x111111);
+            mat.emissiveIntensity = 0.3;
+            mat.roughness = Math.min(mat.roughness, 0.6);
+            mat.metalness = Math.min(mat.metalness, 0.3);
             mat.needsUpdate = true;
           }
         }
