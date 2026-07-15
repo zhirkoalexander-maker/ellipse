@@ -8,9 +8,8 @@ export class Renderer {
     this.three = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.domElement = this.three.domElement;
     this.three.setPixelRatio(1);
-    this.three.setClearColor(0x000010, 1);
-    this.three.toneMapping = THREE.LinearToneMapping;
-    this.three.toneMappingExposure = 1.2;
+    this.three.setClearColor(0x000000, 1);
+    this.three.toneMapping = THREE.NoToneMapping;
     this.three.outputColorSpace = THREE.SRGBColorSpace;
   }
 
