@@ -4,6 +4,7 @@ import type { System } from '../physics/System';
 export class HUD {
   private root: HTMLDivElement;
   private speedVal!: HTMLSpanElement;
+  private fuelVal!: HTMLSpanElement;
   private altVal!: HTMLSpanElement;
   private massVal!: HTMLSpanElement;
   private heatFill!: HTMLDivElement;
@@ -61,6 +62,11 @@ export class HUD {
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">m</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:rgba(244,245,242,0.5);">FUEL</span>
+        <span class="fuel-val" style="color:#ffaa44;">—</span>
+        <span style="font-size:9px;color:rgba(244,245,242,0.3);">kg</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
         <span style="color:rgba(244,245,242,0.5);">MASS</span>
         <span class="mass-val" style="color:#aaaacc;">—</span>
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">t</span>
@@ -88,6 +94,7 @@ export class HUD {
     this.root.appendChild(panel);
 
     this.speedVal = panel.querySelector('.speed-val')!;
+    this.fuelVal = panel.querySelector('.fuel-val')!;
     this.altVal = panel.querySelector('.alt-val')!;
     this.massVal = panel.querySelector('.mass-val')!;
     this.heatFill = panel.querySelector('.heat-fill')!;
@@ -337,6 +344,14 @@ setFreeCamera(active: boolean): void {
       this.altVal.textContent = (nearestAlt / 1000).toFixed(2);
     } else {
       this.altVal.textContent = nearestAlt.toFixed(0);
+    }
+    const fuelKg = state.rocket.totalFuelMass();
+    if (fuelKg > 1000) {
+      this.fuelVal.textContent = (fuelKg / 1000).toFixed(1);
+      (this.fuelVal.nextElementSibling as HTMLElement).textContent = 't';
+    } else {
+      this.fuelVal.textContent = fuelKg.toFixed(0);
+      (this.fuelVal.nextElementSibling as HTMLElement).textContent = 'kg';
     }
     const tPct = Math.round(throttle * 100);
     this.throttlePct.textContent = `${tPct}%`;

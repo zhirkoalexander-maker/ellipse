@@ -221,30 +221,9 @@ export class FlightScene {
       }
     });
 
-    // Landing gear legs (retracted initially)
-    for (let i = 0; i < 3; i++) {
-      const angle = (i / 3) * Math.PI * 2;
-      const legGeom = new THREE.CylinderGeometry(0.015, 0.04, 0.3, 6);
-      const legMat = new THREE.MeshStandardMaterial({ color: 0x556677, metalness: 0.8, roughness: 0.3 });
-      const leg = new THREE.Mesh(legGeom, legMat);
-      leg.position.set(Math.cos(angle) * 0.15, -0.1, Math.sin(angle) * 0.15);
-      leg.rotation.z = Math.cos(angle) * 0.3;
-      leg.rotation.x = Math.sin(angle) * 0.3;
-      leg.visible = false;
-      this.rocketGroup.add(leg);
-      this.gearMeshes.push(leg);
-      // Foot pad
-      const footGeom = new THREE.CylinderGeometry(0.05, 0.06, 0.02, 6);
-      const footMat = new THREE.MeshStandardMaterial({ color: 0x445566, metalness: 0.5, roughness: 0.6 });
-      const foot = new THREE.Mesh(footGeom, footMat);
-      foot.position.set(
-        Math.cos(angle) * 0.22,
-        -0.22,
-        Math.sin(angle) * 0.22
-      );
-      this.rocketGroup.add(foot);
-      this.gearMeshes.push(foot);
-    }
+    // Landing gear — completely disabled (user doesn't want hexagons)
+    // for (let i = 0; i < 3; i++) { ... }
+    // gear meshes are never added to rocketGroup
 
     // Impact prediction marker (red ring on surface)
     const markerGeom = new THREE.RingGeometry(0.05, 0.15, 16);
@@ -836,6 +815,29 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           ctx.fill();
           ctx.fillStyle = '#44DD88';
           ctx.fillText('Pe', peX + 6, cy + 3);
+        }
+
+        // Label trajectory target — which planet is closest to the endpoint
+        if (prediction.points.length > 2) {
+          const lastPt = prediction.points[prediction.points.length - 1]!;
+          const endWX = refBody.position[0] * VISUAL_SCALE + lastPt[0];
+          const endWZ = refBody.position[2] * VISUAL_SCALE + lastPt[1];
+          let nearestPlanet = '';
+          let nearestDist = 30;
+          for (const b of this.system.bodies) {
+            if (b.name === refBody.name || b.mass <= 0) continue;
+            const bx = b.position[0] * VISUAL_SCALE;
+            const bz = b.position[2] * VISUAL_SCALE;
+            const dp = Math.sqrt((endWX - bx)**2 + (endWZ - bz)**2);
+            if (dp < nearestDist) { nearestDist = dp; nearestPlanet = b.name; }
+          }
+          if (nearestPlanet) {
+            const lastX = cx + lastPt[0] * s;
+            const lastY = cy - lastPt[1] * s;
+            ctx.font = 'bold 10px monospace';
+            ctx.fillStyle = '#EACD9E';
+            ctx.fillText('→ ' + nearestPlanet.toUpperCase(), lastX + 10, lastY - 5);
+          }
         }
       }
 
