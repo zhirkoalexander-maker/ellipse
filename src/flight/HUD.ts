@@ -147,7 +147,7 @@ export class HUD {
 
 setFreeCamera(active: boolean): void {
     if (this.camModeEl) {
-      this.camModeEl.textContent = active ? 'FREE CAM' : '';
+      this.camModeEl.textContent = active ? 'FREE' : '';
     }
   }
 
