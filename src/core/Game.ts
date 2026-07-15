@@ -42,7 +42,7 @@ export class Game {
 
 this.system = new System();
     // Sun at center with reduced mass for compressed system
-    const sunMass = 2e26 * 5;
+    const sunMass = 2e27;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
     // Scaled solar system for gameplay (distances ×1e-3 of real, fits in camera far plane)
     // Mercury at 4.5e8 m (×3)
@@ -53,9 +53,9 @@ this.system = new System();
     const earthPos: [number, number, number] = [1.5e9, 0, 0];
     const earthVel: [number, number, number] = [0, 0, 13800];
     this.system.add(new Earth(earthPos, earthVel));
-    // Moon at 1.1532e9 m from Earth (×3)
-    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 1.1532e9];
-    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 590];
+    // Moon close to Earth (gameplay distance)
+    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 1e8];
+    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 1020];
     this.system.add(new Moon(moonPos, moonVel));
     // Mars at 2.25e9 m (×3)
     this.system.add(new Mars([2.25e9, 1.5e9, -6e8], [0, 0, 11200]));
