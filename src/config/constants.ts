@@ -14,7 +14,7 @@ export const FIXED_DT = 1 / 60;
 export const G0 = 9.80665;
 
 /** Earth mass (kg) — g≈14.67 m/s² (max for Ant engine TWR≈1) */
-export const EARTH_MASS = 8.92e24;
+export const EARTH_MASS = 8.92e24 * 5;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
