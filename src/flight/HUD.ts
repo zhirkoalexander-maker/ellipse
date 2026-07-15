@@ -19,7 +19,6 @@ export class HUD {
 
   constructor() {
     this.root = document.createElement('div');
-    this.root.className = 'hud-panel';
     this.root.style.cssText = 'position:fixed;inset:0;z-index:100;pointer-events:none;';
 
     this.pauseOverlay = document.createElement('div');
@@ -48,6 +47,7 @@ export class HUD {
       display:flex;flex-direction:column;gap:4px;
       background:rgba(8,10,24,0.75);border:1px solid rgba(200,152,56,0.15);
       border-radius:6px;padding:8px 10px;min-width:130px;
+      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
     `;
     panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
