@@ -7,16 +7,19 @@ export class Renderer {
   constructor() {
     this.three = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.domElement = this.three.domElement;
-    this.three.setPixelRatio(1);
+    this.three.setPixelRatio(window.devicePixelRatio);
     this.three.setClearColor(0x000000, 1);
     this.three.toneMapping = THREE.NoToneMapping;
     this.three.outputColorSpace = THREE.SRGBColorSpace;
   }
 
   setSize(width: number, height: number): void {
-    this.three.setSize(width, height);
-    this.domElement.style.width = width + 'px';
-    this.domElement.style.height = height + 'px';
+    this.three.setSize(width, height, false);
+    this.domElement.style.width = '100vw';
+    this.domElement.style.height = '100vh';
+    this.domElement.style.position = 'fixed';
+    this.domElement.style.top = '0';
+    this.domElement.style.left = '0';
   }
 
   dispose(): void {
