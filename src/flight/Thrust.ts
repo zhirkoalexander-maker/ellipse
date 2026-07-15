@@ -15,8 +15,8 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
 
   // Thrust force in Newtons (engine.thrust is in kN)
   const forceN = engine.thrust * 1000 * state.throttle;
-  // Mass flow in kg/s — divided by 10 for longer burn time
-  const massFlow = forceN / (engine.isp * G0) / 10;
+  // Mass flow in kg/s — divided by 30 for longer burn time
+  const massFlow = forceN / (engine.isp * G0) / 30;
 
   // Apply force in direction (default +Y = up)
   const dir = direction ?? [0, 1, 0];

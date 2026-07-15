@@ -53,7 +53,7 @@ export class Moon extends Planet {
   }
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('moon', 2.2e23 * 5, position, velocity, 1.737e6);
+    super('moon', 2.2e24, position, velocity, 1.737e6);
 
     const visualR = this.visualRadius;
 
