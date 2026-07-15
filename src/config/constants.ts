@@ -5,7 +5,7 @@ export const G = 6.67430e-11;
 export const ORBIT_SCALE = 1e-9;
 
 /** Visual planet size multiplier */
-export const VISUAL_PLANET_MULT = 250000;
+export const VISUAL_PLANET_MULT = 260000;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
