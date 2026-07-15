@@ -23,7 +23,7 @@ export const PART_SCALE = 0.05;
 export const ROCKET_VISUAL_SCALE = 18;
 
 /** Terrain displacement fraction of visual radius */
-export const TERRAIN_DISP_FRAC = 0.0005;
+export const TERRAIN_DISP_FRAC = 0.004;
 
 /** Ocean depression */
 export const TERRAIN_OCEAN_FRAC = 0;
