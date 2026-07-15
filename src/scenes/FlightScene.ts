@@ -800,21 +800,27 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (prediction.bound && isFinite(prediction.apoapsis) && isFinite(prediction.periapsis)) {
           const apX = cx + prediction.apoapsis * s;
           const peX = cx + prediction.periapsis * s;
-          // Ap marker
-          ctx.beginPath();
-          ctx.arc(apX, cy, 4, 0, Math.PI * 2);
-          ctx.fillStyle = '#FF8844';
-          ctx.fill();
-          ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#FF8844';
-          ctx.fillText('Ap', apX + 6, cy + 3);
-          // Pe marker
-          ctx.beginPath();
-          ctx.arc(peX, cy, 4, 0, Math.PI * 2);
-          ctx.fillStyle = '#44DD88';
-          ctx.fill();
-          ctx.fillStyle = '#44DD88';
-          ctx.fillText('Pe', peX + 6, cy + 3);
+          ctx.beginPath(); ctx.arc(apX, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#FF8844'; ctx.fill();
+          ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#FF8844'; ctx.fillText('Ap', apX + 6, cy + 3);
+          ctx.beginPath(); ctx.arc(peX, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#44DD88'; ctx.fill();
+          ctx.fillStyle = '#44DD88'; ctx.fillText('Pe', peX + 6, cy + 3);
+        }
+        // Target planet label at trajectory end
+        if (prediction.points.length > 2) {
+          const last = prediction.points[prediction.points.length - 1]!;
+          const lx = cx + last[0] * s, ly = cy - last[1] * s;
+          const endWX = refBody.position[0] * VISUAL_SCALE + last[0];
+          const endWZ = refBody.position[2] * VISUAL_SCALE + last[1];
+          let nearName = '', nearD = 20;
+          for (const b of this.system.bodies) {
+            if (b.name === refBody.name || b.mass <= 0) continue;
+            const dp = Math.sqrt((endWX - b.position[0]*VISUAL_SCALE)**2 + (endWZ - b.position[2]*VISUAL_SCALE)**2);
+            if (dp < nearD) { nearD = dp; nearName = b.name; }
+          }
+          if (nearName) {
+            ctx.font = 'bold 10px monospace'; ctx.fillStyle = '#EACD9E';
+            ctx.fillText('\u2192 ' + nearName.toUpperCase(), lx + 8, ly - 4);
+          }
         }
 
         // Label trajectory target — which planet is closest to the endpoint
