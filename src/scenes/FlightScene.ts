@@ -160,7 +160,7 @@ export class FlightScene {
     const dirMag = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
-    const SPAWN_OFFSET_M = 80;
+    const SPAWN_OFFSET_M = 60;
     // Compute nominal surface position (for terrain lookup)
     const nominalSurface: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
