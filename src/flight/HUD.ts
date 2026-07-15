@@ -366,7 +366,7 @@ setFreeCamera(active: boolean): void {
     if (this._fuelRKg) this._fuelRKg.textContent = fKg > 1000 ? `${(fKg/1000).toFixed(1)} t` : `${fKg.toFixed(0)} kg`;
     if (this._fuelRBar) this._fuelRBar.style.width = `${maxF > 0 ? (fKg/maxF)*100 : 0}%`;
     this.throttleFill.style.width = `${tPct}%`;
-    this.throttleFill.style.background = tPct > 80 ? '#ff6644' : '#4488ff';
+    this.throttleFill.style.background = tPct > 80 ? '#ff4444' : tPct > 40 ? '#ffaa00' : '#4488ff';
     this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
     this.heatPct.style.color = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
     this.heatFill.style.width = `${heatPct}%`;
