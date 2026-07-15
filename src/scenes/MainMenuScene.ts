@@ -13,13 +13,10 @@ export class MainMenuScene {
     this.root = document.createElement('div');
     this.root.className = 'panel';
     this.root.style.cssText = `
-      position: fixed; inset: 0; z-index: 200;
+      position: fixed; inset: 0; z-index: 500;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(6,8,20,0.92);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: none;
-      border-radius: 0;
+      background: rgba(6,8,20,0.95);
+      border: none; border-radius: 0;
     `;
 
     const logo = document.createElement('div');
