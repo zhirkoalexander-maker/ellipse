@@ -103,6 +103,7 @@ export class FlightScene {
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugShown = false;
   private _debugMarker: THREE.Mesh | null = null;
+  private _spawnProtectionTimer = 0;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -320,6 +321,7 @@ export class FlightScene {
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
+    this._spawnProtectionTimer = 180; // 3 seconds no-crash grace period
     // OVERRIDE: force camera to guaranteed visible position
     const rocketVisX = this.state.position[0] * VISUAL_SCALE + upDir.x * initVisualOff;
     const rocketVisY = this.state.position[1] * VISUAL_SCALE + upDir.y * initVisualOff;
@@ -1071,6 +1073,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   private updateInner(_dt: number): void {
     const baseDt = _dt;
+    if (this._spawnProtectionTimer > 0) this._spawnProtectionTimer -= 1;
 
     // Pause toggle
     if (this.controls.consumePauseToggle()) {
@@ -2043,6 +2046,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   private doCrash(reason: string, body: any, dx: number, dy: number, dz: number, d: number, bodyR: number): void {
     if (this.crashed) return;
+    if (this._spawnProtectionTimer > 0) return; // spawn grace period
     this.crashed = true;
     this.achievements.unlock('crash');
     this.sound.playCrash();
