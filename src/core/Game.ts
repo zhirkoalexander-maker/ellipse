@@ -68,7 +68,6 @@ export class Game {
       this.sceneMgr.camera.updateProjectionMatrix();
     });
     this.achievements.onUnlock((id) => toast.show(`Achievement: ${id}`));
-    this.preloadModels();
   }
 
   private async preloadModels(): Promise<void> {
@@ -79,7 +78,9 @@ export class Game {
     texLoader.load(assetUrl('/textures/earth_daymap.jpg'), () => {}, undefined, () => {});
   }
 
-  start(): void { this.showMainMenu(); this.loop(); }
+  start(): void { 
+    this.preloadModels().then(() => { this.showMainMenu(); this.loop(); });
+  }
 
   private showMainMenu(): void {
     this.unmountCurrent();
