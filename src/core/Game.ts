@@ -42,23 +42,23 @@ export class Game {
     this.achievements = new Achievements();
 
     this.system = new System();
-    const sunMass = 2e27 * 5 * 4 * 1.5 * 6;
+    const sunMass = 2e27 * 5 * 4 * 1.5 * 6 * 2;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
-    // Planets ×2 further apart (×6 from original), gravity ×5
-    this.system.add(new Mercury([9e8, 0, 1.2e8], [0, 0, 19400]));
-    this.system.add(new Venus([1.8e9, 0, -1.8e8], [0, 0, 12200]));
-    const earthPos: [number, number, number] = [3e9, 0, 0];
-    const earthVel: [number, number, number] = [0, 0, 9800];
+    // Planets at 2× from original (closer together)
+    this.system.add(new Mercury([3e8, 0, 4e7], [0, 0, 33000]));
+    this.system.add(new Venus([6e8, 0, -6e7], [0, 0, 21000]));
+    const earthPos: [number, number, number] = [1e9, 0, 0];
+    const earthVel: [number, number, number] = [0, 0, 17000];
     this.system.add(new Earth(earthPos, earthVel));
-    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 1.2e8];
-    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 800];
+    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 8e7];
+    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 900];
     this.system.add(new Moon(moonPos, moonVel));
-    this.system.add(new Mars([4.5e9, 3e9, -1.2e9], [0, 0, 7900]));
-    this.system.add(new Jupiter([9e9, -1.8e9, 6e8], [0, 0, 5300]));
-    this.system.add(new Saturn([1.68e10, 1.2e9, -1.2e9], [0, 0, 4000]));
-    this.system.add(new Uranus([3.3e10, -6e8, 1.8e9], [0, 0, 2800]));
-    this.system.add(new Neptune([5.1e10, 2.4e9, 0], [0, 0, 2200]));
-    this.system.add(new Pluto([7e10, 5e9, -3e9], [0, 0, 1200]));
+    this.system.add(new Mars([1.5e9, 1e9, -4e8], [0, 0, 13500]));
+    this.system.add(new Jupiter([3e9, -6e8, 2e8], [0, 0, 9000]));
+    this.system.add(new Saturn([5.6e9, 4e8, -4e8], [0, 0, 6800]));
+    this.system.add(new Uranus([1.1e10, -2e8, 6e8], [0, 0, 4800]));
+    this.system.add(new Neptune([1.7e10, 8e8, 0], [0, 0, 3800]));
+    this.system.add(new Pluto([2.3e10, 1.6e9, -1e9], [0, 0, 2000]));
 
     document.getElementById('app')!.appendChild(this.renderer.domElement);
     this.renderer.setSize(window.innerWidth, window.innerHeight);

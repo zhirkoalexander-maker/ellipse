@@ -895,17 +895,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       } else if (e.key === 'g') {
         this.toggleGear();
         e.preventDefault();
-      } else if (e.key === 't') {
-        const modes: ('off' | 'hold' | 'prograde' | 'retrograde')[] = ['off', 'hold', 'prograde', 'retrograde'];
-        const idx = modes.indexOf(this.sasMode);
-        this.sasMode = modes[(idx + 1) % modes.length]!;
-        if (this.sasMode === 'off') toast.show('SAS disabled');
-        else if (this.sasMode === 'hold') {
-          this.sasTargetQuat.copy(this.rocketQuat);
-          toast.show('SAS — attitude hold');
-        } else if (this.sasMode === 'prograde') toast.show('SAS — prograde');
-        else toast.show('SAS — retrograde');
-        e.preventDefault();
       } else if (e.key === 'f') {
         this.chase.reset();
         toast.show('Camera view reset');
