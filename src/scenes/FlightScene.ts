@@ -1451,7 +1451,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       // Collision with surface
       const bodyR = nearestBody ? (nearestBody as any).radius ?? 0 : 0;
       const surfaceR = nearestBody ? ((nearestBody as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR) : 0;
-      if (nearestBody && bodyR > 0 && isFinite(nearestDist)) {
+      if (nearestBody && bodyR > 0 && isFinite(nearestDist) && this._spawnProtectionTimer <= 0) {
         const dx = this.state.position[0] - nearestBody.position[0];
         const dy = this.state.position[1] - nearestBody.position[1];
         const dz = this.state.position[2] - nearestBody.position[2];
@@ -1632,7 +1632,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v0.85<br>C=freecam F=reset T=SAS W=throttle`;
+        dbg.innerHTML = `v0.86<br>C=freecam F=reset T=SAS W=throttle`;
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
