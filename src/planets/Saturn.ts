@@ -71,7 +71,7 @@ export class Saturn extends Planet {
   atmosphereGlow: any;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('saturn', 5.683e27 * 5 * 4 * 1.5 * 6 * 2, position, velocity, 5.8232e7);
+    super('saturn', 5.683e27 * 5 * 4 * 1.5 * 6 * 2 * 2, position, velocity, 5.8232e7);
 
     const visualR = this.visualRadius;
 
