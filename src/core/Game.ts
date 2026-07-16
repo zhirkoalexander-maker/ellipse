@@ -42,7 +42,7 @@ export class Game {
     this.achievements = new Achievements();
 
     this.system = new System();
-    const sunMass = 2e27 * 5 * 4;
+    const sunMass = 2e27 * 5 * 4 * 1.5;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
     // Planets ×2 further apart (×6 from original), gravity ×5
     this.system.add(new Mercury([9e8, 0, 1.2e8], [0, 0, 19400]));
