@@ -71,7 +71,7 @@ export class FlightScene {
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
   private heatEnergy = 0;
-  private readonly MAX_HEAT = 50000;
+  private readonly MAX_HEAT = 30000;
   private readonly HEAT_RADIATION_RATE = 0.995;
   private stageInfo: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> = [];
   private lastReentryIntensity = 0;
