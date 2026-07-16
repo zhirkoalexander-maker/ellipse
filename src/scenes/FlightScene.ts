@@ -52,7 +52,7 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 8;
+  private readonly ANGULAR_ACCEL = 12;
   private readonly ANGULAR_DAMPING = 10;
   private timeWarp = 1;
   private parachuteDeployed = false;
