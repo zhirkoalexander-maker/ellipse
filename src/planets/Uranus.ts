@@ -13,7 +13,7 @@ export class Uranus extends Planet {
   atmosphereGlow: any;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('uranus', 8.681e26 * 5 * 4 * 1.5 * 6 * 2 * 2 * 2, position, velocity, 2.5362e7);
+    super('uranus', 8.681e26 * 5 * 4 * 1.5 * 6 * 2 * 2 * 2 / 15, position, velocity, 2.5362e7);
 
     const visualR = this.visualRadius;
 
