@@ -52,8 +52,8 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 12;
-  private readonly ANGULAR_DAMPING = 10;
+  private readonly ANGULAR_ACCEL = 10;
+  private readonly ANGULAR_DAMPING = 8;
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
@@ -71,7 +71,7 @@ export class FlightScene {
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
   private heatEnergy = 0;
-  private readonly MAX_HEAT = 30000;
+  private readonly MAX_HEAT = 60000;
   private readonly HEAT_RADIATION_RATE = 0.995;
   private stageInfo: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> = [];
   private lastReentryIntensity = 0;
@@ -1154,8 +1154,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     // Engine gimbal: extra rotation authority when thrust is active
     if (engineActive && !this.grounded) {
-      this.angularVel.x += pitchInput * this.state.throttle * 4 * baseDt;
-      this.angularVel.y += yawInput * this.state.throttle * 4 * baseDt;
+      this.angularVel.x += pitchInput * this.state.throttle * 6 * baseDt;
+      this.angularVel.y += yawInput * this.state.throttle * 6 * baseDt;
     }
 
     // SAS: hold attitude or track prograde/retrograde
@@ -1433,7 +1433,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
 
         // Heat accumulation from aerodynamic heating
-        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-4;
+        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-5;
         this.heatEnergy += heatFlux * baseDt;
         }
       }
