@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 import type { Part } from '../parts/Part';
 import { buildPartMesh } from '../parts/PartBuilder';
+import { PART_SCALE } from '../config/constants';
 import type { Vec3 } from '../physics/Body';
+
+const SIZE_DIMS: Record<string, { radius: number }> = {
+  S: { radius: 0.5 * PART_SCALE },
+  M: { radius: 0.7 * PART_SCALE },
+  L: { radius: 1.0 * PART_SCALE },
+  XL: { radius: 1.4 * PART_SCALE }
+};
 
 export interface AssemblyNode {
   part: Part;
@@ -74,6 +82,22 @@ export class Assembly {
       n.children.forEach((c) => walk(c, mesh));
     };
     this.roots.forEach((r) => walk(r, group));
+    // Add smooth adapters between adjacent parts of different sizes
+    const sorted = [...this.roots].sort((a, b) => b.position[1] - a.position[1]);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const top = sorted[i]!, bot = sorted[i + 1]!;
+      const r1 = SIZE_DIMS[top.part.size]?.radius ?? 0;
+      const r2 = SIZE_DIMS[bot.part.size]?.radius ?? 0;
+      if (Math.abs(r1 - r2) > 0.001 && !top.part.id.includes('decoupler') && !bot.part.id.includes('decoupler')) {
+        const midY = (top.position[1] + bot.position[1]) / 2;
+        const coneH = Math.abs(top.position[1] - bot.position[1]) * 0.3;
+        const coneGeom = new THREE.CylinderGeometry(r2, r1, coneH, 32);
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.5, metalness: 0.2 });
+        const cone = new THREE.Mesh(coneGeom, coneMat);
+        cone.position.y = midY;
+        group.add(cone);
+      }
+    }
     // Center group at center of mass so rotation pivots naturally
     const com = this.centerOfMass();
     for (const child of group.children) {
