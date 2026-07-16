@@ -305,7 +305,7 @@ export class Earth extends Planet {
       bumpScale: 0.3,
       emissiveMap: generateNightLightsTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.15,
+      emissiveIntensity: 0.5,
       polygonOffset: true,
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1,
