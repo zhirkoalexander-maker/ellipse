@@ -71,8 +71,8 @@ export class FlightScene {
   private sasTargetQuat = new THREE.Quaternion();
   private screenShake = 0;
   private heatEnergy = 0;
-  private readonly MAX_HEAT = 300000;
-  private readonly HEAT_RADIATION_RATE = 0.98;
+  private readonly MAX_HEAT = 50000;
+  private readonly HEAT_RADIATION_RATE = 0.995;
   private stageInfo: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> = [];
   private lastReentryIntensity = 0;
   private prevMach = 0;
@@ -1433,7 +1433,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
 
         // Heat accumulation from aerodynamic heating
-        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-6;
+        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-4;
         this.heatEnergy += heatFlux * baseDt;
         }
       }
