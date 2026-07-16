@@ -6,6 +6,7 @@ import { FlightScene } from '../scenes/FlightScene';
 import { System } from '../physics/System';
 import { Mercury } from '../planets/Mercury';
 import { Venus } from '../planets/Venus';
+import { Pluto } from '../planets/Pluto';
 import { Earth } from '../planets/Earth';
 import { Moon } from '../planets/Moon';
 import { Mars } from '../planets/Mars';
@@ -41,7 +42,7 @@ export class Game {
     this.achievements = new Achievements();
 
     this.system = new System();
-    const sunMass = 2e27 * 5;
+    const sunMass = 2e27 * 5 * 4;
     this.system.add(new Sun([0, 0, 0], [0, 0, 0], sunMass));
     // Planets ×2 further apart (×6 from original), gravity ×5
     this.system.add(new Mercury([9e8, 0, 1.2e8], [0, 0, 19400]));
@@ -57,6 +58,7 @@ export class Game {
     this.system.add(new Saturn([1.68e10, 1.2e9, -1.2e9], [0, 0, 4000]));
     this.system.add(new Uranus([3.3e10, -6e8, 1.8e9], [0, 0, 2800]));
     this.system.add(new Neptune([5.1e10, 2.4e9, 0], [0, 0, 2200]));
+    this.system.add(new Pluto([7e10, 5e9, -3e9], [0, 0, 1200]));
 
     document.getElementById('app')!.appendChild(this.renderer.domElement);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
