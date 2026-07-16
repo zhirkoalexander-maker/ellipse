@@ -53,7 +53,7 @@ export class Mercury extends Planet {
   }
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('mercury', 1e25 * 5 * 4 * 1.5 * 6, position, velocity, 2.440e6);
+    super('mercury', 1e25 * 5 * 4 * 1.5 * 6 * 2, position, velocity, 2.440e6);
 
     const visualR = this.visualRadius;
 
