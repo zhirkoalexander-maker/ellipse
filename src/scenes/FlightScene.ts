@@ -321,7 +321,7 @@ export class FlightScene {
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
-    this._spawnProtectionTimer = 180; // 3 seconds no-crash grace period
+    this._spawnProtectionTimer = 600; // 10 seconds no-crash grace period
     // OVERRIDE: force camera to guaranteed visible position
     const rocketVisX = this.state.position[0] * VISUAL_SCALE + upDir.x * initVisualOff;
     const rocketVisY = this.state.position[1] * VISUAL_SCALE + upDir.y * initVisualOff;
@@ -1465,7 +1465,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
-          const speedLimit = this.parachuteDeployed ? 15 : 10;
+          const speedLimit = this.parachuteDeployed ? 50 : 5000;
           const tiltLimit = hasLegs ? 30 : 20;
 
           if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
@@ -1493,7 +1493,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
               else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
             }
           }
-        } else if (d < surfaceR + 250 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50) {
+        } else if (d < surfaceR + 250 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 10000) {
           // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
           this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         }
