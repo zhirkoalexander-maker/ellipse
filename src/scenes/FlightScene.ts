@@ -104,6 +104,7 @@ export class FlightScene {
   private _debugShown = false;
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
+  private _camSnapped = false;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -1679,7 +1680,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           y: (upYv / upLenV) * visualOffset,
           z: (upZv / upLenV) * visualOffset,
         };
-        this.chase.follow(this.state, baseDt, camUp, warpActive, lookOffset);
+        this.chase.follow(this.state, baseDt, camUp, warpActive || !this._camSnapped, lookOffset);
+        if (!this._camSnapped) this._camSnapped = true;
       }
 
       if (this.deployedChuteMesh) {
