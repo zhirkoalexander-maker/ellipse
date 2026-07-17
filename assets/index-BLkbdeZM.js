@@ -3810,7 +3810,7 @@ void main() {
         <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:center;">🔄 RESTART</button>
       </div>
     `,document.body.appendChild(this.pauseOverlay),this.pauseOverlay.querySelectorAll(".pause-btn").forEach(t=>{t.addEventListener("click",e=>{this.onAction&&this.onAction(e.target.dataset.action)})})}mount(t=document.body){const e=document.createElement("div");e.style.cssText=`
-      position:fixed;top:16px;left:16px;z-index:100;pointer-events:auto;
+      position:fixed;top:16px;right:16px;z-index:100;pointer-events:auto;
       font-family:monospace;font-size:11px;
       display:flex;flex-direction:column;gap:4px;
       background:rgba(8,10,24,0.75);border:1px solid rgba(200,152,56,0.15);
@@ -4039,4 +4039,4 @@ void main() {
       <h1>Failed to start</h1>
       <pre>${String(r)}</pre>
     </div>`}
-//# sourceMappingURL=index-tzQ9OF8T.js.map
+//# sourceMappingURL=index-BLkbdeZM.js.map
