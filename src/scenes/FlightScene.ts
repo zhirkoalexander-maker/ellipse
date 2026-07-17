@@ -72,7 +72,7 @@ export class FlightScene {
   private screenShake = 0;
   private heatEnergy = 0;
   private readonly MAX_HEAT = 9999999999; // effectively disabled
-  private readonly HEAT_RADIATION_RATE = 0.995;
+  private readonly HEAT_RADIATION_RATE = 0.999;
   private stageInfo: Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> = [];
   private lastReentryIntensity = 0;
   private prevMach = 0;
