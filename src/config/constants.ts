@@ -5,10 +5,10 @@ export const G = 6.67430e-11;
 export const ORBIT_SCALE = 1e-9;
 
 /** Visual planet size multiplier */
-export const VISUAL_PLANET_MULT = 235000;
+export const VISUAL_PLANET_MULT = 240000;
 
 /** Fixed physics timestep (s) */
-export const FIXED_DT = 1 / 60;
+export const FIXED_DT = 1 / 50;
 
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
@@ -20,7 +20,7 @@ export const EARTH_MASS = 8.92e25 * 5 * 4 * 1.5 * 6 * 2 * 2 * 2 / 15 * 3;
 export const PART_SCALE = 0.05;
 
 /** Rocket visual scale multiplier */
-export const ROCKET_VISUAL_SCALE = 22;
+export const ROCKET_VISUAL_SCALE = 24;
 
 /** Terrain displacement fraction of visual radius */
 export const TERRAIN_DISP_FRAC = 0.006;
