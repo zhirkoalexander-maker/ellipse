@@ -8,7 +8,7 @@ export const ORBIT_SCALE = 1e-9;
 export const VISUAL_PLANET_MULT = 250000;
 
 /** Fixed physics timestep (s) */
-export const FIXED_DT = 1 / 50;
+export const FIXED_DT = 1 / 60;
 
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
