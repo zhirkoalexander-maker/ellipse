@@ -1244,6 +1244,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.groundedDir = null;
       this.liftoffFrames = 5;
       this.launched = true;
+      this._camSnapped = false; // reset camera snap on liftoff
       this.achievements.unlock('reach_space');
       this.sound.startEngine();
     }
