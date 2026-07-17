@@ -5,6 +5,7 @@ export class HUD {
   private root: HTMLDivElement;
   private speedVal!: HTMLSpanElement;
   private fuelVal!: HTMLSpanElement;
+  private vsVal!: HTMLSpanElement;
   private altVal!: HTMLSpanElement;
   private massVal!: HTMLSpanElement;
   private heatFill!: HTMLDivElement;
@@ -64,6 +65,11 @@ export class HUD {
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">m</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:rgba(244,245,242,0.5);">V/S</span>
+        <span class="vs-val" style="color:#88ccff;">0</span>
+        <span style="font-size:9px;color:rgba(244,245,242,0.3);">m/s</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
         <span style="color:rgba(244,245,242,0.5);">FUEL</span>
         <span class="fuel-val" style="color:#ffaa44;">—</span>
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">kg</span>
@@ -97,6 +103,7 @@ export class HUD {
 
     this.speedVal = panel.querySelector('.speed-val')!;
     this.fuelVal = panel.querySelector('.fuel-val')!;
+    this.vsVal = panel.querySelector('.vs-val')!;
     this.altVal = panel.querySelector('.alt-val')!;
     this.massVal = panel.querySelector('.mass-val')!;
     this.heatFill = panel.querySelector('.heat-fill')!;
@@ -350,6 +357,10 @@ setFreeCamera(active: boolean): void {
     this.speedVal.textContent = speed > 1000 ? (speed/1000).toFixed(1)+'k' : speed.toFixed(1);
     this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
     const nearestAltKm = nearestAlt / 1000; this.altVal.textContent = nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0);
+    // Vertical speed
+    const vs = state.velocity[1]; // Y-component is radial at surface
+    this.vsVal.textContent = vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0);
+    this.vsVal.style.color = vs > 0 ? '#88ff88' : vs < 0 ? '#ff6644' : '#88ccff';
     const fuelKg = state.rocket.totalFuelMass();
     if (fuelKg > 1000) {
       this.fuelVal.textContent = (fuelKg / 1000).toFixed(1);
