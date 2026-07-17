@@ -45,7 +45,7 @@ export class HUD {
     // Compact top-right panel
     const panel = document.createElement('div');
     panel.style.cssText = `
-      position:fixed;top:16px;left:16px;z-index:100;pointer-events:auto;
+      position:fixed;top:16px;right:16px;z-index:100;pointer-events:auto;
       font-family:monospace;font-size:11px;
       display:flex;flex-direction:column;gap:4px;
       background:rgba(8,10,24,0.75);border:1px solid rgba(200,152,56,0.15);
