@@ -6,13 +6,13 @@ const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
 const MIN_DIST = 0.5;
 const MAX_DIST = 500;
-const LERP_SPEED = 4;
+const LERP_SPEED = 15;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
 const DEFAULT_DIST = 8;
 const DEFAULT_AZIMUTH = 0;
-const DEFAULT_POLAR = Math.PI / 2;
+const DEFAULT_POLAR = Math.PI / 2.5;
 
 export class ChaseCamera {
   camera: THREE.PerspectiveCamera;
