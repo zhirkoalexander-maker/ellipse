@@ -132,9 +132,9 @@ export class HUD {
     const navballContainer = document.createElement('div');
     navballContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:100;pointer-events:none;';
     const canvas = document.createElement('canvas');
-    canvas.width = 140;
-    canvas.height = 140;
-    canvas.style.cssText = 'width:140px;height:140px;border-radius:70px;opacity:0.85;';
+    canvas.width = 150;
+    canvas.height = 150;
+    canvas.style.cssText = 'width:150px;height:150px;border-radius:75px;opacity:0.85;';
     navballContainer.appendChild(canvas);
     this.root.appendChild(navballContainer);
     this.navballCanvas = canvas;
