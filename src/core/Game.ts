@@ -50,7 +50,7 @@ export class Game {
     const earthPos: [number, number, number] = [1e9, 0, 0];
     const earthVel: [number, number, number] = [0, 0, 17000];
     this.system.add(new Earth(earthPos, earthVel));
-    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 8e7];
+    const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 6e7];
     const moonVel: [number, number, number] = [0, 0, earthVel[2] + 900];
     this.system.add(new Moon(moonPos, moonVel));
     this.system.add(new Mars([1.5e9, 1e9, -4e8], [0, 0, 13500]));
