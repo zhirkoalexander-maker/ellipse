@@ -5,7 +5,7 @@ export const G = 6.67430e-11;
 export const ORBIT_SCALE = 1e-9;
 
 /** Visual planet size multiplier */
-export const VISUAL_PLANET_MULT = 229000;
+export const VISUAL_PLANET_MULT = 227000;
 
 /** Fixed physics timestep (s) */
 export const FIXED_DT = 1 / 60;
@@ -23,7 +23,7 @@ export const PART_SCALE = 0.05;
 export const ROCKET_VISUAL_SCALE = 22;
 
 /** Terrain displacement fraction of visual radius */
-export const TERRAIN_DISP_FRAC = 0.003;
+export const TERRAIN_DISP_FRAC = 0.0025;
 
 /** Ocean depression */
 export const TERRAIN_OCEAN_FRAC = 0;
