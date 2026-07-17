@@ -322,7 +322,7 @@ export class FlightScene {
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
-    this._spawnProtectionTimer = 600; // 10 seconds no-crash grace period
+    this._spawnProtectionTimer = 1200; // 10 seconds no-crash grace period
     // OVERRIDE: force camera to guaranteed visible position
     const rocketVisX = this.state.position[0] * VISUAL_SCALE + upDir.x * initVisualOff;
     const rocketVisY = this.state.position[1] * VISUAL_SCALE + upDir.y * initVisualOff;
