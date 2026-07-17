@@ -3833,6 +3833,11 @@ void main() {
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">m/s</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:rgba(244,245,242,0.5);">G-FRC</span>
+        <span class="gfrc-val" style="color:#cc88ff;">1.0</span>
+        <span style="font-size:9px;color:rgba(244,245,242,0.3);">G</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
         <span style="color:rgba(244,245,242,0.5);">FUEL</span>
         <span class="fuel-val" style="color:#ffaa44;">—</span>
         <span style="font-size:9px;color:rgba(244,245,242,0.3);">kg</span>
@@ -4044,4 +4049,4 @@ void main() {
       <h1>Failed to start</h1>
       <pre>${String(o)}</pre>
     </div>`}
-//# sourceMappingURL=index-BGqmdN6z.js.map
+//# sourceMappingURL=index-CrUNyUki.js.map
