@@ -1427,7 +1427,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
 
         // Heat accumulation from aerodynamic heating
-        const heatFlux = 0.5 * rho * speed * speed * speed * 5e-6;
+        const heatFlux = 0.5 * rho * speed * speed * speed * 1e-6;
         this.heatEnergy += heatFlux * baseDt;
         }
       }
