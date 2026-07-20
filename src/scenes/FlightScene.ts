@@ -2297,6 +2297,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.explosionMeshes = [];
     this.controls.dispose();
+    this.chase.dispose();
     this.engineFlame.dispose();
     this.groundSmoke.dispose();
     this.hud.unmount();
