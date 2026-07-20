@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PART_SCALE } from '../config/constants';
 
-const FLAME_SCALE = PART_SCALE / 0.08;
+const FLAME_SCALE = PART_SCALE / 0.08 * 1.5;
 const PARTICLE_COUNT = 600;
 
 function createCoreTexture(): THREE.Texture {
