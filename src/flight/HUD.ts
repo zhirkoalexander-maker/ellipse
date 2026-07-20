@@ -13,7 +13,6 @@ export class HUD {
   private throttleFill!: HTMLDivElement;
   private throttlePct!: HTMLSpanElement;
   private warpLabel!: HTMLSpanElement;
-  private gfrcVal!: HTMLSpanElement;
   private _fuelRKg!: HTMLElement;
   private _fuelRBar!: HTMLElement;
   private pauseOverlay!: HTMLDivElement;
@@ -139,7 +138,6 @@ export class HUD {
     fuelRight.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:12px;background:rgba(8,10,24,0.8);border:1px solid rgba(200,152,56,0.2);border-radius:6px;padding:8px 12px;color:#ffaa44;';
     fuelRight.innerHTML = '<span style="color:rgba(244,245,242,0.5);">FUEL</span> <span class="fuel-r-kg">4500 kg</span><br><div style="width:80px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px;"><div class="fuel-r-bar" style="width:100%;height:100%;background:#ffaa44;border-radius:3px;"></div></div>';
     this.root.appendChild(fuelRight);
-    this.gfrcVal = panel.querySelector('.gfrc-val')!;
     this._fuelRKg = fuelRight.querySelector('.fuel-r-kg') as HTMLElement;
     this._fuelRBar = fuelRight.querySelector('.fuel-r-bar') as HTMLElement;
 
@@ -150,7 +148,6 @@ export class HUD {
     this.root.style.display = v ? '' : 'none';
   }
 
-  setGForce(g: number): void { this.gfrcVal.textContent = g.toFixed(1); }
   setMass(kg: number): void {
     if (this.massVal) this.massVal.textContent = `${(kg / 1000).toFixed(1)}`;
   }
