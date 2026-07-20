@@ -79,7 +79,9 @@ export class Game {
   }
 
   start(): void { 
-    this.preloadModels().then(() => { this.showMainMenu(); this.loop(); });
+    this.showMainMenu();
+    this.loop();
+    this.preloadModels(); // load in background
   }
 
   private showMainMenu(): void {
