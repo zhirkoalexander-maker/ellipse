@@ -185,4 +185,8 @@ export class ChaseCamera {
     this.targetPolar = DEFAULT_POLAR;
     this.polar = DEFAULT_POLAR;
   }
+
+  dispose(): void {
+    this.canvas = null;
+  }
 }
