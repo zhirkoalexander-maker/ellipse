@@ -84,6 +84,7 @@ export class Assembly {
     this.roots.forEach((r) => walk(r, group));
     // Add smooth adapters between adjacent parts of different sizes
     const sorted = [...this.roots].sort((a, b) => b.position[1] - a.position[1]);
+    let adapterCount = 0;
     for (let i = 0; i < sorted.length - 1; i++) {
       const top = sorted[i]!, bot = sorted[i + 1]!;
       const r1 = SIZE_DIMS[top.part.size]?.radius ?? 0;
@@ -94,11 +95,13 @@ if (Math.abs(r1 - r2) > 0.001 && !top.part.id.includes('decoupler') && !bot.part
         const coneGeom = new THREE.CylinderGeometry(Math.min(r1, r2)*1.0, Math.max(r1, r2)*1.0, coneH, 32);
         const coneMat = new THREE.MeshStandardMaterial({ color: 0xdd9944, roughness: 0.25, metalness: 0.4, emissive: 0x331100, emissiveIntensity: 0.2 });
         const cone = new THREE.Mesh(coneGeom, coneMat);
-        cone.position.y = midY;
+cone.position.y = midY;
         group.add(cone);
+        adapterCount++;
       }
     }
-    // Center group at center of mass so rotation pivots naturally
+    // Center group at center of mass
+    if (adapterCount > 0) console.log('Smooth adapters created:', adapterCount);
     const com = this.centerOfMass();
     for (const child of group.children) {
       child.position.x -= com[0];
