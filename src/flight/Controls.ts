@@ -5,13 +5,14 @@ export class Controls {
   private keys: Set<string> = new Set();
   private stagePressed = false;
   private pauseToggle = false;
-  private throttleLimiter = 1.0;
   readonly state: FlightState;
   touch: TouchControls | null = null;
+  private _onKeyDown: (e: KeyboardEvent) => void;
+  private _onKeyUp: (e: KeyboardEvent) => void;
 
   constructor(state: FlightState) {
     this.state = state;
-    window.addEventListener('keydown', (e) => {
+    this._onKeyDown = (e) => {
       if (e.repeat) return;
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
@@ -19,23 +20,21 @@ export class Controls {
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
-    });
-    window.addEventListener('keyup', (e) => {
+    };
+    this._onKeyUp = (e) => {
       this.keys.delete(e.key.toLowerCase());
-    });
+    };
+    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keyup', this._onKeyUp);
   }
 
   enableTouch(): void {
-    if (!this.touch) {
-      this.touch = new TouchControls();
-    }
+    if (!this.touch) this.touch = new TouchControls();
     this.touch.show();
   }
 
   disableTouch(): void {
-    if (this.touch) {
-      this.touch.hide();
-    }
+    this.touch?.hide();
   }
 
   update(dt: number): void {
@@ -82,6 +81,8 @@ export class Controls {
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('keyup', this._onKeyUp);
     this.touch?.dispose();
     this.touch = null;
   }
