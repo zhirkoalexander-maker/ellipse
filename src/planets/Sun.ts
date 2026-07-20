@@ -71,7 +71,7 @@ export class Sun extends Body {
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 
-    this.light = new THREE.DirectionalLight(0xffeedd, 2.5);
+    this.light = new THREE.DirectionalLight(0xffeedd, 5.0);
     this.light.position.set(
       this.mesh.position.x + 100,
       this.mesh.position.y + 50,
