@@ -235,16 +235,16 @@ function generateEarthTextureFallback(): THREE.CanvasTexture {
   ctx.fillRect(0, 0, W, H);
 
   const continents: { lat: number; lon: number; rx: number; ry: number; color: string }[] = [
-    { lat: 0.7, lon: -2.0, rx: 0.55, ry: 0.5, color: '#5a8c3f' },
-    { lat: 0.65, lon: -1.6, rx: 0.35, ry: 0.35, color: '#6a9c4f' },
-    { lat: -0.35, lon: -1.4, rx: 0.4, ry: 0.6, color: '#6a9c4f' },
-    { lat: 0.85, lon: 0.4, rx: 0.2, ry: 0.22, color: '#7aac5a' },
-    { lat: 0.1, lon: 0.6, rx: 0.45, ry: 0.5, color: '#8a9c4f' },
-    { lat: 0.5, lon: 1.5, rx: 0.6, ry: 0.4, color: '#7a9c4a' },
-    { lat: 0.3, lon: 1.1, rx: 0.25, ry: 0.15, color: '#8aac5a' },
-    { lat: -0.4, lon: 1.7, rx: 0.15, ry: 0.35, color: '#7a9c4f' },
-    { lat: 1.0, lon: -2.5, rx: 0.08, ry: 0.1, color: '#6a9c4f' },
-    { lat: -0.7, lon: -1.1, rx: 0.08, ry: 0.08, color: '#7aac5a' },
+    { lat: 0.7, lon: -2.0, rx: 0.55, ry: 0.5, color: '#4a8c2a' },
+    { lat: 0.65, lon: -1.6, rx: 0.35, ry: 0.35, color: '#5a9c3a' },
+    { lat: -0.35, lon: -1.4, rx: 0.4, ry: 0.6, color: '#5a9c3a' },
+    { lat: 0.85, lon: 0.4, rx: 0.2, ry: 0.22, color: '#6aac4a' },
+    { lat: 0.1, lon: 0.6, rx: 0.45, ry: 0.5, color: '#7a8c3a' },
+    { lat: 0.5, lon: 1.5, rx: 0.6, ry: 0.4, color: '#6a9c3a' },
+    { lat: 0.3, lon: 1.1, rx: 0.25, ry: 0.15, color: '#7aac4a' },
+    { lat: -0.4, lon: 1.7, rx: 0.15, ry: 0.35, color: '#5a9c3a' },
+    { lat: 1.0, lon: -2.5, rx: 0.08, ry: 0.1, color: '#5a9c3a' },
+    { lat: -0.7, lon: -1.1, rx: 0.08, ry: 0.08, color: '#6aac4a' },
   ];
 
   for (const c of continents) {
