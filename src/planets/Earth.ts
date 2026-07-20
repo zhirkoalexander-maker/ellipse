@@ -17,7 +17,7 @@ function srand(seed: number): () => number {
 
 /** Generate a procedural cloud texture (grayscale, white = cloudy) */
 function generateCloudTexture(): THREE.CanvasTexture {
-  const W = 1024, H = 512;
+  const W = 2048, H = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -68,7 +68,7 @@ function generateCloudTexture(): THREE.CanvasTexture {
 
 /** Generate a procedural city lights texture for the night side */
 function generateNightLightsTexture(): THREE.CanvasTexture {
-  const W = 1024, H = 512;
+  const W = 2048, H = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -171,7 +171,7 @@ function generateNightLightsTexture(): THREE.CanvasTexture {
 }
 
 function generateRoughnessMap(): THREE.CanvasTexture {
-  const W = 1024, H = 512;
+  const W = 2048, H = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -220,7 +220,7 @@ function generateRoughnessMap(): THREE.CanvasTexture {
 
 /** Generate a procedural Earth texture as a synchronous fallback. */
 function generateEarthTextureFallback(): THREE.CanvasTexture {
-  const W = 2048, H = 1024;
+  const W = 4096, H = 2048;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
