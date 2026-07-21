@@ -1341,9 +1341,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const r2 = r * r;
       if (r > 1 && r2 > 0) {
         const f = (G * nearRef.mass) / r2;
-        this.state.velocity[0] += f * dx / r * baseDt;
-        this.state.velocity[1] += f * dy / r * baseDt;
-        this.state.velocity[2] += f * dz / r * baseDt;
+        const gDelta = f * baseDt;
+        const capped = Math.min(gDelta, 50); // cap per-frame gravity
+        this.state.velocity[0] += capped * dx / r;
+        this.state.velocity[1] += capped * dy / r;
+        this.state.velocity[2] += capped * dz / r;
       }
       this.sanitize(this.state.velocity);
 
@@ -1460,7 +1462,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
         const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
         // Penetration check — inside the planet = always crash
-        if (d < surfaceR - 1) {
+        if (d < surfaceR - 50) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         } else if (d < surfaceR + 60 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
