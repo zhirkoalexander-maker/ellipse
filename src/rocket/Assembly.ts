@@ -92,7 +92,7 @@ export class Assembly {
 if (Math.abs(r1 - r2) > 0.001 && !top.part.id.includes('decoupler') && !bot.part.id.includes('decoupler')) {
         const midY = (top.position[1] + bot.position[1]) / 2;
         const coneH = Math.abs(top.position[1] - bot.position[1]) * 1.5;
-        const coneGeom = new THREE.CylinderGeometry(Math.min(r1, r2)*1.0, Math.max(r1, r2)*1.0, coneH, 32);
+        const coneGeom = new THREE.CylinderGeometry(r1, r2, coneH, 32);
         const coneMat = new THREE.MeshStandardMaterial({ color: 0xdd9944, roughness: 0.2, metalness: 0.5, emissive: 0x221100, emissiveIntensity: 0.3 });
         const cone = new THREE.Mesh(coneGeom, coneMat);
 cone.position.y = midY;
