@@ -249,6 +249,7 @@ export class VABScene {
     });
     document.addEventListener('mouseup', () => { this.vabIsDragging = false; });
     document.addEventListener('wheel', (e: WheelEvent) => {
+      if ((e.target as HTMLElement)?.closest('.vab-parts')) return;
       this.vabDist *= e.deltaY > 0 ? 1.1 : 0.9;
       this.vabDist = Math.max(0.5, Math.min(50, this.vabDist));
       this.updateVabCamera();
