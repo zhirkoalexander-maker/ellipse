@@ -24,7 +24,7 @@ export class SettingsPanel {
 
     this.root = document.createElement('div');
     this.root.style.cssText = `
-      position: fixed; inset: 0; z-index: 250;
+      position: fixed; inset: 0; z-index: 9999;
       background: rgba(6, 8, 20, 0.88);
       display: flex; align-items: center; justify-content: center;
     `;
