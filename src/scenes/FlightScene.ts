@@ -1342,7 +1342,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (r > 1 && r2 > 0) {
         const f = (G * nearRef.mass) / r2;
         const gDelta = f * baseDt;
-        const capped = Math.min(gDelta, 200); // cap per-frame gravity
+        const capped = Math.min(gDelta, 500); // cap per-frame gravity
         this.state.velocity[0] += capped * dx / r;
         this.state.velocity[1] += capped * dy / r;
         this.state.velocity[2] += capped * dz / r;
