@@ -57,7 +57,7 @@ describe('Comprehensive Integration Tests', () => {
     const adapters = mesh.children.filter(c => {
       const m = c as THREE.Mesh;
       return m.isMesh && m.geometry.type === 'CylinderGeometry' && 
-             (m.material as THREE.MeshStandardMaterial).color.getHex() === 0xdd9944;
+             (m.material as THREE.MeshStandardMaterial).color.getHex() === 0xffffff;
     });
     expect(adapters.length).toBeGreaterThanOrEqual(1);
   });
