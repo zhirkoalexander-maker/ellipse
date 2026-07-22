@@ -204,7 +204,7 @@ export class FlightScene {
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
 
-    // Enhance rocket materials — lighter colors, subsurface-like emissive
+    // Clean simple rocket materials
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -213,10 +213,10 @@ export class FlightScene {
           mat.polygonOffsetFactor = -1;
           mat.polygonOffsetUnits = -1;
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.emissive = new THREE.Color(0x111111);
-            mat.emissiveIntensity = 0.3;
-            mat.roughness = Math.min(mat.roughness, 0.6);
-            mat.metalness = Math.min(mat.metalness, 0.3);
+            mat.roughness = 0.4;
+            mat.metalness = 0.1;
+            mat.emissive = new THREE.Color(0x000000);
+            mat.emissiveIntensity = 0;
             mat.needsUpdate = true;
           }
         }
