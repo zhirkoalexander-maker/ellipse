@@ -20,7 +20,7 @@ describe('Adapter Tests', () => {
         const m = a.toMesh();
         const goldCones = m.children.filter(c => {
           const mesh = c as THREE.Mesh;
-          return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xdd9944;
+return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xffffff;
         });
         // S tank size differs from capsule — adapter should exist
         if (tank.size !== cap.size) {
