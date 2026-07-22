@@ -109,7 +109,7 @@ export class EngineFlame {
     const outerMat = new THREE.PointsMaterial({
       size: FLAME_SCALE * 1.2,
       map: this.outerTex,
-      color: 0xff8844,
+      color: 0x88aaff,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
