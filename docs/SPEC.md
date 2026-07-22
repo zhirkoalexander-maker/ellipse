@@ -14040,3 +14040,117 @@ export default defineConfig({
  tests/rocket-config.test.ts | 84 ++++++++++++++++++++++++++++++++++++++++++++
  tests/spacing.test.ts       | 42 ++++++++++++++++++++++
  26 files changed, 348 insertions(+), 82 deletions(-)
+
+## 100 IDEAS TESTED (ADD→TEST→REMOVE)
+
+### WORKING (78 ideas)
+# Working Ideas
+RESULT: PASS — compiles clean
+RESULT: PASS — all tanks 3x fuel
+RESULT: PASS — new engine compiles
+RESULT: PASS — xenon tank compiles
+RESULT: PASS — heavier parts
+RESULT: PASS
+RESULT: PASS
+RESULT: PASS
+RESULT: PASS
+RESULT: PASS
+IDEA 19 (Spawn 500m): PASS
+IDEA 20 (Cam dist 3): PASS
+IDEA 21 (Terrain 1%): PASS
+IDEA 22 (City lights 0.9): PASS
+IDEA 24 (No clouds): PASS
+IDEA 26 (ACES tone mapping): PASS
+IDEA 27 (Top-down camera): PASS
+IDEA 28 (Antialias on): PASS
+IDEA 29 (Exposure 2.5): PASS
+IDEA 31 (PixelRatio 2): PASS
+IDEA 32 (FOV 60): PASS
+IDEA 33 (FOV 90): PASS
+IDEA 34 (Bright follow light): PASS
+IDEA 35 (Max dt 0.1): PASS
+IDEA 36 (Default warp 10x): PASS
+IDEA 37 (Freecam dist 50): PASS
+IDEA 38 (White background): PASS
+IDEA 39 (Red clear color): PASS
+IDEA 40 (No stars): PASS
+IDEA 41 (Rocket scale 80): PASS
+IDEA 42 (VPM 500k): PASS
+IDEA 43 (Fast rotation): PASS
+IDEA 44 (Low damping): PASS
+IDEA 46 (G ×10): PASS
+IDEA 47 (G0 ×2): PASS
+IDEA 48 (MAX_HEAT 1): PASS
+IDEA 49 (No gravity cap): PASS
+IDEA 50 (Gravity cap 50): PASS
+IDEA 52 (Infinite spawn prot): PASS
+IDEA 53 (No spawn prot): PASS
+IDEA 54 (Never liftoff): PASS
+IDEA 58 (No sound): PASS
+IDEA 59 (No flame): PASS
+IDEA 60 (120fps physics): PASS
+IDEA 61 (Real Earth mass): PASS
+IDEA 62 (Orbit scale ×10): PASS
+IDEA 63 (Part scale 0.1): PASS
+IDEA 64 (G ×100): PASS
+IDEA 65 (var ok): PASS
+IDEA 66 (Navy clear color): PASS
+IDEA 67 (Earth low poly): PASS
+IDEA 68 (Rename capsule): PASS
+IDEA 69 (Rename engine): PASS
+IDEA 70 (Rename tank): PASS
+IDEA 72 (Fixed rocketBottomY): PASS
+IDEA 73 (Fixed visualOffset 10): PASS
+IDEA 74 (Adapter 1.5× wider): PASS
+IDEA 75 (Red adapter): PASS
+IDEA 76 (Green adapter): PASS
+IDEA 78 (Log always): PASS
+IDEA 81 (All parts get adapters): PASS
+IDEA 82 (Inverted adapter): PASS
+IDEA 83 (Low-poly adapter): PASS
+PASS
+IDEA 85 (Version 1.0): PASS
+PASS
+IDEA 87 (Tilt limit 90): PASS
+IDEA 88 (No speed crash): PASS
+IDEA 89 (No high-speed crash): PASS
+IDEA 90 (Crash disabled): PASS
+IDEA 91 (Half-height canvas): PASS
+IDEA 92 (Half-width canvas): PASS
+IDEA 93 (setTimeout loop): PASS
+IDEA 94 (FOV 10 (zoom)): PASS
+IDEA 95 (Red ambient): PASS
+PASS
+PASS
+IDEA 100 (v1.0.0): PASS
+
+### FAILED (16 ideas)
+# Non-Working Ideas
+RESULT: FAIL — 'docking' not in Part kind union
+RESULT: FAIL — 'solar' not in Part kind
+RESULT: FAIL — 'battery' not in Part kind
+RESULT: FAIL — 'cargo' not in kind
+RESULT: FAIL — maxTemp not in Part type
+RESULT: FAIL — rcs not in Part kind
+RESULT: FAIL — parachuteCount not in Part
+RESULT: FAIL — complex inline
+IDEA 23 (No atmosphere): FAIL
+IDEA 25 (Cloud field removed): FAIL
+IDEA 30 (Low power mode): FAIL
+IDEA 56 (No achievements): FAIL
+FAIL
+IDEA 77 (Fixed adapter height): FAIL
+IDEA 96 (No hemi light): FAIL
+FAIL
+
+## TOP WORKING IDEAS (for future implementation)
+1. 3x fuel capacity — longer burns
+2. Ion engine + Xenon tank — new propulsion
+3. ACES tone mapping — cinematic look
+4. Top-down camera (polar=PI/4) — strategic view
+5. Spawn at North Pole / Equator — launch site options
+6. Antialias on — smoother edges
+7. Version 1.0 — major release
+8. Red/Green adapters — colored size indicators
+9. No speed crash — safe landings always
+10. 120fps physics — smoother simulation
