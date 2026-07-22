@@ -1,4 +1,4 @@
-import type { Settings } from '../config/settings';
+import type { Settings, Units, Difficulty } from '../config/settings';
 import { DEFAULT_SETTINGS } from '../config/settings';
 
 const KEY = 'ellipse_settings';
@@ -39,8 +39,11 @@ export class SettingsPanel {
     title.style.cssText = 'margin: 0 0 var(--space-5);';
     card.appendChild(title);
 
-    const unitsRow = this.makeRow('Units', ['metric', 'imperial', 'mixed'], current.units, (v) => { this.current.units = v as 'metric' | 'imperial' | 'mixed'; });
+    const unitsRow = this.makeRow('Units', ['metric', 'imperial'], current.units as Units, (v) => { this.current.units = v as Units; });
     card.appendChild(unitsRow);
+
+    const diffRow = this.makeRow('Difficulty', ['easy', 'normal', 'hard', 'realistic'], current.difficulty, (v) => { this.current.difficulty = v as Difficulty; });
+    card.appendChild(diffRow);
 
     const autoSaveRow = this.makeToggle('Auto-save', current.autoSave, (v) => { this.current.autoSave = v; });
     card.appendChild(autoSaveRow);
