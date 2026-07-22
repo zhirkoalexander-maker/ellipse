@@ -398,7 +398,7 @@ export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): Texture
 
   // === COLOR MAP ===
   // Light grey-white base (like real rocket tanks)
-  colorCtx.fillStyle = '#e8e8e4';
+  colorCtx.fillStyle = "#f5f5f0";
   colorCtx.fillRect(0, 0, W, H);
 
   // Subtle vertical gradient for lighting effect
@@ -663,7 +663,7 @@ export function generateCapsuleTexture(): TextureSet {
 
   // === COLOR MAP ===
   // White capsule body (Apollo/Dragon style)
-  colorCtx.fillStyle = '#f5f5ee';
+  colorCtx.fillStyle = "#fafaf5";
   colorCtx.fillRect(0, 0, W, H * 0.78);
 
   // Subtle vertical gradient
@@ -936,7 +936,7 @@ export function generateEngineTexture(): TextureSet {
 
   // === COLOR MAP ===
   // Upper engine body - dark inconel/steel
-  colorCtx.fillStyle = '#3a3a40';
+  colorCtx.fillStyle = "#1a1a20";
   colorCtx.fillRect(0, 0, W, H * 0.30);
 
   // Subtle brushed metal texture on body
