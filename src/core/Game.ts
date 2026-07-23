@@ -85,10 +85,10 @@ export class Game {
     texLoader.load(assetUrl('/textures/earth_daymap.jpg'), () => {}, undefined, () => {});
   }
 
-  start(): void { 
+  async start(): Promise<void> { 
+    await this.preloadModels();
     this.showMainMenu();
     this.loop();
-    this.preloadModels(); // load in background
   }
 
   private showMainMenu(): void {
@@ -110,15 +110,22 @@ export class Game {
     this.unmountCurrent();
     const a = rocket?.assembly ?? new Assembly();
     if (!rocket) {
-      const p = PART_SCALE;
-      const capH = 1.1 * p, tankH = 0.7 * p, engH = 0.7 * p;
-      const gap = 0.005;
-      const engY = 0;
-      const tankY = engY + engH/2 + gap + tankH/2;
-      const capY = tankY + tankH/2 + gap + capH/2;
-      a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
-      a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
-      a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
+      // Try Saturn V GLB model for realistic rocket
+      const saturnPart = findPart('saturn_v');
+      if (saturnPart) {
+        a.addRoot({ part: saturnPart, position: [0, 0, 0], rotation: 0, children: [] });
+      } else {
+        // Fallback to procedural rocket
+        const p = PART_SCALE;
+        const capH = 1.1 * p, tankH = 0.7 * p, engH = 0.7 * p;
+        const gap = 0.005;
+        const engY = 0;
+        const tankY = engY + engH/2 + gap + tankH/2;
+        const capY = tankY + tankH/2 + gap + capH/2;
+        a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
+      }
     }
     const r = new Rocket(a);
     this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements);
