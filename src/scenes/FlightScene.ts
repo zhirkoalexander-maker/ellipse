@@ -1272,8 +1272,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.exhaustLight.color.setHSL(0.08 - this.state.throttle * 0.05, 1, 0.5 + this.state.throttle * 0.3);
     }
 
-    // Ground smoke when engine active and grounded
-    if (engineActive && this.grounded) this.groundSmoke.start();
+    // Ground smoke disabled
+    if (false && engineActive && this.grounded) this.groundSmoke.start();
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
@@ -1605,10 +1605,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const camUp = new THREE.Vector3(cdx / cd, cdy / cd, cdz / cd);
 
     if (this.rocketShadow) {
-      this.rocketShadow.visible = this.grounded && !this.crashed;
-      if (this.rocketShadow.visible) {
-        this.rocketShadow.position.y = this.rocketBottomY - 0.02;
-      }
+      this.rocketShadow.visible = false;
     }
 
     // Update debug marker position
@@ -1635,7 +1632,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v0.98<br>C=freecam F=reset T=SAS W=throttle`;
+        dbg.innerHTML = `v0.99<br>C=freecam F=reset T=SAS W=throttle`;
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
