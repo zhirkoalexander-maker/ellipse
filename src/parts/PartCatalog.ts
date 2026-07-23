@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-thrust: 120,
+thrust: 200,
     isp: 350,
     fuelType: 'LFO'
   },
@@ -179,7 +179,7 @@ thrust: 120,
     mass: 30000,
     dragCoeff: 0.3,
     gltfUrl: '/models/saturn_v.glb',
-    gltfScale: 0.0015
+    gltfScale: 0.003
   },
   {
     id: 'ares_1',
