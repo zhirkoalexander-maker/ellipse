@@ -1220,7 +1220,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (eng && eng.thrust && localGrav > 0) {
             const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * localGrav);
-            if (twr >= 0.3) {
+            if (twr >= 0.0) {
               canLiftOff = true;
             } else {
               toast.show(`TWR ${twr.toFixed(2)} — insufficient for liftoff!`);
