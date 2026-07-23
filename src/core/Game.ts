@@ -110,11 +110,11 @@ export class Game {
     this.unmountCurrent();
     const a = rocket?.assembly ?? new Assembly();
     if (!rocket) {
-      // Saturn V body + engine for thrust
       const saturnPart = findPart('saturn_v');
       if (saturnPart) {
-        a.addRoot({ part: saturnPart, position: [0, 0.1, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('engine_mammoth')!, position: [0, -0.05, 0], rotation: 0, children: [] });
+        a.addRoot({ part: saturnPart, position: [0, 0.15, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, 0.02, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_mammoth')!, position: [0, -0.08, 0], rotation: 0, children: [] });
       } else {
         // Fallback to procedural rocket
         const p = PART_SCALE;
