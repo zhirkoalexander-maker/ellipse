@@ -1463,13 +1463,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // Penetration check — inside the planet = always crash
         if (d < surfaceR - 50) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 60 && d > 0.001 && this.liftoffFrames <= 0) {
+        } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
           const speedLimit = this.parachuteDeployed ? 200 : 20000;
-          const tiltLimit = hasLegs ? 30 : 20;
+          const tiltLimit = hasLegs ? 60 : 45;
 
           if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
             this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
