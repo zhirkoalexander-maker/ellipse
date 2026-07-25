@@ -19,7 +19,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'S',
     mass: 200,
-    fuelCapacity: 4500,
+    fuelCapacity: 500,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -29,7 +29,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'M',
     mass: 600,
-    fuelCapacity: 45000,
+    fuelCapacity: 5000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -39,7 +39,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'L',
     mass: 1200,
-    fuelCapacity: 90000,
+    fuelCapacity: 10000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
@@ -49,7 +49,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'tank',
     size: 'XL',
     mass: 2500,
-    fuelCapacity: 225000,
+    fuelCapacity: 25000,
     fuelType: 'LFO',
     dragCoeff: 0.4
   },
