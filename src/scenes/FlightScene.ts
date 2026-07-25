@@ -111,7 +111,7 @@ export class FlightScene {
       this.countdownEl = document.createElement('div');
       this.countdownEl.style.cssText = `
         position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
-        font-size:72px;font-weight:bold;color:#fff;z-index:500;
+        font-size:72px;font-weight:bold;color:#fff;z-index:1000;
         text-shadow:0 0 30px rgba(68,136,255,0.6);
         font-family:system-ui,sans-serif;pointer-events:none;
         transition:opacity 0.2s;
