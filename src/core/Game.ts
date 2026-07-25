@@ -36,6 +36,7 @@ export class Game {
   private flight?: FlightScene;
 
   constructor() {
+    console.log('Game constructor started v1.1');
     loadAllTextures();
     this.renderer = new Renderer();
     this.sceneMgr = new SceneManager();
