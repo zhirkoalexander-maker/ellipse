@@ -18,12 +18,7 @@
         justify-content: center; align-items: center; text-align: center;
         flex-direction: column; gap: 16px;
       }
-      #loading-screen {
-        position: fixed; inset: 0; z-index: 900;
-        background: #0a0a1a;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-      }
+      #loading-screen { display: none !important; }
         align-items: center; justify-content: center;
         transition: opacity 0.8s ease-out;
       }
@@ -71,13 +66,13 @@
         100% { opacity: 0.9; }
       }
     </style>
-    <script type="module" crossorigin src="/ellipse/assets/index-CT94HMws.js"></script>
+    <script type="module" crossorigin src="/ellipse/assets/index-BZF7V1rL.js"></script>
     <link rel="stylesheet" crossorigin href="/ellipse/assets/index-CbrtuRE9.css">
   </head>
   <body>
     <div id="loading-screen">
       <div class="star-field" id="loading-stars"></div>
-      <div class="logo">ELLIPSE <span style="font-size:12px;color:#ff4444;display:block;" id="ver-badge">v1.7</span></div>
+      <div class="logo">ELLIPSE <span style="font-size:12px;color:#ff4444;display:block;" id="ver-badge">v1.8</span></div>
       <div class="loader-spinner"></div>
       <div class="loader-label" id="loading-label">INITIALIZING</div>
     </div>
@@ -114,7 +109,7 @@
       window.onerror = function(m) { alert('JS Error: '+m); };
       // Force cache-bust: if page is old, try to reload
       (function(){
-        var v = 'v1.7';
+        var v = 'v1.8';
         if (sessionStorage.getItem('ellipse_ver') && sessionStorage.getItem('ellipse_ver') !== v) {
           sessionStorage.setItem('ellipse_ver', v);
           location.reload(true);
