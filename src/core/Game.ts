@@ -89,10 +89,6 @@ export class Game {
   async start(): Promise<void> { 
     this.showMainMenu();
     this.loop();
-    setTimeout(() => {
-      const el = document.getElementById('loading-screen');
-      if (el) el.classList.add('hidden');
-    }, 4000);
   }
 
   private showMainMenu(): void {
