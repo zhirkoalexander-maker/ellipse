@@ -294649,3 +294649,10 @@ describe('Rocket Part Spacing', () => {
 - Loading screen stays until models loaded + menu shown
 - SAS: deprecated, T key removed, sasMode always 'off'
 - Version bumped to 1.1
+### v1.1 Latest
+- Default rocket: capsule M + tank M (uniform width, no big head)
+- Ant thrust: 150kN (TWR=1.7, smooth acceleration)
+- Countdown z-index: 1000 (always visible)
+- Adapter: CylinderGeometry(r2, r1) — narrow top, wide bottom
+- Loading screen: stays until models+menu ready
+- Staging: removeStage with splice, proper fuel tank removal
