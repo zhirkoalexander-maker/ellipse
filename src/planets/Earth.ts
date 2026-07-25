@@ -220,7 +220,7 @@ function generateRoughnessMap(): THREE.CanvasTexture {
 
 /** Generate a procedural Earth texture as a synchronous fallback. */
 function generateEarthTextureFallback(): THREE.CanvasTexture {
-  const W = 4096, H = 2048;
+  const W = 1024, H = 512;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
