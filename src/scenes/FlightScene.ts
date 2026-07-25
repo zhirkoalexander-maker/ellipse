@@ -1947,6 +1947,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         (pMesh as any)._vz = Math.sin(angle) * (0.8 + Math.random() * 1.5);
         this.explosionMeshes.push(pMesh);
       }
+      // Detach lower roots (flat assembly)
+      const roots = this.rocket.assembly.roots;
+      const decIdx = roots.indexOf(decoupler);
+      if (decIdx >= 0) for (let i = decIdx; i < roots.length; i++) {
+        const m = this.rocketGroup.getObjectByName(roots[i]!.part.id);
+        if (m) { const wp = new THREE.Vector3(); m.getWorldPosition(wp); worldPositions.push(wp); meshes.push(m); m.removeFromParent(); }
+      }
       while (decouplerMesh.children.length > 0) {
         const child = decouplerMesh.children[0]!;
         const wp = new THREE.Vector3();
