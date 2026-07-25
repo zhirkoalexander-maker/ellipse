@@ -294643,3 +294643,9 @@ describe('Rocket Part Spacing', () => {
     expect(Math.abs(tankBottom - engTop - gap)).toBeLessThan(0.001);
   });
 });
+### v1.1 Changes
+- Adapter cone direction fixed: narrow top, wide bottom (rocket shape)
+- Staging: removeStage uses splice to properly remove lower parts
+- Loading screen stays until models loaded + menu shown
+- SAS: deprecated, T key removed, sasMode always 'off'
+- Version bumped to 1.1
