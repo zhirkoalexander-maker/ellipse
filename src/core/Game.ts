@@ -87,6 +87,8 @@ export class Game {
   }
 
   async start(): Promise<void> { 
+    const el = document.getElementById('loading-screen');
+    if (el) el.classList.add('hidden');
     this.showMainMenu();
     this.loop();
   }

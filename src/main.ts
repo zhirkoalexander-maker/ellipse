@@ -11,7 +11,6 @@ function hideLoadingScreen(): void {
 }
 
 try {
-  hideLoadingScreen();
   const game = new Game();
   game.start();
 } catch (e) {
