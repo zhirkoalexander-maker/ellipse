@@ -82,7 +82,9 @@
       <div>Please rotate your device to landscape</div>
     </div>
     <div id="app" style="position:fixed;inset:0;z-index:1;"></div>
+    <div id="game-alive" style="position:fixed;top:10px;left:10px;z-index:10000;color:#0f0;font:bold 16px monospace;"></div>
     <script>
+      document.getElementById('game-alive').textContent = 'PAGE LOADED v1.8';
       (function() {
         var el = document.getElementById('loading-stars');
         if (el) {
