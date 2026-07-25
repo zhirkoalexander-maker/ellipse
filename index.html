@@ -78,7 +78,7 @@
   <body>
     <div id="loading-screen">
       <div class="star-field" id="loading-stars"></div>
-      <div class="logo">ELLIPSE <span style="font-size:12px;color:#ff4444;display:block;" id="ver-badge">v1.2</span></div>
+      <div class="logo">ELLIPSE <span style="font-size:12px;color:#ff4444;display:block;" id="ver-badge">v1.3</span></div>
       <div class="loader-spinner"></div>
       <div class="loader-label" id="loading-label">INITIALIZING</div>
     </div>
@@ -115,7 +115,7 @@
       window.onerror = function(m) { alert('JS Error: '+m); };
       // Force cache-bust: if page is old, try to reload
       (function(){
-        var v = 'v1.2';
+        var v = 'v1.3';
         if (sessionStorage.getItem('ellipse_ver') && sessionStorage.getItem('ellipse_ver') !== v) {
           sessionStorage.setItem('ellipse_ver', v);
           location.reload(true);

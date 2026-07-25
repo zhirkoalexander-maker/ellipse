@@ -292,7 +292,7 @@ export class Earth extends Planet {
     super('earth', EARTH_MASS, position, velocity, 6.371e6);
 
     const visualR = this.visualRadius;
-    const SEG = 200;
+    const SEG = 64;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const roughnessMap = generateRoughnessMap();
