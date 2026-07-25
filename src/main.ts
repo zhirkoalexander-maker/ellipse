@@ -12,7 +12,6 @@ function hideLoadingScreen(): void {
 
 try {
   const game = new Game();
-  hideLoadingScreen();
   game.start();
 } catch (e) {
   console.error('Failed to start Ellipse:', e);
