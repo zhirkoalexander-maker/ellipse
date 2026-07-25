@@ -111,8 +111,8 @@ export class FlightScene {
       this.countdownEl = document.createElement('div');
       this.countdownEl.style.cssText = `
         position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
-        font-size:72px;font-weight:bold;color:#fff;z-index:1000;
-        text-shadow:0 0 30px rgba(68,136,255,0.6);
+        font-size:120px;font-weight:bold;color:#ff0;z-index:9999;
+        text-shadow:0 0 30px rgba(255,136,0,0.8);
         font-family:system-ui,sans-serif;pointer-events:none;
         transition:opacity 0.2s;
       `;
@@ -2099,15 +2099,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     overlay.style.cssText = `
       position:fixed;top:0;left:0;width:100%;height:100%;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
-      background:rgba(0,0,0,0.7);z-index:1000;
-      font-family:system-ui,sans-serif;color:#fff;
+      background:rgba(0,0,0,0.7);z-index:9999;
+      font-family:system-ui,sans-serif;color:#ff0;
     `;
     overlay.innerHTML = `
       <div style="font-size:48px;font-weight:bold;color:#ff4444;margin-bottom:8px;">CRASH!</div>
       <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
       <div style="display:flex;gap:16px;">
-        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#fff;cursor:pointer;">MENU</button>
-        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#fff;cursor:pointer;">LAUNCH AGAIN</button>
+        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#ff0;cursor:pointer;">MENU</button>
+        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#ff0;cursor:pointer;">LAUNCH AGAIN</button>
       </div>
     `;
     document.body.appendChild(overlay);
