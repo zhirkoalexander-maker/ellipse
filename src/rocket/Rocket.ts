@@ -39,10 +39,20 @@ export class Rocket {
   }
 
   removeStage(decouplerNode: AssemblyNode): void {
-    const idsToRemove = new Set<AssemblyNode>();
-    collectDescendants(decouplerNode, idsToRemove);
-    idsToRemove.add(decouplerNode);
-    this.fuelTanks = this.fuelTanks.filter(t => !idsToRemove.has(t.node));
+    const roots = this.assembly.roots;
+    const decIdx = roots.indexOf(decouplerNode);
+    if (decIdx < 0) return;
+    // Remove decoupler and all roots below it
+    const count = roots.length - decIdx;
+    roots.splice(decIdx, count);
+    // Remove fuel tanks for removed nodes
+    const removedIds = new Set<string>();
+    const walk = (n: AssemblyNode) => { removedIds.add(n.part.id); n.children.forEach(walk); };
+    walk(decouplerNode);
+    for (let i = 0; i < count - 1; i++) {
+      if (roots[decIdx + i]) walk(roots[decIdx + i]!);
+    }
+    this.fuelTanks = this.fuelTanks.filter(t => !removedIds.has(t.node.part.id));
     decouplerNode.children = [];
   }
 }
