@@ -92,7 +92,7 @@ export class Game {
     setTimeout(() => {
       const el = document.getElementById('loading-screen');
       if (el) el.classList.add('hidden');
-    }, 2000);
+    }, 4000);
   }
 
   private showMainMenu(): void {
