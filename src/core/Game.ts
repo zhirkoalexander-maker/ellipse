@@ -87,8 +87,7 @@ export class Game {
   }
 
   async start(): Promise<void> { 
-    this.preloadModels(); // background loading
-    // Show menu immediately
+    // Show menu immediately — models load on demand
     const el = document.getElementById('loading-screen');
     if (el) el.classList.add('hidden');
     this.showMainMenu();
