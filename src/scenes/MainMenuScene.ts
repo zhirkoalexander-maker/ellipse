@@ -15,38 +15,34 @@ export class MainMenuScene {
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 500;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(6,8,20,0.95);
+      background: radial-gradient(ellipse at center, rgba(10,15,30,0.3) 0%, rgba(6,8,20,0.75) 70%);
       border: none; border-radius: 0;
+      backdrop-filter: blur(0px);
     `;
 
     const logo = document.createElement('div');
     logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
-      <svg viewBox="0 0 120 40" fill="none" style="width:100px;height:36px;display:block;margin:0 auto var(--space-2);">
-        <ellipse cx="60" cy="20" rx="52" ry="16" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.2" opacity="0.4"/>
-        <ellipse cx="60" cy="20" rx="36" ry="10" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.8" opacity="0.25"/>
-        <ellipse cx="60" cy="20" rx="18" ry="5" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.6" opacity="0.15"/>
-        <circle cx="60" cy="20" r="2.5" fill="var(--accent-gold)"/>
-        <line x1="10" y1="20" x2="110" y2="20" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
-        <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
-      </svg>
-      <div class="text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
-      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.15em;">SPACE FLIGHT SIMULATOR</div>
+      <div style="font-size:64px;letter-spacing:0.12em;color:var(--accent-gold);font-weight:700;text-shadow:0 0 60px rgba(200,152,56,0.3);margin-bottom:4px;">ELLIPSE</div>
+      <div style="font-size:14px;color:rgba(244,245,242,0.5);letter-spacing:0.2em;margin-bottom:24px;">SPACE FLIGHT SIMULATOR</div>
     `;
     this.root.appendChild(logo);
 
-    const btn = (label: string, variant: string, cb: () => void): HTMLButtonElement => {
+    const btn = (label: string, variant: string, cb: () => void, emoji?: string): HTMLButtonElement => {
       const b = document.createElement('button');
       b.className = `btn btn--${variant}`;
-      b.textContent = label;
-      b.style.cssText = 'margin: 6px; min-width: 220px; padding: 12px 24px; font-size: 14px;';
+      const prefix = emoji ? `<span style="font-size:18px;margin-right:8px;">${emoji}</span>` : '';
+      b.innerHTML = `${prefix}${label}`;
+      b.style.cssText = 'margin: 8px; min-width: 260px; padding: 16px 32px; font-size: 16px; font-weight:600; letter-spacing:0.06em; border-radius:8px; transition:all 0.2s;';
+      b.addEventListener('mouseenter', () => { b.style.transform = 'scale(1.03)'; b.style.boxShadow = '0 0 24px rgba(234,205,158,0.15)'; });
+      b.addEventListener('mouseleave', () => { b.style.transform = 'scale(1)'; b.style.boxShadow = 'none'; });
       b.addEventListener('click', cb);
       return b;
     };
-    this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay));
-    this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab));
-    this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
-    this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
+    this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay, '🚀'));
+    this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab, '🔧'));
+    this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings, '⚙️'));
+    this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp(), '📖'));
   }
 
   private toggleHelp(): void {

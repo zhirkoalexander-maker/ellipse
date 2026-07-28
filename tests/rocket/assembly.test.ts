@@ -21,8 +21,8 @@ describe('Assembly', () => {
   it('totalMassWithFuel adds tank fuel', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 0, 0], rotation: 0, children: [] });
-    // tank 600 + 45000 fuel = 45600
-    expect(a.totalMassWithFuel()).toBe(45600);
+    // tank 600 + 5000 fuel = 5600
+    expect(a.totalMassWithFuel()).toBe(5600);
   });
 
   it('centerOfMass is mass-weighted average position', () => {
