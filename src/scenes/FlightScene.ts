@@ -52,8 +52,8 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 10;
-  private readonly ANGULAR_DAMPING = 8;
+  private readonly ANGULAR_ACCEL = 3;
+  private readonly ANGULAR_DAMPING = 5;
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
@@ -1145,10 +1145,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.angularVel.y += yawInput * this.ANGULAR_ACCEL * baseDt;
     this.angularVel.z += rollInput * this.ANGULAR_ACCEL * baseDt;
 
-    // Engine gimbal: extra rotation authority when thrust is active
+    // Engine gimbal: extra rotation authority when thrust is active (scales with throttle)
     if (engineActive && !this.grounded) {
-      this.angularVel.x += pitchInput * this.state.throttle * 6 * baseDt;
-      this.angularVel.y += yawInput * this.state.throttle * 6 * baseDt;
+      const gimbalForce = this.state.throttle * 2;
+      this.angularVel.x += pitchInput * gimbalForce * baseDt;
+      this.angularVel.y += yawInput * gimbalForce * baseDt;
     }
 
     // SAS: hold attitude or track prograde/retrograde
@@ -1219,7 +1220,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (eng && eng.thrust && localGrav > 0) {
-            const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * localGrav);
+             const twr = (eng.thrust * 1000 * this.state.throttle) / (this.state.rocket.totalMass() * localGrav);
             if (twr >= 1.0) {
               canLiftOff = true;
             } else {
