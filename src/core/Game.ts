@@ -36,7 +36,6 @@ export class Game {
   private flight?: FlightScene;
 
   constructor() {
-    document.getElementById("game-alive")!.textContent = "v1.9 OK";
     loadAllTextures();
     this.renderer = new Renderer();
     this.sceneMgr = new SceneManager();
@@ -101,7 +100,7 @@ export class Game {
 
   private showVab(): void {
     this.unmountCurrent();
-    this.vab = new VABScene((assembly: Assembly) => { const r = new Rocket(assembly); this.showFlight(r); });
+    this.vab = new VABScene((assembly: Assembly) => { const r = new Rocket(assembly); this.showFlight(r); }, () => this.showMainMenu());
     this.vab.mount();
     this.sceneMgr.scene.add(this.vab.scene);
   }
