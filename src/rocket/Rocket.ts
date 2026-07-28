@@ -46,13 +46,13 @@ export class Rocket {
     const count = roots.length - decIdx;
     roots.splice(decIdx, count);
     // Remove fuel tanks for removed nodes
-    const removedIds = new Set<string>();
-    const walk = (n: AssemblyNode) => { removedIds.add(n.part.id); n.children.forEach(walk); };
+    const removedNodes = new Set<AssemblyNode>();
+    const walk = (n: AssemblyNode) => { removedNodes.add(n); n.children.forEach(walk); };
     walk(decouplerNode);
     for (let i = 0; i < count - 1; i++) {
       if (roots[decIdx + i]) walk(roots[decIdx + i]!);
     }
-    this.fuelTanks = this.fuelTanks.filter(t => !removedIds.has(t.node.part.id));
+    this.fuelTanks = this.fuelTanks.filter(t => !removedNodes.has(t.node));
     decouplerNode.children = [];
   }
 }

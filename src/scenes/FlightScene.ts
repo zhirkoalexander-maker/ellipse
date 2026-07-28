@@ -1220,7 +1220,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (eng && eng.thrust && localGrav > 0) {
             const twr = (eng.thrust * 1000) / (this.state.rocket.totalMass() * localGrav);
-            if (twr >= 0.0) {
+            if (twr >= 1.0) {
               canLiftOff = true;
             } else {
               toast.show(`TWR ${twr.toFixed(2)} — insufficient for liftoff!`);
@@ -1272,8 +1272,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.exhaustLight.color.setHSL(0.08 - this.state.throttle * 0.05, 1, 0.5 + this.state.throttle * 0.3);
     }
 
-    // Ground smoke disabled
-    if (false && engineActive && this.grounded) this.groundSmoke.start();
+    // Ground smoke when engine runs on pad
+    if (engineActive && this.grounded) this.groundSmoke.start();
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
@@ -1468,14 +1468,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
           const hasLegs = this.hasLandingLegs();
-          const speedLimit = this.parachuteDeployed ? 200 : 20000;
+          const speedLimit = this.parachuteDeployed ? 15 : 20;
+          const softLimit = this.parachuteDeployed ? 8 : 5;
           const tiltLimit = hasLegs ? 60 : 45;
 
           if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
             this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
           } else if (tiltDeg > tiltLimit) {
             this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-          } else if (isFinite(vertSpeed) && vertSpeed < 1) {
+          } else if (isFinite(vertSpeed) && Math.abs(vertSpeed) < softLimit) {
             this.state.velocity = [0, 0, 0];
             this.grounded = true;
             this.groundedDir = [dx / d, dy / d, dz / d];
@@ -1495,6 +1496,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
               else if (bodyName === 'venus') this.achievements.unlock('land_venus');
               else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
             }
+          } else if (isFinite(vertSpeed)) {
+            this.state.velocity = [0, 0, 0];
+            this.grounded = true;
+            this.groundedDir = [dx / d, dy / d, dz / d];
+            const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
+            this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
+            this.screenShake = Math.abs(vertSpeed) * 0.05;
+            this.sound.playLand();
+            this.sound.stopEngine();
+            const bodyName = nearestBody.name;
+            toast.show(`Rough landing on ${bodyName}! (${Math.abs(vertSpeed).toFixed(1)} m/s)`);
+            if (bodyName === 'earth') this.achievements.unlock('land_earth');
+            else if (bodyName === 'moon') this.achievements.unlock('land_moon');
           }
         } else if (d < surfaceR + 250 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50000) {
           // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
@@ -1632,7 +1646,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v1.8<br>C=freecam F=reset T=SAS W=throttle`;
+        dbg.innerHTML = `v2.3<br>C=freecam F=reset T=SAS W=throttle`;
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -1861,7 +1875,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const skyR = 0.45 * (1 - skyBlend) + 0.01 * skyBlend;
     const skyG = 0.65 * (1 - skyBlend) + 0.01 * skyBlend;
     const skyB = 0.95 * (1 - skyBlend) + 0.02 * skyBlend;
-    this.sceneMgr.scene.background = new THREE.Color(skyR, skyG, skyB);
+    this.sceneMgr.scene.background = (this.sceneMgr.scene.background as THREE.Color).setRGB(skyR, skyG, skyB);
 
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
@@ -2011,6 +2025,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     this.rocket.removeStage(decoupler);
+    this.positionFlameAtNozzle();
     this.achievements.unlock('stage_separate');
     toast.show('Stage separated!');
   }
