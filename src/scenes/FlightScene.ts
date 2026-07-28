@@ -80,6 +80,7 @@ export class FlightScene {
   private sonicBoomTimer = 0;
   private countdownTimer = 0;
   private countdownActive = false;
+  private countdownCooldown = 0;
   private countdownEl: HTMLElement | null = null;
   private lastRefBody: string | null = null;
   private impactMarker: THREE.Mesh | null = null;
@@ -1195,11 +1196,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const fwd = getFwd();
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
-    // Apply thrust — always allowed after countdown finishes, no weight gate
+    // Apply thrust — TWR gate: must have enough thrust at current throttle
     let canLiftOff = false;
+    if (this.countdownCooldown > 0) this.countdownCooldown -= baseDt;
     if (engineActive && this.grounded) {
       // Countdown — start once
-      if (!this.countdownActive && !this.launched) {
+      if (!this.countdownActive && !this.launched && this.countdownCooldown <= 0) {
         this.countdownActive = true;
         this.countdownTimer = 0;
         this.showCountdown('3');
@@ -1224,9 +1226,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             if (twr >= 1.0) {
               canLiftOff = true;
             } else {
-              toast.show(`TWR ${twr.toFixed(2)} — insufficient for liftoff!`);
+              toast.show(`TWR ${twr.toFixed(2)} — need more throttle!`);
               this.launched = false;
-              this.countdownTimer = 0; // Allow retry
+              this.countdownTimer = 0;
+              this.countdownCooldown = 5; // 5s cooldown before retry
             }
           }
           if (canLiftOff) {
@@ -1499,6 +1502,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             }
           } else if (isFinite(vertSpeed)) {
             this.state.velocity = [0, 0, 0];
+            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 50), nearestBody.position[1] + dy / d * (surfaceR + 50), nearestBody.position[2] + dz / d * (surfaceR + 50)];
             this.grounded = true;
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
