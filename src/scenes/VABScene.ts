@@ -22,6 +22,7 @@ export class VABScene {
   private partListEl: HTMLDivElement;
   private currentRocketEl: HTMLDivElement;
   private onLaunch: (assembly: Assembly) => void;
+  private onBack!: () => void;
   private stackHeight = 0;
   private addedPartNames: string[] = [];
   private framed = false;
@@ -33,8 +34,9 @@ export class VABScene {
   private vabPrevMouse = { x: 0, y: 0 };
   private vabTarget = new THREE.Vector3(0, PART_SCALE, 0);
 
-  constructor(onLaunch: (assembly: Assembly) => void) {
+  constructor(onLaunch: (assembly: Assembly) => void, onBack: () => void) {
     this.onLaunch = onLaunch;
+    this.onBack = onBack;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0d1a);
@@ -105,6 +107,7 @@ export class VABScene {
           <button id="vab-launch" style="width:100%;padding:10px;background:#EACD9E;color:#0A0C18;border:none;border-radius:4px;font-size:13px;cursor:pointer;letter-spacing:0.06em;">LAUNCH</button>
           <button id="vab-remove" style="width:100%;padding:8px;background:transparent;color:#F4F5F2;border:1px solid rgba(244,245,242,0.2);border-radius:4px;font-size:11px;cursor:pointer;margin-top:6px;letter-spacing:0.06em;">REMOVE LAST</button>
           <button id="vab-clear" style="width:100%;padding:8px;background:transparent;color:#F4F5F2;border:1px solid rgba(244,245,242,0.2);border-radius:4px;font-size:11px;cursor:pointer;margin-top:4px;letter-spacing:0.06em;">CLEAR ALL</button>
+          <button id="vab-back" style="width:100%;padding:8px;background:transparent;color:rgba(244,245,242,0.6);border:1px solid rgba(244,245,242,0.1);border-radius:4px;font-size:11px;cursor:pointer;margin-top:4px;letter-spacing:0.06em;">BACK TO MENU</button>
         </div>
       </div>
       <div style="flex:1;pointer-events:none;"></div>
@@ -120,6 +123,7 @@ export class VABScene {
     });
     this.rootEl.querySelector('#vab-remove')!.addEventListener('click', () => this.removeLast());
     this.rootEl.querySelector('#vab-clear')!.addEventListener('click', () => this.clearAll());
+    this.rootEl.querySelector('#vab-back')!.addEventListener('click', () => this.onBack());
   }
 
   private buildPresets(): void {
