@@ -502,64 +502,67 @@ function buildTank(group: THREE.Group, d: { radius: number; height: number }, si
 
 function buildEngine(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
+  const SEG_HQ = 48;
 
   const tex = getTextureSet(`engine_${size}`, generateEngineTexture);
   const engineMat = createMaterialFromTextureSet(tex);
+
+  // Gunmetal for nozzle bell (metallic, heat-resistant look)
+  const bellMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3a4a, roughness: 0.35, metalness: 0.85,
+  });
 
   // Gold for flange
   const goldTex = getTextureSet('gold', generateGoldTexture);
   const goldMat = createMaterialFromTextureSet(goldTex);
 
-  // Engine upper body
-  const upperGeom = new THREE.CylinderGeometry(r * 1.4, r * 0.6, h * 0.25, SEG);
+  // Dark inner cavity
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x111122, roughness: 0.9, metalness: 0.2,
+  });
+
+  // Engine upper body (turbopump housing)
+  const upperGeom = new THREE.CylinderGeometry(r * 1.4, r * 0.6, h * 0.25, SEG_HQ);
   applyCylindricalUV(upperGeom);
   const upper = new THREE.Mesh(upperGeom, engineMat);
   upper.position.y = h * 0.35;
   group.add(upper);
 
   // Mid flange ring
-  const ringGeom = new THREE.CylinderGeometry(r * 0.6, r * 0.5, h * 0.06, SEG);
-  applyCylindricalUV(ringGeom);
-  perturbVertices(ringGeom, PART_SCALE * 0.015);
+  const ringGeom = new THREE.TorusGeometry(r * 0.55, r * 0.06, 12, SEG_HQ);
   const ring = new THREE.Mesh(ringGeom, goldMat);
-  ring.position.y = h * 0.12;
-  group.add(ring)
+  ring.position.y = h * 0.10;
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
 
-  // Nozzle outer
-  const bellOuterGeom = new THREE.CylinderGeometry(r * 0.5, r * 0.85, h * 0.4, SEG);
-  applyCylindricalUV(bellOuterGeom, 1.5);
-  perturbVertices(bellOuterGeom, PART_SCALE * 0.01);
-  const bellOuter = new THREE.Mesh(bellOuterGeom, engineMat);
-  bellOuter.position.y = -h * 0.12;
+  // Nozzle bell outer — tapered cone (narrow at top, wide at bottom)
+  const bellOuterGeom = new THREE.CylinderGeometry(r * 0.48, r * 0.88, h * 0.45, SEG_HQ);
+  const bellOuter = new THREE.Mesh(bellOuterGeom, bellMat);
+  bellOuter.position.y = -h * 0.14;
   group.add(bellOuter);
 
-  // Nozzle inner (throat)
-  const darkMat = createMaterialFromTextureSet(tex, {
-    color: 0x1A222A,
-    roughness: 0.7,
-    metalness: 0.5,
-  });
-  const bellInnerGeom = new THREE.CylinderGeometry(r * 0.35, r * 0.7, h * 0.38, SEG);
-  applyCylindricalUV(bellInnerGeom, 1.5);
-  perturbVertices(bellInnerGeom, PART_SCALE * 0.012);
+  // Nozzle inner cone (throat interior — dark, inverted taper)
+  const bellInnerGeom = new THREE.CylinderGeometry(r * 0.32, r * 0.68, h * 0.40, SEG_HQ);
   const bellInner = new THREE.Mesh(bellInnerGeom, darkMat);
-  bellInner.position.y = -h * 0.12;
+  bellInner.position.y = -h * 0.13;
   group.add(bellInner);
 
-  // Nozzle exit rim
-  const rimGeom = new THREE.CylinderGeometry(r * 0.88, r * 0.88, h * 0.03, SEG);
-  applyCylindricalUV(rimGeom);
-  perturbVertices(rimGeom, PART_SCALE * 0.008);
+  // Nozzle exit rim (wide ring at bottom)
+  const rimGeom = new THREE.TorusGeometry(r * 0.78, r * 0.04, 8, SEG_HQ);
   const rim = new THREE.Mesh(rimGeom, goldMat);
-  rim.position.y = -h * 0.12 - h * 0.2 - h * 0.015;
+  rim.position.y = -h * 0.14 - h * 0.225;
+  rim.rotation.x = Math.PI / 2;
   group.add(rim);
 
-  // Engine glow
-  const glowM = new THREE.MeshBasicMaterial({ color: 0xFF8800, transparent: true, opacity: 0.4 });
-  const inner = new THREE.Mesh(new THREE.RingGeometry(0, r * 0.3, SEG), glowM);
-  inner.position.y = -h * 0.12 - h * 0.2 - h * 0.02;
-  inner.rotation.x = -PI / 2;
-  group.add(inner);
+  // Engine throat glow (orange ring inside nozzle)
+  const glowM = new THREE.MeshBasicMaterial({
+    color: 0xFF6600, transparent: true, opacity: 0.5, depthWrite: false,
+  });
+  const glowGeom = new THREE.RingGeometry(r * 0.2, r * 0.35, SEG_HQ);
+  const glow = new THREE.Mesh(glowGeom, glowM);
+  glow.position.y = -h * 0.13 - h * 0.2;
+  glow.rotation.x = -Math.PI / 2;
+  group.add(glow);
 }
 
 function buildParachute(group: THREE.Group, d: { radius: number; height: number }) {

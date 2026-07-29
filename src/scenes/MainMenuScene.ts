@@ -15,9 +15,8 @@ export class MainMenuScene {
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 500;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: radial-gradient(ellipse at center, rgba(10,15,30,0.3) 0%, rgba(6,8,20,0.75) 70%);
+      background: #060814;
       border: none; border-radius: 0;
-      backdrop-filter: blur(0px);
     `;
 
     const logo = document.createElement('div');
