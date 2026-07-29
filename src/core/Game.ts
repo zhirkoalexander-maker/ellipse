@@ -116,7 +116,7 @@ export class Game {
       const tankY = engY + engH/2 + gap + tankH/2;
       const capY = tankY + tankH/2 + gap + capH/2;
       a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
-      a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
+      a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
       a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
     }
     const r = new Rocket(a);
