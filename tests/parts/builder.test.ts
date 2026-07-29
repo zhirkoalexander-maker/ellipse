@@ -58,11 +58,11 @@ describe('PartBuilder', () => {
     expect(countMeshes(g)).toBeGreaterThanOrEqual(4);
   });
 
-  it('engine has upper body, ring, bell, rim, and inner glow', () => {
+  it('engine has chamber, rings, bell, inner cavity, and exit rim', () => {
     const p = findPart('engine_vector')!;
     const g = buildPartMesh(p);
-    expect(countMeshes(g)).toBeGreaterThanOrEqual(5);
-    expect(hasGeometryType(g, 'RingGeometry')).toBe(true);
+    expect(countMeshes(g)).toBeGreaterThanOrEqual(7);
+    expect(hasGeometryType(g, 'TorusGeometry')).toBe(true);
   });
 
   it('parachute is packed container (3 meshes) until deployed in flight', () => {
