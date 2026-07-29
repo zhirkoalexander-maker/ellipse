@@ -502,67 +502,90 @@ function buildTank(group: THREE.Group, d: { radius: number; height: number }, si
 
 function buildEngine(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
-  const SEG_HQ = 48;
+  const SEG = 48;
 
   const tex = getTextureSet(`engine_${size}`, generateEngineTexture);
   const engineMat = createMaterialFromTextureSet(tex);
 
-  // Gunmetal for nozzle bell (metallic, heat-resistant look)
+  // Gunmetal bell — shiny metallic
   const bellMat = new THREE.MeshStandardMaterial({
-    color: 0x3a3a4a, roughness: 0.35, metalness: 0.85,
+    color: 0x2a2a3a, roughness: 0.25, metalness: 0.9,
   });
 
-  // Gold for flange
+  // Copper-gold for rings/accents
   const goldTex = getTextureSet('gold', generateGoldTexture);
   const goldMat = createMaterialFromTextureSet(goldTex);
 
-  // Dark inner cavity
+  // Dark soot-covered interior
   const darkMat = new THREE.MeshStandardMaterial({
-    color: 0x111122, roughness: 0.9, metalness: 0.2,
+    color: 0x0a0a18, roughness: 0.95, metalness: 0.1,
   });
 
-  // Engine upper body (turbopump housing)
-  const upperGeom = new THREE.CylinderGeometry(r * 1.4, r * 0.6, h * 0.25, SEG_HQ);
-  applyCylindricalUV(upperGeom);
-  const upper = new THREE.Mesh(upperGeom, engineMat);
-  upper.position.y = h * 0.35;
-  group.add(upper);
+  // Hot turbine exhaust (subtle glow inside)
+  const hotMat = new THREE.MeshBasicMaterial({
+    color: 0xff4400, transparent: true, opacity: 0.3, depthWrite: false,
+  });
 
-  // Mid flange ring
-  const ringGeom = new THREE.TorusGeometry(r * 0.55, r * 0.06, 12, SEG_HQ);
-  const ring = new THREE.Mesh(ringGeom, goldMat);
-  ring.position.y = h * 0.10;
-  ring.rotation.x = Math.PI / 2;
-  group.add(ring);
+  // Combustion chamber (wide cylinder at top of engine)
+  const chamberGeom = new THREE.CylinderGeometry(r * 1.15, r * 0.75, h * 0.28, SEG);
+  const chamber = new THREE.Mesh(chamberGeom, engineMat);
+  chamber.position.y = h * 0.20;
+  group.add(chamber);
 
-  // Nozzle bell outer — tapered cone (narrow at top, wide at bottom)
-  const bellOuterGeom = new THREE.CylinderGeometry(r * 0.48, r * 0.88, h * 0.45, SEG_HQ);
-  const bellOuter = new THREE.Mesh(bellOuterGeom, bellMat);
-  bellOuter.position.y = -h * 0.14;
-  group.add(bellOuter);
+  // Chamber-top flange
+  const topFlange = new THREE.Mesh(
+    new THREE.TorusGeometry(r * 0.75, r * 0.05, 8, SEG),
+    goldMat
+  );
+  topFlange.position.y = h * 0.33;
+  topFlange.rotation.x = Math.PI / 2;
+  group.add(topFlange);
 
-  // Nozzle inner cone (throat interior — dark, inverted taper)
-  const bellInnerGeom = new THREE.CylinderGeometry(r * 0.32, r * 0.68, h * 0.40, SEG_HQ);
+  // Upper ring on chamber
+  const upperRing = new THREE.Mesh(
+    new THREE.TorusGeometry(r * 0.70, r * 0.04, 8, SEG),
+    goldMat
+  );
+  upperRing.position.y = h * 0.12;
+  upperRing.rotation.x = Math.PI / 2;
+  group.add(upperRing);
+
+  // Lower ring (where bell starts)
+  const lowerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(r * 0.52, r * 0.04, 8, SEG),
+    goldMat
+  );
+  lowerRing.position.y = -h * 0.02;
+  lowerRing.rotation.x = Math.PI / 2;
+  group.add(lowerRing);
+
+  // Nozzle bell outer — wide tapered cone with metallic shine
+  const bellGeom = new THREE.CylinderGeometry(r * 0.48, r * 0.90, h * 0.50, SEG);
+  const bell = new THREE.Mesh(bellGeom, bellMat);
+  bell.position.y = -h * 0.18;
+  group.add(bell);
+
+  // Nozzle inner surface — dark cavity visible from below
+  const bellInnerGeom = new THREE.CylinderGeometry(r * 0.30, r * 0.68, h * 0.44, SEG);
   const bellInner = new THREE.Mesh(bellInnerGeom, darkMat);
-  bellInner.position.y = -h * 0.13;
+  bellInner.position.y = -h * 0.16;
   group.add(bellInner);
 
-  // Nozzle exit rim (wide ring at bottom)
-  const rimGeom = new THREE.TorusGeometry(r * 0.78, r * 0.04, 8, SEG_HQ);
-  const rim = new THREE.Mesh(rimGeom, goldMat);
-  rim.position.y = -h * 0.14 - h * 0.225;
-  rim.rotation.x = Math.PI / 2;
-  group.add(rim);
+  // Hot inner glow ring (visible inside the bell)
+  const innerGlowGeom = new THREE.TorusGeometry(r * 0.25, r * 0.06, 8, SEG);
+  const innerGlow = new THREE.Mesh(innerGlowGeom, hotMat);
+  innerGlow.position.y = -h * 0.14 - h * 0.22;
+  innerGlow.rotation.x = Math.PI / 2;
+  group.add(innerGlow);
 
-  // Engine throat glow (orange ring inside nozzle)
-  const glowM = new THREE.MeshBasicMaterial({
-    color: 0xFF6600, transparent: true, opacity: 0.5, depthWrite: false,
-  });
-  const glowGeom = new THREE.RingGeometry(r * 0.2, r * 0.35, SEG_HQ);
-  const glow = new THREE.Mesh(glowGeom, glowM);
-  glow.position.y = -h * 0.13 - h * 0.2;
-  glow.rotation.x = -Math.PI / 2;
-  group.add(glow);
+  // Exit lip — thick gold rim at nozzle exit
+  const exitRim = new THREE.Mesh(
+    new THREE.TorusGeometry(r * 0.83, r * 0.045, 12, SEG),
+    goldMat
+  );
+  exitRim.position.y = -h * 0.18 - h * 0.25;
+  exitRim.rotation.x = Math.PI / 2;
+  group.add(exitRim);
 }
 
 function buildParachute(group: THREE.Group, d: { radius: number; height: number }) {

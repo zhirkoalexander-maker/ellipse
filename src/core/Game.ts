@@ -92,6 +92,7 @@ export class Game {
 
   private showMainMenu(): void {
     this.unmountCurrent();
+    this.sceneMgr.scene.background = new THREE.Color(0x000000);
     this.mainMenu = new MainMenuScene(() => this.showFlight(), () => this.showVab(), () => this.showSettings());
     this.mainMenu.mount();
   }
