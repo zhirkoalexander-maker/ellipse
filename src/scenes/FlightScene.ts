@@ -52,8 +52,8 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 3;
-  private readonly ANGULAR_DAMPING = 5;
+  private readonly ANGULAR_ACCEL = 1.2;
+  private readonly ANGULAR_DAMPING = 3.5;
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
@@ -1132,26 +1132,28 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
-    // Current forward direction (rocket local +Y in world space)
-    const getFwd = (): THREE.Vector3 => new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-
-    // Angular velocity with damping and engine gimbal (torque from engine when thrust is active)
+    // Quaternion-based rotation in local space — natural feel
     const engineActive = this.state.throttle > 0;
-    // In freecam mode, arrow keys control camera, not rocket
     const inFreeCam = this.cameraMode === 'free';
     const pitchInput = (warpActive || inFreeCam) ? 0 : this.controls.getPitch();
     const yawInput = (warpActive || inFreeCam) ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
-    this.angularVel.x += pitchInput * this.ANGULAR_ACCEL * baseDt;
-    this.angularVel.y += yawInput * this.ANGULAR_ACCEL * baseDt;
-    this.angularVel.z += rollInput * this.ANGULAR_ACCEL * baseDt;
 
-    // Engine gimbal: extra rotation authority when thrust is active (scales with throttle)
-    if (engineActive && !this.grounded) {
-      const gimbalForce = this.state.throttle * 2;
-      this.angularVel.x += pitchInput * gimbalForce * baseDt;
-      this.angularVel.y += yawInput * gimbalForce * baseDt;
-    }
+    // Local axes from current rocket orientation
+    const rocketRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rocketQuat);
+    const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+    const worldUp = new THREE.Vector3(0, 1, 0);
+
+    const accel = this.ANGULAR_ACCEL * baseDt;
+    // Pitch around rocket's right axis — tilts forward/back relative to where rocket points
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * accel * 1.5);
+    // Yaw around world-up — always intuitive left/right turn
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(worldUp, yawInput * accel);
+    // Roll around rocket's forward axis — barrel roll
+    const qRoll = new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * accel * 0.5);
+
+    this.rocketQuat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
+    this.rocketQuat.normalize();
 
     // SAS: hold attitude or track prograde/retrograde
     if (this.sasMode !== 'off' && !warpActive) {
@@ -1178,22 +1180,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.angularVel.multiplyScalar(Math.exp(-5 * baseDt));
     }
 
-    const damp = Math.exp(-this.ANGULAR_DAMPING * baseDt);
-    this.angularVel.multiplyScalar(damp);
-
-    // Apply rotation: yaw → pitch → roll
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.angularVel.y * baseDt);
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.angularVel.x * baseDt);
-    const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angularVel.z * baseDt);
-    
-    this.rocketQuat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
-    this.rocketQuat.normalize();
-
     // Apply rotation to mesh
     this.rocketGroup.quaternion.copy(this.rocketQuat);
-
-    // Thrust direction from quaternion
-    const fwd = getFwd();
+    // Thrust direction from quaternion (rocketFwd already computed above)
+    const fwd = rocketFwd;
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
     // Apply thrust — TWR gate: must have enough thrust at current throttle
@@ -1882,7 +1872,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const skyB = 0.95 * (1 - skyBlend) + 0.02 * skyBlend;
     this.sceneMgr.scene.background = (this.sceneMgr.scene.background as THREE.Color).setRGB(skyR, skyG, skyB);
 
-    const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+    const rocketDir = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const velMag = Math.sqrt(
       this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
     );
