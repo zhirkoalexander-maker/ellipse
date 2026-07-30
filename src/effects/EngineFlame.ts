@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PART_SCALE } from '../config/constants';
 
 const FLAME_SCALE = PART_SCALE / 0.08 * 1.5;
-const PARTICLE_COUNT = 600;
+const PARTICLE_COUNT = 900;
 
 function createCoreTexture(): THREE.Texture {
   try {
@@ -107,14 +107,14 @@ export class EngineFlame {
     const outerGeom = new THREE.BufferGeometry();
     outerGeom.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(), 3));
     const outerMat = new THREE.PointsMaterial({
-      size: FLAME_SCALE * 1.2,
+      size: FLAME_SCALE * 1.5,
       map: this.outerTex,
-      color: 0x88aaff,
+      color: 0xffaa66,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.6,
     });
 
     this.outerParticles = new THREE.Points(outerGeom, outerMat);
@@ -147,33 +147,32 @@ export class EngineFlame {
   }
 
   update(dt: number): void {
-    const vacMult = this.inVacuum ? 3.5 : 1;
+    const vacMult = this.inVacuum ? 4.5 : 1;
 
     if (this.active) {
-      const spawnCount = Math.ceil((3 + Math.random() * 3) * this.throttleLevel);
+      const spawnCount = Math.ceil((5 + Math.random() * 4) * this.throttleLevel);
 
       for (let i = 0; i < spawnCount; i++) {
         const idx = this.nextIndex;
         this.nextIndex = (this.nextIndex + 1) % PARTICLE_COUNT;
 
-        // Wider spread at lower pressure (vacuum expansion)
-        const spread = (0.08 + Math.random() * 0.15) * (this.inVacuum ? 3 : 1) / Math.max(0.3, this.throttleLevel);
+        // Wider spread in vacuum (plume expands dramatically in space)
+        const spread = (0.06 + Math.random() * 0.12) * (this.inVacuum ? 4 : 1) / Math.max(0.2, this.throttleLevel);
 
         this.positions[idx * 3]     = (Math.random() - 0.5) * spread * FLAME_SCALE;
-        this.positions[idx * 3 + 1] = -(Math.random() * 0.04) * FLAME_SCALE;
+        this.positions[idx * 3 + 1] = -(Math.random() * 0.03) * FLAME_SCALE;
         this.positions[idx * 3 + 2] = (Math.random() - 0.5) * spread * FLAME_SCALE;
 
-        // Speed depends on throttle and atmosphere
-        const speed = (6 + Math.random() * 10) * this.throttleLevel * vacMult;
-        this.velocities[idx * 3]     = (Math.random() - 0.5) * 0.3 * FLAME_SCALE;
+        // Faster exhaust in vacuum, slower in atmosphere
+        const speed = (5 + Math.random() * 8) * this.throttleLevel * vacMult;
+        this.velocities[idx * 3]     = (Math.random() - 0.5) * 0.4 * FLAME_SCALE;
         this.velocities[idx * 3 + 1] = -(speed * FLAME_SCALE);
-        this.velocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.3 * FLAME_SCALE;
+        this.velocities[idx * 3 + 2] = (Math.random() - 0.5) * 0.4 * FLAME_SCALE;
 
-        // Lifetime longer in vacuum (plume expands more)
-        this.lifetimes[idx] = (0.25 + Math.random() * 0.35) * vacMult;
+        // Longer lifetime in vacuum
+        this.lifetimes[idx] = (0.2 + Math.random() * 0.3) * vacMult;
         this.ages[idx] = 0;
 
-        // Size variation
         this.sizes[idx] = 0.5 + Math.random() * 0.5;
       }
     }
@@ -228,10 +227,11 @@ export class EngineFlame {
         b = 0.05 - t2 * 0.04;
       }
 
-      // Vacuum: slightly more blue-shifted
+      // Vacuum: blue-shifted plume (hotter, ionized)
       if (this.inVacuum) {
-        g *= 0.85;
-        b *= 0.5;
+        r = r * 0.5 + 0.1;
+        g = g * 0.3 + 0.1;
+        b = b * 0.1 + 0.5;
       }
 
       this.colors[i3]     = Math.max(0, r);
