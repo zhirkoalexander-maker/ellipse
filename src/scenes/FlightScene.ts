@@ -1350,7 +1350,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const r2 = r * r;
       if (r > 1 && r2 > 0) {
         const f = (G * nearRef.mass) / r2;
-        const gDelta = f * baseDt;
+        const gDelta = f * _dt;
         this.state.velocity[0] += gDelta * dx / r;
         this.state.velocity[1] += gDelta * dy / r;
         this.state.velocity[2] += gDelta * dz / r;
@@ -1372,7 +1372,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const q = 0.5 * rho * speed * speed;
           const dragForce = q * CdA;
           const dragAccel = dragForce / mass;
-          const dragDelta = dragAccel * baseDt;
+          const dragDelta = dragAccel * _dt;
           if (dragDelta >= speed) {
             this.state.velocity[0] = 0;
             this.state.velocity[1] = 0;
