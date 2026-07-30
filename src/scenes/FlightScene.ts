@@ -1299,6 +1299,21 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const speed = Math.sqrt(
       this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
     );
+    // Aerodynamic stability: rocket naturally aligns with velocity in atmosphere
+    if (!this.grounded && !warpActive && speed > 5 && nearestBody && (nearestBody as any).radius) {
+      const aeroAlt = nearestDist - (nearestBody as any).radius;
+      if (aeroAlt > 0 && aeroAlt < 70000) {
+        const rho = Math.exp(-aeroAlt / 8500);
+        const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
+        const currFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+        const dot = Math.abs(currFwd.dot(velDir));
+        if (dot < 0.99) {
+          const alignQ = new THREE.Quaternion().setFromUnitVectors(currFwd, velDir);
+          this.rocketQuat.slerp(alignQ, rho * 0.1 * baseDt);
+          this.rocketQuat.normalize();
+        }
+      }
+    }
     if (!this.grounded && nearestBody && (nearestBody as any).radius) {
       const alt = nearestDist - (nearestBody as any).radius;
       if (alt > 0 && alt < 120000 && speed > 2000) {
