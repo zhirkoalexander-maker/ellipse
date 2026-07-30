@@ -13,8 +13,8 @@ export const FIXED_DT = 1 / 60;
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
 
-/** Earth mass (kg) — g≈587 m/s² at 5× radius (10× current gravity) */
-export const EARTH_MASS = 8.92e24 * 1000;
+/** Earth mass (kg) — g≈1174 m/s² */
+export const EARTH_MASS = 8.92e24 * 2000;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;

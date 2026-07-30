@@ -1271,8 +1271,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
-    // Integrate position (skip during warp when grounded to prevent bounce)
-    if (!(this.grounded && warpActive)) {
+    // Integrate position (skip when grounded to prevent bounce-through)
+    if (!this.grounded) {
       this.state.position[0] += this.state.velocity[0] * _dt;
       this.state.position[1] += this.state.velocity[1] * _dt;
       this.state.position[2] += this.state.velocity[2] * _dt;
@@ -1469,8 +1469,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dz = this.state.position[2] - nearestBody.position[2];
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
         const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
-        // Penetration check — inside the planet = always crash
-        if (d < surfaceR - 50) {
+        // Inside planet or on surface: always crash at orbital speeds
+        if (d < surfaceR) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
