@@ -18,11 +18,11 @@ describe('TWR and launch', () => {
     const engine = findFirstEngine(r.assembly.roots);
     expect(engine).not.toBeNull();
     const mass = r.totalMass();
-    const grav = 1174;
+    const grav = 2347;
     const twr = (engine!.thrust * 1000) / (mass * grav);
 
     expect(twr).toBeGreaterThanOrEqual(1.0);
-    expect(twr).toBeLessThan(2.0);
+    expect(twr).toBeLessThan(1.5);
   });
 
   it('default rocket at 1% throttle has TWR < 1.0', () => {
@@ -34,7 +34,7 @@ describe('TWR and launch', () => {
 
     const engine = findFirstEngine(r.assembly.roots);
     const mass = r.totalMass();
-    const grav = 1174;
+    const grav = 2347;
     const twr = (engine!.thrust * 1000 * 0.01) / (mass * grav);
 
     expect(twr).toBeLessThan(1.0);
@@ -44,9 +44,9 @@ describe('TWR and launch', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    const expectedMassFlow = 8400000 / (350 * G0);
-    expect(expectedMassFlow).toBeGreaterThan(1500);
-    expect(expectedMassFlow).toBeLessThan(3500);
+    const expectedMassFlow = 16800000 / (350 * G0);
+    expect(expectedMassFlow).toBeGreaterThan(3000);
+    expect(expectedMassFlow).toBeLessThan(7000);
   });
 
   it('multi-engine sums all thrust', () => {
