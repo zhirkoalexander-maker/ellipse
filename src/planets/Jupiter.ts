@@ -13,7 +13,7 @@ export class Jupiter extends Planet {
   atmosphereGlow: any;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("jupiter", 1.9e27, position, velocity, 6.9911e7 * 5);
+    super("jupiter", 1.9e27, position, velocity, 6.9911e7 * 2);
 
     const visualR = this.visualRadius;
 

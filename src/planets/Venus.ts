@@ -56,7 +56,7 @@ export class Venus extends Planet {
   atmosphereGlow: AtmosphereGlow;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("venus", 1.46e25, position, velocity, 6.052e6 * 5);
+    super("venus", 1.46e25, position, velocity, 6.052e6 * 2);
 
     const visualR = this.visualRadius;
 
