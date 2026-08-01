@@ -443,8 +443,11 @@ export class FlightScene {
       }
     });
 
+    let mapFrame = 0;
     const drawMap = () => {
       if (!mapActive) return;
+      mapFrame++;
+      if (mapFrame % 5 !== 0) { requestAnimationFrame(drawMap); return; }
       const dpr = window.devicePixelRatio || 1;
       const w = mapCanvas.clientWidth;
       const h = mapCanvas.clientHeight;
@@ -1565,6 +1568,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
+    }
+
+    // Planet visibility: barely visible from ground, fade in with altitude
+    const refVis = getReferenceBody(this.state.position, this.system);
+    const rdx = this.state.position[0] - refVis.position[0];
+    const rdy = this.state.position[1] - refVis.position[1];
+    const rdz = this.state.position[2] - refVis.position[2];
+    const altAboveSurface = Math.sqrt(rdx*rdx + rdy*rdy + rdz*rdz) - ((refVis as any).radius ?? 6371000);
+    const planetAlpha = Math.max(0.05, Math.min(1, altAboveSurface / 50000));
+    for (const body of this.system.bodies) {
+      const b = body as any;
+      if (!b.mesh || b.name === 'earth' || b.name === 'sun') continue;
+      if (b.mesh.material) {
+        const mats = Array.isArray(b.mesh.material) ? b.mesh.material : [b.mesh.material];
+        for (const m of mats) {
+          if (m.transparent !== undefined) { m.transparent = true; m.opacity = planetAlpha; m.needsUpdate = true; }
+        }
+      }
     }
 
     // Update atmosphere scattering direction for all planets
