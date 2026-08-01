@@ -51,7 +51,7 @@ export class Sun extends Body {
     super('sun', mass, position, velocity);
 
     // Visible sphere — visible when approaching
-    this.visualRadius = 500;
+    this.visualRadius = 200;
 
     const geom = new THREE.SphereGeometry(this.visualRadius, 32, 16);
     const mat = new THREE.ShaderMaterial({

@@ -461,35 +461,6 @@ export class FlightScene {
       const cx = w / 2 + mapPanX;
       const cy = h / 2 + mapPanY;
 
-      // Subtle radial gradient from rocket position
-      const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.6);
-      radGrad.addColorStop(0, 'rgba(20,30,60,0.3)');
-      radGrad.addColorStop(0.5, 'rgba(10,15,30,0.15)');
-      radGrad.addColorStop(1, 'rgba(6,8,20,0)');
-      ctx.fillStyle = radGrad;
-      ctx.fillRect(0, 0, w, h);
-
-      // Draw grid lines
-      ctx.strokeStyle = 'rgba(100,100,150,0.08)';
-      ctx.lineWidth = 1;
-      const gridSize = 100 * mapZoom;
-      for (let x = cx % gridSize; x < w; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-      }
-      for (let y = cy % gridSize; y < h; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-      }
-
-      // Concentric range rings from rocket
-      ctx.strokeStyle = 'rgba(68,136,255,0.06)';
-      ctx.lineWidth = 0.5;
-      for (let r = gridSize; r < Math.max(w, h); r += gridSize) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Use VISUAL_SCALE for map distances to match visual scale
       let maxRelD = 1;
       for (const b of this.system.bodies) {
         const dx = (b.position[0] - this.state.position[0]) * VISUAL_SCALE;
@@ -507,18 +478,10 @@ export class FlightScene {
   io: '#eeddaa', europa: '#aaccdd', ganymede: '#bbccaa',
   phobos: '#bb9988', deimos: '#887766'
 };
-const glowColors: Record<string, string> = {
-  sun: 'rgba(255,220,68,0.20)', earth: 'rgba(79,195,247,0.12)',
-  mars: 'rgba(232,120,68,0.12)', venus: 'rgba(232,184,76,0.12)',
-  jupiter: 'rgba(232,184,124,0.12)', saturn: 'rgba(244,232,176,0.20)',
-  uranus: 'rgba(95,224,240,0.10)', neptune: 'rgba(91,136,238,0.10)',
-  moon: 'rgba(204,204,238,0.06)', titan: 'rgba(221,170,119,0.08)'
-};
 const sizes: Record<string, number> = {
-  sun: 8, earth: 5, moon: 2.5, venus: 3.5, mars: 3.5, mercury: 2.5,
-  jupiter: 7, saturn: 6, uranus: 4, neptune: 3.5,
-  pluto: 1.5, titan: 2, io: 1.5, europa: 1.5, ganymede: 2,
-  phobos: 1, deimos: 1
+  sun: 12, earth: 7, moon: 3, venus: 5, mars: 5, mercury: 3,
+  jupiter: 10, saturn: 9, uranus: 6, neptune: 5,
+  pluto: 2
 };
 
   // Draw planet orbit trails around sun
@@ -553,65 +516,19 @@ if (sunPos) {
   }
 }
 
-    // Atmospheric halos for bodies with atmospheres
-const atmosBodies = ['earth', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
-for (const b of this.system.bodies) {
-  if (atmosBodies.includes(b.name)) {
-    const bx = cx + (b.position[0] - this.state.position[0]) * s;
-    const by = cy - (b.position[2] - this.state.position[2]) * s;
-    const baseR = sizes[b.name] || 3;
-    const grad = ctx.createRadialGradient(bx, by, baseR * 0.5, bx, by, baseR * 3);
-    const col = colors[b.name] || '#888';
-    grad.addColorStop(0, col + '30');
-    grad.addColorStop(0.5, col + '15');
-    grad.addColorStop(1, col + '00');
-    ctx.beginPath();
-    ctx.arc(bx, by, baseR * 3, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-  }
-}
-
-// Kármán line atmosphere boundary rings (100km altitude)
-for (const b of this.system.bodies) {
-  if (atmosBodies.includes(b.name)) {
-    const bx = cx + (b.position[0] - this.state.position[0]) * s;
-    const by = cy - (b.position[2] - this.state.position[2]) * s;
-    const baseR = sizes[b.name] || 3;
-    const atmosFactor = 1.2;
-    ctx.beginPath();
-    ctx.arc(bx, by, baseR * atmosFactor, 0, Math.PI * 2);
-    ctx.setLineDash([2, 6]);
-    ctx.strokeStyle = 'rgba(100,180,255,0.25)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-}
-
-// Planet bodies with glow
+  // Planet bodies — simple dots with labels
 for (const b of this.system.bodies) {
   const bx = cx + (b.position[0] - this.state.position[0]) * s;
   const by = cy - (b.position[2] - this.state.position[2]) * s;
-
-  // Glow for sun and large bodies
-  if (sizes[b.name] && sizes[b.name]! >= 5) {
-    ctx.beginPath();
-    ctx.arc(bx, by, sizes[b.name]! * 3, 0, Math.PI * 2);
-    ctx.fillStyle = glowColors[b.name] || 'rgba(100,100,150,0.05)';
-    ctx.fill();
-  }
+  const r = sizes[b.name] || 3;
 
   ctx.beginPath();
-  ctx.arc(bx, by, sizes[b.name] || 3, 0, Math.PI * 2);
+  ctx.arc(bx, by, r, 0, Math.PI * 2);
   ctx.fillStyle = colors[b.name] || '#888';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(244,245,242,0.3)';
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-  ctx.font = '9px monospace';
+  ctx.font = 'bold 10px monospace';
   ctx.fillStyle = '#F4F5F2';
-  ctx.fillText(b.name.toUpperCase(), bx + sizes[b.name]! + 6, by + 3);
+  ctx.fillText(b.name.toUpperCase(), bx + r + 5, by + 4);
 }
 
     // Draw SOI circles for all bodies
