@@ -13,7 +13,7 @@ export class Neptune extends Planet {
   atmosphereGlow: any;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("neptune", 1.024e26, position, velocity, 2.4622e7 * 5);
+    super("neptune", 1.024e26, position, velocity, 2.4622e7 * 2);
 
     const visualR = this.visualRadius;
 
