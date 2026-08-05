@@ -1062,21 +1062,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Local axes from current rocket orientation
     const rocketRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rocketQuat);
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-    const worldUp = new THREE.Vector3(0, 1, 0);
+    const rocketSide = new THREE.Vector3(0, 0, 1).applyQuaternion(this.rocketQuat);
 
-    const accel = this.ANGULAR_ACCEL * baseDt;
-    // Speed-dependent resistance: faster = harder to turn (aerodynamic stability)
-    const currentSpeed = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
-    const speedResist = 1 / (1 + currentSpeed / 3000);
-    const turn = accel * speedResist;
-    // Pitch around rocket's right axis — tilts forward/back relative to where rocket points
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * turn * 1.5);
-    // Yaw around world-up — always intuitive left/right turn
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(worldUp, yawInput * turn);
-    // Roll around rocket's forward axis — barrel roll
-    const qRoll = new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * turn * 0.5);
-
-    this.rocketQuat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
+    const turn = this.ANGULAR_ACCEL * baseDt;
+    // Pure local-space rotation — natural feel in any orientation
+    this.rocketQuat.multiply(
+      new THREE.Quaternion().setFromAxisAngle(rocketSide, yawInput * turn)
+    ).multiply(
+      new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * turn * 1.5)
+    ).multiply(
+      new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * turn * 0.5)
+    );
     this.rocketQuat.normalize();
 
     // SAS: hold attitude or track prograde/retrograde
