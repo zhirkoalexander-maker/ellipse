@@ -1059,20 +1059,29 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const yawInput = (warpActive || inFreeCam) ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
 
-    // Local axes from current rocket orientation
-    const rocketRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rocketQuat);
+    // Realistic rotation: yaw around surface normal, pitch around horizon tangent
     const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-    const rocketSide = new THREE.Vector3(0, 0, 1).applyQuaternion(this.rocketQuat);
+    const rocketRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rocketQuat);
+
+    // Surface normal (up from planet center)
+    const rotRefBody = getReferenceBody(this.state.position, this.system);
+    const sx = this.state.position[0] - rotRefBody.position[0];
+    const sy = this.state.position[1] - rotRefBody.position[1];
+    const sz = this.state.position[2] - rotRefBody.position[2];
+    const sl = Math.sqrt(sx*sx + sy*sy + sz*sz) || 1;
+    const surfaceNormal = new THREE.Vector3(sx/sl, sy/sl, sz/sl);
+
+    // Horizon tangent = perpendicular to both forward and surface normal
+    const horizon = new THREE.Vector3().crossVectors(rocketFwd, surfaceNormal).normalize();
+    if (horizon.length() < 0.01) horizon.copy(rocketRight);
 
     const turn = this.ANGULAR_ACCEL * baseDt;
-    // Pure local-space rotation — natural feel in any orientation
-    this.rocketQuat.multiply(
-      new THREE.Quaternion().setFromAxisAngle(rocketSide, yawInput * turn)
-    ).multiply(
-      new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * turn * 1.5)
-    ).multiply(
-      new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * turn * 0.5)
-    );
+    // Yaw around surface normal — turns left/right on the horizon
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(surfaceNormal, yawInput * turn);
+    // Pitch around horizon tangent — tilts up/down relative to horizon
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(horizon, pitchInput * turn * 1.2);
+
+    this.rocketQuat.multiply(qYaw).multiply(qPitch);
     this.rocketQuat.normalize();
 
     // SAS: hold attitude or track prograde/retrograde
