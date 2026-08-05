@@ -214,8 +214,8 @@ export class FlightScene {
           mat.polygonOffsetFactor = -1;
           mat.polygonOffsetUnits = -1;
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.roughness = 0.4;
-            mat.metalness = 0.1;
+            mat.roughness = 0.5;
+            mat.metalness = 0.4;
             mat.emissive = new THREE.Color(0x000000);
             mat.emissiveIntensity = 0;
             mat.needsUpdate = true;
@@ -1065,12 +1065,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const worldUp = new THREE.Vector3(0, 1, 0);
 
     const accel = this.ANGULAR_ACCEL * baseDt;
+    // Speed-dependent resistance: faster = harder to turn (aerodynamic stability)
+    const currentSpeed = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+    const speedResist = 1 / (1 + currentSpeed / 3000);
+    const turn = accel * speedResist;
     // Pitch around rocket's right axis — tilts forward/back relative to where rocket points
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * accel * 1.5);
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(rocketRight, pitchInput * turn * 1.5);
     // Yaw around world-up — always intuitive left/right turn
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(worldUp, yawInput * accel);
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(worldUp, yawInput * turn);
     // Roll around rocket's forward axis — barrel roll
-    const qRoll = new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * accel * 0.5);
+    const qRoll = new THREE.Quaternion().setFromAxisAngle(rocketFwd, rollInput * turn * 0.5);
 
     this.rocketQuat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
     this.rocketQuat.normalize();
@@ -1819,10 +1823,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Dynamic sky color — smooth blue→black transition from surface to space
     const nearestAltSky = nearestAlt ?? 0;
     // Blend from 0m (bright blue) -> 100km (pure black)
-    const skyBlend = Math.min(1, Math.max(0, nearestAltSky / 100000));
-    const skyR = 0.45 * (1 - skyBlend) + 0.01 * skyBlend;
-    const skyG = 0.65 * (1 - skyBlend) + 0.01 * skyBlend;
-    const skyB = 0.95 * (1 - skyBlend) + 0.02 * skyBlend;
+    const skyBlend = Math.min(1, Math.max(0, nearestAltSky / 30000));
+    const skyR = 0.02 * (1 - skyBlend) + 0.00 * skyBlend;
+    const skyG = 0.05 * (1 - skyBlend) + 0.00 * skyBlend;
+    const skyB = 0.15 * (1 - skyBlend) + 0.01 * skyBlend;
     this.sceneMgr.scene.background = (this.sceneMgr.scene.background as THREE.Color).setRGB(skyR, skyG, skyB);
 
     const rocketDir = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
