@@ -169,18 +169,34 @@ const textureCache = new Map<string, TextureSet>();
 
 function getTextureSet(key: string, generator: () => TextureSet): TextureSet {
   if (!textureCache.has(key)) {
-    const set = generator();
-    // Set proper filtering on all textures
-    const textures = [set.color, set.normal, set.roughness, set.metalness, set.ao, set.emissive].filter(Boolean) as THREE.Texture[];
-    for (const tex of textures) {
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
-      tex.needsUpdate = true;
+    try {
+      const set = generator();
+      const textures = [set.color, set.normal, set.roughness, set.metalness, set.ao, set.emissive].filter(Boolean) as THREE.Texture[];
+      for (const tex of textures) {
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+        tex.needsUpdate = true;
+      }
+      textureCache.set(key, set);
+    } catch {
+      console.warn('Texture generation failed for:', key, 'using solid fallback');
+      const fallback = { color: createSolidTexture(0x808080), normal: undefined, roughness: undefined, metalness: undefined, ao: undefined, emissive: undefined } as TextureSet;
+      textureCache.set(key, fallback);
     }
-    textureCache.set(key, set);
   }
   return textureCache.get(key)!;
+}
+
+function createSolidTexture(hex: number): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#' + hex.toString(16).padStart(6, '0');
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function createMaterialFromTextureSet(
