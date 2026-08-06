@@ -24,7 +24,6 @@ import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
 import * as THREE from 'three';
-import { loadGLTF } from '../parts/PartBuilder';
 
 export class Game {
   renderer: Renderer;
@@ -70,22 +69,11 @@ export class Game {
     this.achievements.onUnlock((id) => toast.show(`Achievement: ${id}`));
   }
 
-  private async preloadModels(): Promise<void> {
-    const { loadGLTF } = await import('../parts/PartBuilder');
+  async start(): Promise<void> {
+    // Preload GLTF models
     const models = ['/models/agena.glb','/models/saturn_v.glb','/models/apollo_soyuz.glb','/models/ares_1.glb','/models/apollo_lunar_module.glb','/models/atlas_6.glb','/models/atlas_9.glb','/models/crawler.glb'];
-    await Promise.allSettled(models.map(async url => {
-      try {
-        const result = await loadGLTF(url, 1.0);
-        console.log('Model loaded:', url, result ? 'OK' : 'NULL');
-      } catch(e) {
-        console.error('Model failed:', url, e);
-      }
-    }));
-    const texLoader = new THREE.TextureLoader();
-    texLoader.load(assetUrl('/textures/earth_daymap.jpg'), () => {}, undefined, () => {});
-  }
-
-  async start(): Promise<void> { 
+    const { loadGLTF } = await import('../parts/PartBuilder');
+    await Promise.allSettled(models.map(url => loadGLTF(url, 1.0)));
     this.showMainMenu();
     this.loop();
   }
