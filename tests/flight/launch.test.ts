@@ -44,9 +44,9 @@ describe('TWR and launch', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
-    const expectedMassFlow = 16800000 / (350 * G0);
-    expect(expectedMassFlow).toBeGreaterThan(3000);
-    expect(expectedMassFlow).toBeLessThan(7000);
+    const expectedMassFlow = 25000000 / (350 * G0);
+    expect(expectedMassFlow).toBeGreaterThan(5000);
+    expect(expectedMassFlow).toBeLessThan(10000);
   });
 
   it('multi-engine sums all thrust', () => {
