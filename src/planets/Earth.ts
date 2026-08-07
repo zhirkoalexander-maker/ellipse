@@ -289,7 +289,7 @@ export class Earth extends Planet {
   private cloudTex: THREE.CanvasTexture;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('earth', EARTH_MASS, position, velocity, 6.371e6 * 5);
+    super('earth', EARTH_MASS, position, velocity, 6.371e6);
 
     const visualR = this.visualRadius;
     const SEG = 128;
