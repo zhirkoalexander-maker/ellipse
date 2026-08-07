@@ -1,6 +1,7 @@
 export class MainMenuScene {
   private root: HTMLDivElement;
   private helpOverlay: HTMLDivElement | null = null;
+  private stars: HTMLDivElement[] = [];
 
   constructor(
     private onPlay: () => void,
@@ -8,91 +9,121 @@ export class MainMenuScene {
     private onSettings: () => void,
   ) {
     this.root = document.createElement('div');
-    this.root.style.cssText = `
-      position:fixed;inset:0;z-index:500;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      background:radial-gradient(ellipse at 50% 30%, #0d1020 0%, #050608 70%);
-    `;
+    this.root.style.cssText = 'position:fixed;inset:0;z-index:500;background:#04060a;overflow:hidden;';
 
-    const logo = document.createElement('div');
-    logo.style.cssText = 'margin-bottom:48px;text-align:center;';
-    logo.innerHTML = `
-      <div style="font-size:56px;font-weight:200;color:#a0a8c0;letter-spacing:0.25em;">ELLIPSE</div>
-      <div style="width:60px;height:1px;background:rgba(160,168,192,0.3);margin:16px auto;"></div>
-      <div style="font-size:11px;color:rgba(160,168,192,0.4);letter-spacing:0.3em;">SPACE FLIGHT SIMULATOR</div>
+    for (let i = 0; i < 80; i++) {
+      const s = document.createElement('div');
+      const size = Math.random() * 1.5 + 0.5;
+      s.style.cssText = `position:absolute;width:${size}px;height:${size}px;background:#fff;border-radius:50%;left:${Math.random()*100}%;top:${Math.random()*100}%;opacity:${Math.random()*0.4+0.1};`;
+      s.style.animation = `starPulse ${2+Math.random()*3}s ease-in-out ${Math.random()*3}s infinite alternate`;
+      this.root.appendChild(s);
+      this.stars.push(s);
+    }
+
+    const content = document.createElement('div');
+    content.style.cssText = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.style.cssText = 'text-align:center;margin-bottom:60px;';
+
+    const title = document.createElement('div');
+    title.textContent = 'ELLIPSE';
+    title.style.cssText = `
+      font:200 64px/1 system-ui,-apple-system,sans-serif;
+      color:#8090a8;letter-spacing:0.3em;
+      text-shadow:0 0 80px rgba(128,144,168,0.08);
+      animation:titleFade 4s ease-in-out infinite alternate;
     `;
-    this.root.appendChild(logo);
+    titleGroup.appendChild(title);
+
+    const line = document.createElement('div');
+    line.style.cssText = 'width:40px;height:1px;background:rgba(128,144,168,0.2);margin:20px auto;';
+    titleGroup.appendChild(line);
+
+    const subtitle = document.createElement('div');
+    subtitle.textContent = 'SPACE FLIGHT SIMULATOR';
+    subtitle.style.cssText = 'font:400 10px/1 system-ui,-apple-system,sans-serif;color:rgba(128,144,168,0.3);letter-spacing:0.35em;';
+    titleGroup.appendChild(subtitle);
+    content.appendChild(titleGroup);
+
+    const items = [
+      { label: 'FLIGHT', action: this.onPlay, primary: true },
+      { label: 'VEHICLE ASSEMBLY', action: this.onVab, primary: false },
+      { label: 'SETTINGS', action: this.onSettings, primary: false },
+    ];
 
     const menu = document.createElement('div');
-    menu.style.cssText = 'display:flex;flex-direction:column;gap:2px;width:240px;';
+    menu.style.cssText = 'display:flex;flex-direction:column;gap:1px;width:260px;';
 
-    const item = (label: string, cb: () => void, accent = false) => {
-      const b = document.createElement('button');
-      b.textContent = label;
-      b.style.cssText = `
-        width:100%;padding:14px 24px;background:transparent;
-        color:${accent ? '#c8b080' : 'rgba(200,200,220,0.6)'};
-        border:1px solid ${accent ? 'rgba(200,176,128,0.2)' : 'rgba(255,255,255,0.05)'};
-        font-size:13px;letter-spacing:0.08em;cursor:pointer;
-        text-align:left;transition:all 0.2s;
+    for (const item of items) {
+      const btn = document.createElement('button');
+      btn.textContent = item.label;
+      btn.style.cssText = `
+        width:100%;padding:16px 24px;background:transparent;text-align:left;
+        color:${item.primary?'#a0b0c8':'rgba(160,176,200,0.5)'};
+        border:1px solid ${item.primary?'rgba(160,176,200,0.12)':'rgba(160,176,200,0.04)'};
+        font:400 13px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.1em;
+        cursor:pointer;transition:all 0.3s ease;
       `;
-      b.addEventListener('mouseenter', () => {
-        b.style.background = accent ? 'rgba(200,176,128,0.08)' : 'rgba(255,255,255,0.04)';
-        b.style.color = accent ? '#dcc898' : '#fff';
-        b.style.borderColor = accent ? 'rgba(200,176,128,0.35)' : 'rgba(255,255,255,0.15)';
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = 'rgba(160,176,200,0.04)';
+        btn.style.color = '#c0d0e0';
+        btn.style.borderColor = 'rgba(160,176,200,0.2)';
+        btn.style.paddingLeft = '32px';
       });
-      b.addEventListener('mouseleave', () => {
-        b.style.background = 'transparent';
-        b.style.color = accent ? '#c8b080' : 'rgba(200,200,220,0.6)';
-        b.style.borderColor = accent ? 'rgba(200,176,128,0.2)' : 'rgba(255,255,255,0.05)';
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = 'transparent';
+        btn.style.color = item.primary?'#a0b0c8':'rgba(160,176,200,0.5)';
+        btn.style.borderColor = item.primary?'rgba(160,176,200,0.12)':'rgba(160,176,200,0.04)';
+        btn.style.paddingLeft = '24px';
       });
-      b.addEventListener('click', cb);
-      return b;
-    };
+      btn.addEventListener('click', item.action);
+      menu.appendChild(btn);
+    }
+    content.appendChild(menu);
 
-    menu.appendChild(item('FLIGHT', this.onPlay, true));
-    menu.appendChild(item('VEHICLE ASSEMBLY', this.onVab));
-    menu.appendChild(item('SETTINGS', this.onSettings));
-    this.root.appendChild(menu);
+    const help = document.createElement('button');
+    help.textContent = 'CONTROLS';
+    help.style.cssText = `
+      margin-top:48px;background:transparent;color:rgba(160,176,200,0.15);
+      border:none;font:400 9px/1 system-ui,-apple-system,sans-serif;
+      letter-spacing:0.15em;cursor:pointer;transition:color 0.3s;
+    `;
+    help.addEventListener('mouseenter', () => help.style.color = 'rgba(160,176,200,0.4)');
+    help.addEventListener('mouseleave', () => help.style.color = 'rgba(160,176,200,0.15)');
+    help.addEventListener('click', () => this.showHelp());
+    content.appendChild(help);
 
-    const help = document.createElement('div');
-    help.style.cssText = 'margin-top:40px;';
-    const hb = document.createElement('button');
-    hb.textContent = 'HOW TO PLAY';
-    hb.style.cssText = 'background:transparent;color:rgba(255,255,255,0.2);border:none;font-size:10px;cursor:pointer;letter-spacing:0.1em;';
-    hb.addEventListener('mouseenter', () => hb.style.color = 'rgba(255,255,255,0.5)');
-    hb.addEventListener('mouseleave', () => hb.style.color = 'rgba(255,255,255,0.2)');
-    hb.addEventListener('click', () => this.toggleHelp());
-    help.appendChild(hb);
-    this.root.appendChild(help);
+    this.root.appendChild(content);
 
-    const ver = document.createElement('div');
-    ver.style.cssText = 'position:absolute;bottom:16px;right:20px;font-size:9px;color:rgba(255,255,255,0.1);letter-spacing:0.1em;';
-    ver.textContent = 'v2.4';
-    this.root.appendChild(ver);
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes starPulse { 0%{opacity:0.1} 100%{opacity:0.5} }
+      @keyframes titleFade { 0%{text-shadow:0 0 80px rgba(128,144,168,0.04)} 100%{text-shadow:0 0 80px rgba(128,144,168,0.12)} }
+    `;
+    this.root.appendChild(style);
   }
 
-  mount(parent = document.body) { parent.appendChild(this.root); }
+  mount(p = document.body) { p.appendChild(this.root); }
   unmount() { this.root.remove(); this.helpOverlay?.remove(); }
 
-  private toggleHelp() {
+  private showHelp() {
     if (this.helpOverlay) { this.helpOverlay.remove(); this.helpOverlay = null; return; }
     const o = document.createElement('div');
-    o.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(5,6,8,0.95);';
-    o.innerHTML = `<div style="max-width:480px;padding:32px;color:#a0a8c0;font:13px/1.8 sans-serif;">
-      <div style="font-size:18px;color:#c8b080;margin-bottom:20px;">CONTROLS</div>
+    o.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(4,6,10,0.97);';
+    o.innerHTML = `<div style="max-width:420px;padding:40px;font:13px/2 system-ui,-apple-system,sans-serif;color:#8090a8;">
+      <div style="font:200 24px/1 system-ui,-apple-system,sans-serif;color:#a0b0c0;margin-bottom:24px;letter-spacing:0.1em;">CONTROLS</div>
       <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">W / S</td><td>Throttle up / down</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">↑ ↓ ← →</td><td>Pitch / Yaw</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">Space</td><td>Stage</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">M / Tab</td><td>Map</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">C</td><td>Free camera</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">T</td><td>SAS</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">Q / E</td><td>Time warp</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">Esc</td><td>Pause</td></tr>
-        <tr><td style="color:rgba(200,176,128,0.6);padding:3px 16px 3px 0;">Mouse</td><td>Orbit / zoom</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">W / S</td><td style="font-size:11px;">Throttle</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">&uarr;&darr;&larr;&rarr;</td><td style="font-size:11px;">Pitch / Yaw</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Space</td><td style="font-size:11px;">Stage</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">M</td><td style="font-size:11px;">Map</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">C</td><td style="font-size:11px;">Free camera</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">T</td><td style="font-size:11px;">SAS</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Q / E</td><td style="font-size:11px;">Time warp</td></tr>
+        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Mouse</td><td style="font-size:11px;">Orbit / zoom</td></tr>
       </table>
-      <button style="margin-top:24px;padding:10px 32px;background:rgba(200,176,128,0.1);color:#c8b080;border:1px solid rgba(200,176,128,0.2);cursor:pointer;font-size:12px;">CLOSE</button>
+      <button style="margin-top:32px;padding:12px 36px;background:rgba(160,176,200,0.06);color:#a0b0c8;border:1px solid rgba(160,176,200,0.12);font:400 12px system-ui;cursor:pointer;letter-spacing:0.1em;">CLOSE</button>
     </div>`;
     o.querySelector('button')!.addEventListener('click', () => { o.remove(); this.helpOverlay = null; });
     document.body.appendChild(o);
