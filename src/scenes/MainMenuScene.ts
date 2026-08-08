@@ -1,7 +1,6 @@
 export class MainMenuScene {
   private root: HTMLDivElement;
   private helpOverlay: HTMLDivElement | null = null;
-  private stars: HTMLDivElement[] = [];
 
   constructor(
     private onPlay: () => void,
@@ -9,99 +8,99 @@ export class MainMenuScene {
     private onSettings: () => void,
   ) {
     this.root = document.createElement('div');
-    this.root.style.cssText = 'position:fixed;inset:0;z-index:500;background:#04060a;overflow:hidden;';
+    this.root.style.cssText = `
+      position:fixed;inset:0;z-index:500;
+      background:radial-gradient(ellipse at 60% 40%, #0a0e18 0%, #04060a 70%);
+      display:flex;
+    `;
 
-    for (let i = 0; i < 80; i++) {
+    for (let i=0;i<60;i++) {
       const s = document.createElement('div');
-      const size = Math.random() * 1.5 + 0.5;
-      s.style.cssText = `position:absolute;width:${size}px;height:${size}px;background:#fff;border-radius:50%;left:${Math.random()*100}%;top:${Math.random()*100}%;opacity:${Math.random()*0.4+0.1};`;
-      s.style.animation = `starPulse ${2+Math.random()*3}s ease-in-out ${Math.random()*3}s infinite alternate`;
+      s.style.cssText = `position:absolute;width:${1+Math.random()}px;height:${1+Math.random()}px;background:rgba(180,200,220,${0.1+Math.random()*0.3});border-radius:50%;left:${10+Math.random()*80}%;top:${Math.random()*100}%;animation:drift${2+Math.random()*4}s ease-in-out infinite alternate`;
       this.root.appendChild(s);
-      this.stars.push(s);
     }
 
-    const content = document.createElement('div');
-    content.style.cssText = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;';
+    const left = document.createElement('div');
+    left.style.cssText = 'position:relative;z-index:1;width:50%;display:flex;align-items:center;padding-left:12%;';
 
-    const titleGroup = document.createElement('div');
-    titleGroup.style.cssText = 'text-align:center;margin-bottom:60px;';
+    const logoBlock = document.createElement('div');
+    const line1 = document.createElement('div');
+    line1.textContent = 'EL';
+    line1.style.cssText = 'font:100 96px/0.8 system-ui;color:rgba(200,210,225,0.08);letter-spacing:0.2em;';
+    const line2 = document.createElement('div');
+    line2.textContent = 'LIP';
+    line2.style.cssText = 'font:100 96px/0.8 system-ui;color:rgba(200,210,225,0.06);letter-spacing:0.2em;margin-top:4px;';
+    const line3 = document.createElement('div');
+    line3.textContent = 'SE';
+    line3.style.cssText = 'font:100 96px/0.8 system-ui;color:rgba(200,210,225,0.04);letter-spacing:0.2em;margin-top:4px;';
+    logoBlock.appendChild(line1);
+    logoBlock.appendChild(line2);
+    logoBlock.appendChild(line3);
+    left.appendChild(logoBlock);
 
-    const title = document.createElement('div');
-    title.textContent = 'ELLIPSE';
-    title.style.cssText = `
-      font:200 64px/1 system-ui,-apple-system,sans-serif;
-      color:#8090a8;letter-spacing:0.3em;
-      text-shadow:0 0 80px rgba(128,144,168,0.08);
-      animation:titleFade 4s ease-in-out infinite alternate;
-    `;
-    titleGroup.appendChild(title);
+    const right = document.createElement('div');
+    right.style.cssText = 'position:relative;z-index:1;width:50%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding-right:12%;';
 
-    const line = document.createElement('div');
-    line.style.cssText = 'width:40px;height:1px;background:rgba(128,144,168,0.2);margin:20px auto;';
-    titleGroup.appendChild(line);
+    const sub = document.createElement('div');
+    sub.textContent = 'SPACE FLIGHT SIMULATOR';
+    sub.style.cssText = 'font:400 9px/1 system-ui;color:rgba(200,210,225,0.15);letter-spacing:0.3em;margin-bottom:40px;';
+    right.appendChild(sub);
 
-    const subtitle = document.createElement('div');
-    subtitle.textContent = 'SPACE FLIGHT SIMULATOR';
-    subtitle.style.cssText = 'font:400 10px/1 system-ui,-apple-system,sans-serif;color:rgba(128,144,168,0.3);letter-spacing:0.35em;';
-    titleGroup.appendChild(subtitle);
-    content.appendChild(titleGroup);
-
-    const items = [
-      { label: 'FLIGHT', action: this.onPlay, primary: true },
-      { label: 'VEHICLE ASSEMBLY', action: this.onVab, primary: false },
-      { label: 'SETTINGS', action: this.onSettings, primary: false },
+    const menuItems = [
+      { label: 'FLIGHT', action: this.onPlay },
+      { label: 'ASSEMBLY', action: this.onVab },
+      { label: 'SETTINGS', action: this.onSettings },
     ];
 
-    const menu = document.createElement('div');
-    menu.style.cssText = 'display:flex;flex-direction:column;gap:1px;width:260px;';
+    for (const item of menuItems) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:20px;margin:3px 0;cursor:pointer;padding:10px 0;';
 
-    for (const item of items) {
-      const btn = document.createElement('button');
-      btn.textContent = item.label;
-      btn.style.cssText = `
-        width:100%;padding:16px 24px;background:transparent;text-align:left;
-        color:${item.primary?'#a0b0c8':'rgba(160,176,200,0.5)'};
-        border:1px solid ${item.primary?'rgba(160,176,200,0.12)':'rgba(160,176,200,0.04)'};
-        font:400 13px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.1em;
-        cursor:pointer;transition:all 0.3s ease;
-      `;
-      btn.addEventListener('mouseenter', () => {
-        btn.style.background = 'rgba(160,176,200,0.04)';
-        btn.style.color = '#c0d0e0';
-        btn.style.borderColor = 'rgba(160,176,200,0.2)';
-        btn.style.paddingLeft = '32px';
+      const num = document.createElement('div');
+      num.textContent = `0${menuItems.indexOf(item)+1}`;
+      num.style.cssText = 'font:400 10px/1 system-ui;color:rgba(200,210,225,0.1);width:20px;transition:all 0.4s;';
+
+      const label = document.createElement('div');
+      label.textContent = item.label;
+      label.style.cssText = 'font:200 28px/1 system-ui;color:rgba(200,210,225,0.3);letter-spacing:0.15em;transition:all 0.4s;';
+
+      const line = document.createElement('div');
+      line.style.cssText = 'height:1px;width:0;background:rgba(200,210,225,0.15);transition:width 0.4s;flex:1;';
+
+      row.appendChild(num);
+      row.appendChild(label);
+      row.appendChild(line);
+
+      row.addEventListener('mouseenter', () => {
+        label.style.color = 'rgba(220,230,240,0.9)';
+        label.style.letterSpacing = '0.25em';
+        num.style.color = 'rgba(200,210,225,0.5)';
+        line.style.width = '80px';
       });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.background = 'transparent';
-        btn.style.color = item.primary?'#a0b0c8':'rgba(160,176,200,0.5)';
-        btn.style.borderColor = item.primary?'rgba(160,176,200,0.12)':'rgba(160,176,200,0.04)';
-        btn.style.paddingLeft = '24px';
+      row.addEventListener('mouseleave', () => {
+        label.style.color = 'rgba(200,210,225,0.3)';
+        label.style.letterSpacing = '0.15em';
+        num.style.color = 'rgba(200,210,225,0.1)';
+        line.style.width = '0';
       });
-      btn.addEventListener('click', item.action);
-      menu.appendChild(btn);
+      row.addEventListener('click', item.action);
+      right.appendChild(row);
     }
-    content.appendChild(menu);
 
-    const help = document.createElement('button');
-    help.textContent = 'CONTROLS';
-    help.style.cssText = `
-      margin-top:48px;background:transparent;color:rgba(160,176,200,0.15);
-      border:none;font:400 9px/1 system-ui,-apple-system,sans-serif;
-      letter-spacing:0.15em;cursor:pointer;transition:color 0.3s;
-    `;
-    help.addEventListener('mouseenter', () => help.style.color = 'rgba(160,176,200,0.4)');
-    help.addEventListener('mouseleave', () => help.style.color = 'rgba(160,176,200,0.15)');
+    const help = document.createElement('div');
+    help.textContent = 'controls';
+    help.style.cssText = 'margin-top:48px;font:400 8px/1 system-ui;color:rgba(200,210,225,0.08);letter-spacing:0.2em;cursor:pointer;transition:color 0.4s;';
+    help.addEventListener('mouseenter', () => help.style.color = 'rgba(200,210,225,0.3)');
+    help.addEventListener('mouseleave', () => help.style.color = 'rgba(200,210,225,0.08)');
     help.addEventListener('click', () => this.showHelp());
-    content.appendChild(help);
+    right.appendChild(help);
 
-    this.root.appendChild(content);
+    this.root.appendChild(left);
+    this.root.appendChild(right);
 
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes starPulse { 0%{opacity:0.1} 100%{opacity:0.5} }
-      @keyframes titleFade { 0%{text-shadow:0 0 80px rgba(128,144,168,0.04)} 100%{text-shadow:0 0 80px rgba(128,144,168,0.12)} }
-    `;
-    this.root.appendChild(style);
+    const s = document.createElement('style');
+    s.textContent = '@keyframes drift{0%{transform:translateY(0)}100%{transform:translateY(-8px)}}';
+    this.root.appendChild(s);
   }
 
   mount(p = document.body) { p.appendChild(this.root); }
@@ -111,21 +110,16 @@ export class MainMenuScene {
     if (this.helpOverlay) { this.helpOverlay.remove(); this.helpOverlay = null; return; }
     const o = document.createElement('div');
     o.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(4,6,10,0.97);';
-    o.innerHTML = `<div style="max-width:420px;padding:40px;font:13px/2 system-ui,-apple-system,sans-serif;color:#8090a8;">
-      <div style="font:200 24px/1 system-ui,-apple-system,sans-serif;color:#a0b0c0;margin-bottom:24px;letter-spacing:0.1em;">CONTROLS</div>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">W / S</td><td style="font-size:11px;">Throttle</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">&uarr;&darr;&larr;&rarr;</td><td style="font-size:11px;">Pitch / Yaw</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Space</td><td style="font-size:11px;">Stage</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">M</td><td style="font-size:11px;">Map</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">C</td><td style="font-size:11px;">Free camera</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">T</td><td style="font-size:11px;">SAS</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Q / E</td><td style="font-size:11px;">Time warp</td></tr>
-        <tr><td style="color:rgba(160,176,200,0.4);padding:2px 20px 2px 0;font-size:11px;">Mouse</td><td style="font-size:11px;">Orbit / zoom</td></tr>
-      </table>
-      <button style="margin-top:32px;padding:12px 36px;background:rgba(160,176,200,0.06);color:#a0b0c8;border:1px solid rgba(160,176,200,0.12);font:400 12px system-ui;cursor:pointer;letter-spacing:0.1em;">CLOSE</button>
-    </div>`;
-    o.querySelector('button')!.addEventListener('click', () => { o.remove(); this.helpOverlay = null; });
+    o.innerHTML = `<div style="max-width:400px;padding:48px;color:rgba(200,210,225,0.5);font:12px/2 system-ui;">
+      <div style="font:200 28px/1 system-ui;color:rgba(200,210,225,0.7);margin-bottom:28px;">CONTROLS</div>
+      <table style="width:100%;"><tr><td style="color:rgba(200,210,225,0.25);padding:2px 24px 2px 0;">W / S</td><td>Throttle</td></tr>
+      <tr><td style="color:rgba(200,210,225,0.25);">↑↓←→</td><td>Pitch / Yaw</td></tr>
+      <tr><td style="color:rgba(200,210,225,0.25);">Space</td><td>Stage</td></tr>
+      <tr><td style="color:rgba(200,210,225,0.25);">M</td><td>Map</td></tr>
+      <tr><td style="color:rgba(200,210,225,0.25);">T</td><td>SAS</td></tr>
+      <tr><td style="color:rgba(200,210,225,0.25);">Q/E</td><td>Warp</td></tr></table>
+      <div style="margin-top:32px;font:400 10px system-ui;color:rgba(200,210,225,0.15);cursor:pointer;" id="hc">close</div></div>`;
+    o.querySelector('#hc')!.addEventListener('click', () => { o.remove(); this.helpOverlay = null; });
     document.body.appendChild(o);
     this.helpOverlay = o;
   }
