@@ -292,7 +292,7 @@ export class Earth extends Planet {
     super('earth', EARTH_MASS, position, velocity, 6.371e6);
 
     const visualR = this.visualRadius;
-    const SEG = 128;
+    const SEG = 256;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const roughnessMap = generateRoughnessMap();
@@ -402,18 +402,27 @@ export class Earth extends Planet {
   }
 
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    const n1 = Math.sin(nx * 3.0 + ny * 1.8) * 0.5 + Math.cos(ny * 2.5 - nz * 1.3) * 0.3;
-    const n2 = Math.sin(nz * 1.8 + nx * 1.2 + ny * 0.6) * 0.2 + Math.sin(nx * 6.0 + ny * 3.0 + nz * 4.0) * 0.15;
-    const n3 = Math.sin(nx * 12.0 + nz * 8.0) * 0.1 + Math.cos(ny * 10.0 + nx * 5.0) * 0.08;
-    const n4 = Math.sin(nx * 25.0 + ny * 20.0 + nz * 30.0) * 0.05;
-    const elev = ((n1 + n2 + n3 + n4) * 0.3 + 0.5) * 1.2;
-    const maxDisp = this.visualRadius * 0.005;
-    const oceanDepth = this.visualRadius * 0.001;
-    if (elev > 0.4) {
-      const h = (elev - 0.4) / 0.6;
-      return h * h * maxDisp;
+    // Multi-octave FBM for realistic terrain
+    const f1 = Math.sin(nx*5.0+ny*3.0)*0.5 + Math.cos(ny*4.0-nz*3.0)*0.3;
+    const f2 = Math.sin(nz*6.0+nx*2.0+ny*4.0)*0.15 + Math.sin(nx*12.0+ny*8.0+nz*10.0)*0.1;
+    const f3 = Math.sin(nx*20.0+nz*15.0)*0.05 + Math.cos(ny*18.0+nx*12.0)*0.04;
+    const f4 = Math.sin(nx*40.0+ny*35.0+nz*45.0)*0.02;
+    const elev = ((f1+f2+f3+f4)*0.35+0.5)*1.1;
+
+    const maxDisp = this.visualRadius * 0.025;
+    const oceanDepth = this.visualRadius * 0.006;
+
+    // Continents rise high, oceans dip deep
+    if (elev > 0.45) {
+      const h = (elev - 0.45) / 0.55;
+      const mountain = h < 0.7 ? h*0.5 : 0.35 + (h-0.7)/0.3*0.65;
+      return mountain * maxDisp;
     }
-    return -(0.4 - elev) / 0.4 * oceanDepth;
+    if (elev > 0.35) {
+      const h = (elev - 0.35) / 0.1;
+      return h * h * maxDisp * 0.3;
+    }
+    return -(0.35 - elev) / 0.35 * oceanDepth;
   }
 
   private generateTerrain(visualR: number): void {
