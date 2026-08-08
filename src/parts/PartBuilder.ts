@@ -389,82 +389,45 @@ case 'gltf': {
 
 function buildCapsule(group: THREE.Group, d: { radius: number; height: number }, id: string) {
   const r = d.radius, h = d.height;
-  const isMk1 = id.includes('mk1');
 
-  const tex = getTextureSet(`capsule_${isMk1 ? 'mk1' : 'mk2'}`, generateCapsuleTexture);
+  const tex = getTextureSet('capsule_mk1', generateCapsuleTexture);
   const bodyMat = createMaterialFromTextureSet(tex);
-
-  // Gold accents for stripes and base
   const goldTex = getTextureSet('gold', generateGoldTexture);
   const goldMat = createMaterialFromTextureSet(goldTex);
 
-  // Main body cylinder
-  const bodyGeom = new THREE.CylinderGeometry(r, r, h * 0.6, SEG);
-  applyCylindricalUV(bodyGeom);
-  const body = new THREE.Mesh(bodyGeom, bodyMat);
-  body.position.y = h * 0.05;
-  group.add(body);
-
-  // Nose cone (hemisphere)
-  const noseGeom = new THREE.SphereGeometry(r, SEG, SEG, 0, PI * 2, 0, PI / 2);
-  applyCylindricalUV(noseGeom, 0.5);
+  // Rounded top hemisphere — smooth nose cone
+  const noseGeom = new THREE.SphereGeometry(r, 48, 24, 0, Math.PI*2, 0, Math.PI/2);
   const nose = new THREE.Mesh(noseGeom, bodyMat);
-  nose.position.y = h * 0.35;
+  nose.position.y = h * 0.3;
   group.add(nose);
 
-  // Tip
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(r * 0.08, 12, 8), goldMat);
-  tip.position.y = h * 0.35 + r * 0.5;
-  group.add(tip);
+  // Main body — slightly tapered cylinder
+  const bodyGeom = new THREE.CylinderGeometry(r*0.95, r, h*0.5, 48);
+  applyCylindricalUV(bodyGeom);
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
+  body.position.y = h * 0.02;
+  group.add(body);
 
-  // Stripe bands (painted stripes on capsule body)
-  const stripeColor = isMk1 ? 0xDD4444 : 0x0077D1;
-  const stripeMat = new THREE.MeshStandardMaterial({
-    color: stripeColor,
-    roughness: 0.6,
-    metalness: 0.1,
-  });
-  const bandGeom = new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.05, SEG);
-  applyCylindricalUV(bandGeom);
-  perturbVertices(bandGeom, PART_SCALE * 0.008);
-  const band = new THREE.Mesh(bandGeom, stripeMat);
-  band.position.y = h * 0.05;
-  group.add(band);
+  // Heat shield base — darker, wider
+  const shieldGeom = new THREE.CylinderGeometry(r*1.02, r*0.9, h*0.12, 48);
+  const shieldMat = new THREE.MeshStandardMaterial({ color:0x2a2a38, roughness:0.6, metalness:0.5 });
+  const shield = new THREE.Mesh(shieldGeom, shieldMat);
+  shield.position.y = -h * 0.25;
+  group.add(shield);
 
-  const band2Geom = new THREE.CylinderGeometry(r * 1.04, r * 1.04, h * 0.03, SEG);
-  applyCylindricalUV(band2Geom);
-  perturbVertices(band2Geom, PART_SCALE * 0.008);
-  const band2 = new THREE.Mesh(band2Geom, stripeMat);
-  band2.position.y = -h * 0.15;
-  group.add(band2);
+  // Gold stripe ring
+  const ringGeom = new THREE.TorusGeometry(r*0.98, r*0.04, 8, 48);
+  const ring = new THREE.Mesh(ringGeom, goldMat);
+  ring.position.y = -h*0.18;
+  ring.rotation.x = Math.PI/2;
+  group.add(ring);
 
-  // Base ring
-  const baseGeom = new THREE.CylinderGeometry(r * 1.3, r * 0.95, h * 0.15, SEG);
-  applyCylindricalUV(baseGeom);
-  perturbVertices(baseGeom, PART_SCALE * 0.01);
-  const base = new THREE.Mesh(baseGeom, goldMat);
-  base.position.y = -h * 0.3 - h * 0.075;
-  group.add(base);
-
-  // Window
-  const winMat = createMaterialFromTextureSet(tex, {
-    color: 0x1A5988,
-    roughness: 0.1,
-    metalness: 0.8,
-    transparent: true,
-    opacity: 0.3,
-  });
-  const win = new THREE.Mesh(new THREE.CircleGeometry(r * 0.2, 16), winMat);
-  win.position.set(r + 0.001, h * 0.18, 0);
-  win.rotation.y = -PI / 2;
+  // Small window
+  const winGeom = new THREE.SphereGeometry(r*0.15, 16, 8);
+  const winMat = new THREE.MeshStandardMaterial({ color:0x88ccff, roughness:0.2, metalness:0.3, emissive:0x224466, emissiveIntensity:0.3 });
+  const win = new THREE.Mesh(winGeom, winMat);
+  win.position.set(0, h*0.08, r*0.7);
   group.add(win);
-
-  // Window glow ring
-  const glowM = new THREE.MeshBasicMaterial({ color: 0x3399FF, transparent: true, opacity: 0.6 });
-  const glowRing = new THREE.Mesh(new THREE.RingGeometry(r * 0.2, r * 0.24, 16), glowM);
-  glowRing.position.set(r + 0.001, h * 0.18, 0);
-  glowRing.rotation.y = -PI / 2;
-  group.add(glowRing);
 }
 
 function buildTank(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
