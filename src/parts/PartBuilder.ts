@@ -23,7 +23,7 @@ const SIZE_DIMS = {
 };
 
 const PI = Math.PI;
-const SEG = 64;
+const SEG = 128;
 
 // Seeded random for vertex noise
 let _vnoiseSeed = 0;
@@ -432,51 +432,27 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
 
 function buildTank(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
+  const HQ = 64;
 
   const tex = getTextureSet(`tank_${size}`, () => generateTankTexture(size));
   const bodyMat = createMaterialFromTextureSet(tex);
-
-  // Gold bands
   const goldTex = getTextureSet('gold', generateGoldTexture);
   const goldMat = createMaterialFromTextureSet(goldTex);
 
-  const bodyGeom = new THREE.CylinderGeometry(r, r, h, SEG);
+  // Main cylinder with slight taper
+  const bodyGeom = new THREE.CylinderGeometry(r*0.97, r*1.01, h, HQ);
   applyCylindricalUV(bodyGeom);
   const body = new THREE.Mesh(bodyGeom, bodyMat);
   group.add(body);
 
-  const bh = h * 0.03;
-  const bandGeom = new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG);
-  applyCylindricalUV(bandGeom);
-  perturbVertices(bandGeom, PART_SCALE * 0.006);
-  const band = new THREE.Mesh(bandGeom, goldMat);
-  band.position.y = h / 2 - bh / 2;
-  group.add(band);
-
-  const bandBGeom = new THREE.CylinderGeometry(r * 1.03, r * 1.03, bh, SEG);
-  applyCylindricalUV(bandBGeom);
-  perturbVertices(bandBGeom, PART_SCALE * 0.006);
-  const bandB = new THREE.Mesh(bandBGeom, goldMat);
-  bandB.position.y = -h / 2 + bh / 2;
-  group.add(bandB);
-
-  for (let i = 0; i < 3; i++) {
-    const ridgeGeom = new THREE.TorusGeometry(r * 1.01, bh * 1.5, 6, SEG);
-    applyCylindricalUV(ridgeGeom);
-    perturbVertices(ridgeGeom, PART_SCALE * 0.005);
-    const ridge = new THREE.Mesh(ridgeGeom, goldMat);
-    ridge.position.y = -h / 2 + h * 0.2 * (i + 1);
-    ridge.rotation.x = PI / 2;
-    group.add(ridge);
+  // Gold rings at top, third, two-thirds, bottom
+  const ringPositions = [h*0.42, h*0.1, -h*0.15, -h*0.42];
+  for (const py of ringPositions) {
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(r*1.03, r*0.025, 8, HQ), goldMat);
+    rg.position.y = py;
+    rg.rotation.x = Math.PI/2;
+    group.add(rg);
   }
-
-  const ringGeom = new THREE.TorusGeometry(r * 1.02, bh * 1.2, 6, SEG);
-  applyCylindricalUV(ringGeom);
-  perturbVertices(ringGeom, PART_SCALE * 0.005);
-  const ring = new THREE.Mesh(ringGeom, goldMat);
-  ring.position.y = 0;
-  ring.rotation.x = PI / 2;
-  group.add(ring);
 }
 
 function buildEngine(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
