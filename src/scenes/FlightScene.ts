@@ -52,7 +52,7 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 1.2;
+  private readonly ANGULAR_ACCEL = 1.5;
   private readonly ANGULAR_DAMPING = 3.5;
   private timeWarp = 1;
   private parachuteDeployed = false;
@@ -1072,8 +1072,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const surfaceNormal = new THREE.Vector3(sx/sl, sy/sl, sz/sl);
 
     // Horizon tangent = perpendicular to both forward and surface normal
-    const horizon = new THREE.Vector3().crossVectors(rocketFwd, surfaceNormal).normalize();
-    if (horizon.length() < 0.01) horizon.copy(rocketRight);
+    const horizon = new THREE.Vector3().crossVectors(rocketFwd, surfaceNormal);
+    const hLen = horizon.length();
+    if (hLen < 0.001) {
+      // Gimbal lock: rocket pointing straight up/down — use any perpendicular
+      horizon.set(-surfaceNormal.z, 0, surfaceNormal.x).normalize();
+      if (horizon.length() < 0.001) horizon.set(1, 0, 0);
+    } else {
+      horizon.normalize();
+    }
 
     const turn = this.ANGULAR_ACCEL * baseDt;
     // Yaw around surface normal — turns left/right on the horizon
