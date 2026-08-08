@@ -214,8 +214,8 @@ export class FlightScene {
           mat.polygonOffsetFactor = -1;
           mat.polygonOffsetUnits = -1;
           if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.roughness = 0.5;
-            mat.metalness = 0.4;
+            mat.roughness = 0.45;
+            mat.metalness = 0.5;
             mat.emissive = new THREE.Color(0x000000);
             mat.emissiveIntensity = 0;
             mat.needsUpdate = true;
