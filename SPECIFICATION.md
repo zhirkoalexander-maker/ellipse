@@ -1,14 +1,9 @@
-# Ellipse — Space Flight Simulator (v2.3)
+# Ellipse — Space Flight Simulator (v2.5)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
 - English UI
 - Desktop + mobile (touch controls)
-
-## Methodology
-- TDD (Vitest)
-- localStorage persistence
-- Git tags for versions
 
 ## Scale Constants
 ```
@@ -20,114 +15,79 @@ VISUAL_PLANET_MULT = 230000
 VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT = 2.3e-4
 PART_SCALE = 0.05
 ROCKET_VISUAL_SCALE = 60
+EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ```
 
-## Physics
+## Physics (v2.5)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
 - **Realistic rocket equation**: mass flow = thrust / (Isp * G0)
-- **Drag** CdA ∝ mass, exponential atmosphere density
 - **Multiple engines** — all engines fire simultaneously, thrust summed
-- **No angular velocity persistence** between sessions
-- **Reentry heating** — aerodynamic flux accumulation, radiative cooling
-- **Explosions on crash** — fireball + debris with physics
-
-## Gravity
-- **Earth**: mass = 8.92e24 × 4 ≈ 3.57e25 kg → g ≈ 58.7 m/s² (6× real)
-- Other bodies: realistic masses (~1.5× real for terrestrial planets)
+- **Drag** CdA ∝ mass, exponential atmosphere density
+- **Landing**: soft <5m/s (8 with chute), rough <20m/s (15 with chute), crash above
+- **TWR gate**: must have TWR ≥ 1.0 at CURRENT throttle to lift off
+- **Countdown**: 3-2-1-LIFTOFF, 5s cooldown after TWR failure
+- **Spawn protection**: 2 seconds (120 frames) after launch
+- **Aerodynamic stability**: rocket aligns with velocity in atmosphere (<70km)
+- **Rotation**: yaw around surface normal, pitch around horizon tangent — realistic
+- **Gravity/drag**: use warped dt — consistent at all time warp levels
 
 ## Solar System
-| Body | Mass (kg) | Orbital radius | Notes |
-|------|-----------|---------------|-------|
-| Sun | 2e26 | origin | Custom shader + sprite glow |
-| Mercury | 1e24 | ~2e8 m | FBM crater terrain |
-| Venus | 1.46e25 | ~6e8 m | Volcanic terrain + atmosphere |
-| Earth | 3.57e25 | 1e9 m | Texture + night lights + clouds + atmosphere |
-| Moon | 2.2e23 | Earth+6e7(Z) | 3D FBM craters |
-| Mars | 1.9e24 | 1.5e9 m | FBM + texture + atmosphere |
-| Jupiter | 1.9e27 | 3e9 m | Basic sphere |
-| Saturn | 5.68e26 | 5.6e9 m | Basic sphere |
-| Uranus | 8.68e25 | 1.1e10 m | Basic sphere |
-| Neptune | 1.02e26 | 1.7e10 m | Basic sphere |
-| Pluto | 1.46e22 | 2.3e10 m | Basic sphere |
+| Body | Mass (kg) | Radius (m) | Orbital radius |
+|------|-----------|------------|---------------|
+| Sun | 2e26 | visual R=100 | origin |
+| Earth | 4.28e26 | 12.74e6 (2×) | 1e9 m |
+| Moon | 2.2e23 | 1.737e6 | Earth+6e7(Z) |
+| Venus | 1.46e25 | 6.052e6 | ~6e8 m |
+| Mars | 1.9e24 | 3.390e6 | 1.5e9 m |
+| Mercury | 1e24 | 2.440e6 | ~2e8 m |
+| Jupiter | 1.9e27 | 69.91e6 | 3e9 m |
+| Saturn | 5.68e26 | 58.23e6 | 5.6e9 m |
+| Uranus | 8.68e25 | 25.36e6 | 1.1e10 m |
+| Neptune | 1.02e26 | 24.62e6 | 1.7e10 m |
+| Pluto | 1.46e22 | 1.188e6 | 2.3e10 m |
+
+## Earth (v2.5)
+- Radius: 12.74 million meters (2× real)
+- SEG: 256 — smooth sphere
+- **Vertex-colored terrain** based on height:
+  - Deep ocean (dark blue) → ocean → beach (beige) → plains (green) → hills (brown) → mountains (gray) → snow peaks (white)
+- 4-octave FBM noise: mountain ranges, ocean basins, continental shelves
+- Cloud layer (procedural, rotating)
+- Atmosphere glow (Rayleigh/Mie scattering)
+- Night city lights (emissive map, 5 continents)
+- Optional high-res texture (/textures/earth_daymap.jpg)
 
 ## Default Rocket (Quick Flight)
 ```
 capsule_mk1  — 1200 kg, crew 1, parachute
-tank_m_lfo   — 600 kg dry, 5000 kg fuel (LFO)
-engine_ant   — 50 kg, 420 kN, Isp 350s
+tank_s_lfo   — 200 kg dry, 5000 kg fuel (LFO)
+engine_ant   — 50 kg, 1800 kN, Isp 350s
 
-Total wet: 6850 kg, TWR ≈ 1.045 (barely enough)
-Staging: required for orbit (Δv ~4500 m/s single-stage)
+Total wet: 6450 kg, TWR ≈ 1.6 at g≈176
+Staging required for orbit
 ```
 
 ## Part Catalog (18 parts)
-- **Capsule**: MK-1 (M, 1200 kg)
-- **Tanks**: S(500)/M(5000)/L(10000)/XL(25000) kg fuel, all LFO
-- **Engines**: Ant(420kN,Isp350)/Vector(1000,Isp340)/Mastodon(2500,Isp330)/Mammoth(6000,Isp310)
-- **Utility**: Parachute Mk16, Landini landing legs, 3 Heat shields, TD-1 Decoupler
+- **Capsule**: MK-1 (M, 1200 kg) — textured body, dark heat shield, blue window, gold ring
+- **Tanks**: S(5000)/M(50000)/L(100000)/XL(250000) kg fuel, all LFO — textured, dark connector rings, gold accents
+- **Engines**: Ant(1800kN,Isp350)/Vector(3000,Isp340)/Mastodon(7500,Isp330)/Mammoth(18000,Isp310) — textured upper, gunmetal bell, dark cavity, gold rim, orange glow
+- **Utility**: Parachute Mk16, Landini legs, 3 Heat shields, TD-1 Decoupler
 - **GLTF models**: Agena, Apollo-Soyuz, Saturn V, Ares I, Apollo LM, Atlas 6/9, Crawler
 
+## Saturn V
+- GLTF model, 30000 kg dry, 500000 kg fuel, 60000 kN thrust, Isp 310
+
 ## Controls
-| Key | Action |
-|-----|--------|
-| W / S | Throttle up / down |
-| ↑ ↓ ← → | Pitch / Yaw |
-| Q / E | Time warp down / up |
-| C | Free camera toggle |
-| F | Reset camera |
-| T | SAS mode toggle (off/hold/prograde/retrograde) |
-| Space | Stage |
-| P | Parachute toggle |
-| M / Tab | Map toggle |
-| Esc | Pause |
-| Mouse drag | Orbit camera |
-| Scroll | Camera zoom |
-
-## HUD
-- Speed, altitude, vertical speed, fuel bar (%), mass, throttle %
-- Navball (2D canvas): pitch lines, heading, prograde/retrograde markers
-- Heat bar, warp indicator
-- Button bar: STAGE, CHUTE, MAP, SAS mode, MENU, RESTART
-
-## Map
-- Top-down solar system view
-- Planet positions, SOI circles (dashed), labels
-- Rocket trajectory prediction (Keplerian)
-- Ap/Pe markers for bound orbits
-- Zoom (scroll), pan (drag), double-click to center on body
-
-## Staging
-- Flat assembly: parts ordered bottom-to-top
-- Decoupler splits assembly into stages
-- `removeStage`: removes decoupler + all lower roots, updates fuel tanks
-- Auto-stage: fires when engine has no fuel + decoupler exists (in flight)
-- Stage data computed per-frame for HUD
-
-## Landing
-- **Soft**: vertical speed < 5 m/s (8 m/s with chute) — clean landing
-- **Rough**: between soft limit and 20 m/s (15 m/s with chute) — survive with shake
-- **Crash**: above speed limit OR tilt > 45° (60° with legs)
-- Parachute: deployable via P key or CHUTE button, CdA = 50
-- Landing legs: checked in assembly, increase tilt tolerance to 60°
-
-## TWR & Launch
-- **TWR check ≥ 1.0 at current throttle** — rocket won't lift off underpowered
-- Countdown: 3-2-1-LIFTOFF, only at throttle where TWR ≥ 1.0
-- TWR = (thrust_kN × 1000 × throttle) / (totalMass × localGravity)
-
-## Persistence
-- Achievements (localStorage): first_launch, reach_space, land_*, stage_separate, crash
-- Settings: units, difficulty, volumes
-- Version cache-bust via sessionStorage
+W/S throttle, ↑↓ pitch, ←→ yaw, Space stage, M map, C freecam, T SAS, Q/E warp, Esc pause, Mouse orbit/zoom
 
 ## Scenes
-- **MainMenu**: HTML overlay, logo, FLIGHT/VAB/SETTINGS/GUIDE buttons
-- **VAB**: 3D rocket builder with part catalog, quick presets, orbit camera, LAUNCH/BACK/CLEAR
-- **Flight**: 2311-line monolith (physics, rendering, HUD, map, effects, staging, SAS)
+- **MainMenu** (v1.0 style): SVG ellipse logo, gold accent, FLIGHT/VEHICLE ASSEMBLY/SETTINGS/GUIDE buttons via CSS classes
+- **VAB**: dark sidebar, part list grouped by type, color-coded indicators, rocket breadcrumbs, UNDO/CLEAR/LAUNCH/BACK
+- **Flight**: physics, rendering, HUD, map, effects, staging, SAS — 2300+ lines
 
-## Known Issues (v2.3)
+## Known Issues (v2.5)
 - FlightScene.ts needs decomposition into modules
-- Landing gear meshes disabled (user preference)
-- Earth mass 6× real makes orbital velocity ~19 km/s
 - Flat assembly model limits radial/staged complexity
+- No symmetry mode for boosters
+- Map redraw throttled to every 5th frame to avoid lag
