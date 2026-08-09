@@ -4,7 +4,6 @@ import { Assembly } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
 import { gltfCache } from '../parts/PartBuilder';
-import { buildRocketFromDescription } from '../parts/RocketBuilder';
 
 const PH: Record<string,number> = { S:0.7, M:1.1, L:1.6, XL:2.2 };
 
@@ -45,10 +44,6 @@ export class VABScene {
           <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#8090a8;letter-spacing:0.1em;">ASSEMBLY</div>
           <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.12);min-height:32px;">select parts</div>
         </div>
-        <div style="padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
-          <div style="font:400 7px/1 system-ui;color:rgba(255,255,255,0.1);letter-spacing:0.1em;margin-bottom:6px;">AI DESIGNS</div>
-          <div id="va-presets" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
-        </div>
         <div id="vl" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
         <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:6px;">
           <button id="vg" style="width:100%;padding:12px;background:rgba(160,176,200,0.08);color:#a0b0c8;border:1px solid rgba(160,176,200,0.12);font:400 12px system-ui;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;">LAUNCH</button>
@@ -62,7 +57,6 @@ export class VABScene {
       <div style="flex:1;"></div>`;
     this.info = this.root.querySelector('#vi')!;
     this.build();
-    this.buildPresets();
     this.root.querySelector('#vg')!.addEventListener('click', () => { if(this.assembly.roots.length) this.ol(this.assembly); });
     this.root.querySelector('#vu')!.addEventListener('click', () => this.undo());
     this.root.querySelector('#vc')!.addEventListener('click', () => { this.assembly=new Assembly(); this.st=0; this.nm=[]; this.rf(); this.up(); });
@@ -92,34 +86,6 @@ export class VABScene {
         b.addEventListener('click', () => this.add(p));
         el.appendChild(b);
       }
-    }
-  }
-
-  private buildPresets() {
-    const el = this.root.querySelector('#va-presets')!;
-    const presets = [
-      { name:'GPT-4 Heavy', desc:'capsule, tank L, decoupler, tank XL, mammoth', color:'#44cc88' },
-      { name:'Claude 3 Lift', desc:'capsule, tank M, vector', color:'#cc8844' },
-      { name:'Gemini Ultra', desc:'capsule, tank M, decoupler, tank XL, mastodon', color:'#4488ff' },
-      { name:'Llama 3 Deep', desc:'capsule, tank S, decoupler, tank L, mastodon', color:'#ff6644' },
-      { name:'Mixtral 8x', desc:'capsule, tank S, ant', color:'#8888cc' },
-      { name:'Qwen 2 Max', desc:'capsule, tank XL, mammoth', color:'#cc44cc' },
-      { name:'DeepSeek V3', desc:'capsule, tank L, decoupler, tank XL, decoupler, tank XL, mammoth', color:'#44cccc' },
-      { name:'Falcon 180B', desc:'capsule, tank M, decoupler, tank L, mastodon', color:'#cc8844' },
-      { name:'Command R+', desc:'capsule, tank S, decoupler, tank M, vector', color:'#88cc44' },
-      { name:'Phi-4 Vision', desc:'capsule, tank S, ant', color:'#cccc44' },
-    ];
-    for (const p of presets) {
-      const btn = document.createElement('button');
-      btn.textContent = p.name;
-      btn.style.cssText = `padding:3px 8px;background:rgba(255,255,255,0.03);color:${p.color};border:1px solid rgba(255,255,255,0.06);border-radius:3px;font:400 8px system-ui;cursor:pointer;`;
-      btn.addEventListener('click', () => {
-        this.assembly = buildRocketFromDescription(p.desc);
-        this.st = 0; this.nm = [];
-        for (const r of this.assembly.roots) { this.st += PH[r.part.size]||0.6; this.nm.push(r.part.name); }
-        this.rf(); this.up();
-      });
-      el.appendChild(btn);
     }
   }
 
