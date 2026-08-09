@@ -389,79 +389,65 @@ case 'gltf': {
 
 function buildCapsule(group: THREE.Group, d: { radius: number; height: number }, _id: string) {
   const r = d.radius, h = d.height;
+  const HQ = 48;
 
-  // Clean white body material
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.35, metalness: 0.1 });
-  // Dark heat shield
+  const tex = getTextureSet('capsule_mk1', generateCapsuleTexture);
+  const bodyMat = createMaterialFromTextureSet(tex);
+  const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
   const shieldMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.5, metalness: 0.4 });
-  // Window
-  const winMat = new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.1, metalness: 0.5, emissive: 0x112244, emissiveIntensity: 0.4 });
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x4488cc, roughness: 0.1, metalness: 0.3, emissive: 0x112244, emissiveIntensity: 0.4 });
 
-  // Smooth rounded top
-  const topGeom = new THREE.SphereGeometry(r*0.92, 48, 32, 0, Math.PI*2, 0, Math.PI*0.55);
-  const top = new THREE.Mesh(topGeom, whiteMat);
+  const topGeom = new THREE.SphereGeometry(r * 0.92, HQ, 24, 0, Math.PI * 2, 0, Math.PI * 0.52);
+  const top = new THREE.Mesh(topGeom, bodyMat);
   top.position.y = h * 0.22;
   group.add(top);
 
-  // Body cylinder
-  const bodyGeom = new THREE.CylinderGeometry(r*0.92, r, h*0.48, 48);
-  const body = new THREE.Mesh(bodyGeom, whiteMat);
+  const bodyGeom = new THREE.CylinderGeometry(r * 0.92, r, h * 0.48, HQ);
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
   body.position.y = -h * 0.02;
   group.add(body);
 
-  // Heat shield — dark, slightly wider at base
-  const hsGeom = new THREE.CylinderGeometry(r*0.98, r*0.85, h*0.13, 48);
+  const hsGeom = new THREE.CylinderGeometry(r, r * 0.82, h * 0.12, HQ);
   const hs = new THREE.Mesh(hsGeom, shieldMat);
   hs.position.y = -h * 0.28;
   group.add(hs);
 
-  // Round window
-  const winGeom = new THREE.SphereGeometry(r*0.14, 16, 8);
+  // Gold connection ring at base
+  const ringGeom = new THREE.TorusGeometry(r * 0.95, r * 0.035, 8, HQ);
+  const ring = new THREE.Mesh(ringGeom, goldMat);
+  ring.position.y = -h * 0.32;
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  const winGeom = new THREE.SphereGeometry(r * 0.13, 12, 6);
   const win = new THREE.Mesh(winGeom, winMat);
-  win.position.set(0, h*0.12, r*0.7);
+  win.position.set(0, h * 0.1, r * 0.68);
   group.add(win);
 }
 
 function buildTank(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height;
+  const HQ = 64;
 
-  // White body with warm stripe
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4, metalness: 0.1 });
-  const orangeMat = new THREE.MeshStandardMaterial({ color: 0xe07830, roughness: 0.45, metalness: 0.05 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.5, metalness: 0.3 });
+  const tex = getTextureSet(`tank_${size}`, () => generateTankTexture(size));
+  const bodyMat = createMaterialFromTextureSet(tex);
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.5, metalness: 0.3 });
 
-  // Main white cylinder
-  const bodyGeom = new THREE.CylinderGeometry(r, r, h*0.88, 64);
-  const body = new THREE.Mesh(bodyGeom, whiteMat);
+  const bodyGeom = new THREE.CylinderGeometry(r, r, h, HQ);
+  const body = new THREE.Mesh(bodyGeom, bodyMat);
   group.add(body);
 
-  // Orange fuel stripe (middle third)
-  const stripeGeom = new THREE.CylinderGeometry(r*1.005, r*1.005, h*0.22, 64);
-  const stripe = new THREE.Mesh(stripeGeom, orangeMat);
-  stripe.position.y = -h*0.05;
-  group.add(stripe);
-
-  // Top dark ring (connector)
-  const topRingGeom = new THREE.TorusGeometry(r*0.98, r*0.03, 8, 64);
-  const topRing = new THREE.Mesh(topRingGeom, darkMat);
-  topRing.position.y = h*0.42;
-  topRing.rotation.x = Math.PI/2;
-  group.add(topRing);
-
-  // Bottom dark ring
-  const botRingGeom = new THREE.TorusGeometry(r*0.98, r*0.03, 8, 64);
-  const botRing = new THREE.Mesh(botRingGeom, darkMat);
-  botRing.position.y = -h*0.42;
-  botRing.rotation.x = Math.PI/2;
-  group.add(botRing);
-
-  // Thin gold accent rings
-  const goldRingGeom = new THREE.TorusGeometry(r*1.01, r*0.015, 6, 64);
-  for (const py of [h*0.32, -h*0.32]) {
-    const gr = new THREE.Mesh(goldRingGeom, goldMat);
-    gr.position.y = py;
-    gr.rotation.x = Math.PI/2;
+  // Dark connector rings
+  for (const py of [h * 0.45, -h * 0.45]) {
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(r * 1.02, r * 0.03, 8, HQ), darkMat);
+    rg.position.y = py; rg.rotation.x = Math.PI / 2;
+    group.add(rg);
+  }
+  // Gold accent rings
+  for (const py of [h * 0.3, -h * 0.3]) {
+    const gr = new THREE.Mesh(new THREE.TorusGeometry(r * 1.01, r * 0.015, 6, HQ), goldMat);
+    gr.position.y = py; gr.rotation.x = Math.PI / 2;
     group.add(gr);
   }
 }
@@ -470,48 +456,41 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   const r = d.radius, h = d.height;
   const HQ = 48;
 
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.5, metalness: 0.5 });
+  const tex = getTextureSet('engine_ant', generateEngineTexture);
+  const engineMat = createMaterialFromTextureSet(tex);
   const bellMat = new THREE.MeshStandardMaterial({ color: 0x2a2a35, roughness: 0.3, metalness: 0.7 });
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0a0a14, roughness: 0.9, metalness: 0.1 });
   const hotMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.4, depthWrite: false });
 
-  // Upper body (pumps/turbines)
-  const upperGeom = new THREE.CylinderGeometry(r*0.85, r*0.7, h*0.2, HQ);
-  const upper = new THREE.Mesh(upperGeom, darkMat);
-  upper.position.y = h*0.22;
+  const upperGeom = new THREE.CylinderGeometry(r * 0.85, r * 0.7, h * 0.2, HQ);
+  const upper = new THREE.Mesh(upperGeom, engineMat);
+  upper.position.y = h * 0.22;
   group.add(upper);
 
-  // Gold flange ring
-  const flangeGeom = new THREE.TorusGeometry(r*0.72, r*0.04, 8, HQ);
+  const flangeGeom = new THREE.TorusGeometry(r * 0.72, r * 0.04, 8, HQ);
   const flange = new THREE.Mesh(flangeGeom, goldMat);
-  flange.position.y = h*0.12;
-  flange.rotation.x = Math.PI/2;
+  flange.position.y = h * 0.12; flange.rotation.x = Math.PI / 2;
   group.add(flange);
 
-  // Nozzle bell — wide cone
-  const bellGeom = new THREE.CylinderGeometry(r*0.55, r*0.85, h*0.35, HQ);
+  const bellGeom = new THREE.CylinderGeometry(r * 0.52, r * 0.82, h * 0.35, HQ);
   const bell = new THREE.Mesh(bellGeom, bellMat);
-  bell.position.y = -h*0.06;
+  bell.position.y = -h * 0.06;
   group.add(bell);
 
-  // Inner dark cavity
-  const innerGeom = new THREE.CylinderGeometry(r*0.35, r*0.6, h*0.28, HQ);
+  const innerGeom = new THREE.CylinderGeometry(r * 0.32, r * 0.58, h * 0.28, HQ);
   const inner = new THREE.Mesh(innerGeom, darkMat);
-  inner.position.y = -h*0.04;
+  inner.position.y = -h * 0.04;
   group.add(inner);
 
-  // Exit rim — gold
-  const rimGeom = new THREE.TorusGeometry(r*0.8, r*0.035, 6, HQ);
+  const rimGeom = new THREE.TorusGeometry(r * 0.75, r * 0.03, 6, HQ);
   const rim = new THREE.Mesh(rimGeom, goldMat);
-  rim.position.y = -h*0.06 - h*0.175;
-  rim.rotation.x = Math.PI/2;
+  rim.position.y = -h * 0.06 - h * 0.175; rim.rotation.x = Math.PI / 2;
   group.add(rim);
 
-  // Hot glow inside
-  const glowGeom = new THREE.RingGeometry(r*0.3, r*0.5, HQ);
+  const glowGeom = new THREE.RingGeometry(r * 0.25, r * 0.45, HQ);
   const glow = new THREE.Mesh(glowGeom, hotMat);
-  glow.position.y = -h*0.06 - h*0.14;
-  glow.rotation.x = -Math.PI/2;
+  glow.position.y = -h * 0.06 - h * 0.14; glow.rotation.x = -Math.PI / 2;
   group.add(glow);
 }
 

@@ -2,443 +2,185 @@ import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
-import { generateEarthBumpMap } from '../effects/ProceduralTextures';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
-/**
- * Seeded random (mulberry32)
- */
 function srand(seed: number): () => number {
   let s = seed | 0;
   return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-/** Generate a procedural cloud texture (grayscale, white = cloudy) */
-function generateCloudTexture(): THREE.CanvasTexture {
+function makeCloudTexture(): THREE.CanvasTexture {
   const W = 2048, H = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-
-  const rng = srand(999);
-  const imgData = ctx.createImageData(W, H);
-
-  // Simple value noise approach
-  const freq = 3;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(W, H);
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
-      const u = px / W, v = py / H;
-      const lat = (v - 0.5) * Math.PI;
-      const lon = u * Math.PI * 2;
+      const v = py / H, u = px / W;
+      const lat = (v - 0.5) * Math.PI, lon = u * Math.PI * 2;
       const nx = Math.cos(lat) * Math.cos(lon);
       const ny = Math.cos(lat) * Math.sin(lon);
       const nz = Math.sin(lat);
-
-      // Layered noise on sphere
-      const n1 = Math.sin(nx * freq + ny * 1.3 + nz * 0.7) * 0.5 + 0.5;
-      const n2 = Math.sin((nx + 1.7) * freq * 2 + nz * 1.1) * 0.5 + 0.5;
-      const n3 = Math.cos((ny + 0.5) * freq * 4 - nx * 2.3) * 0.5 + 0.5;
-      const n4 = Math.sin(nx * freq * 8 + ny * 6 + nz * 7) * 0.5 + 0.5;
-
-      let cloud = (n1 * 0.4 + n2 * 0.3 + n3 * 0.2 + n4 * 0.1);
-      // Reduce clouds over poles
-      const polarFade = 1 - Math.abs(v - 0.5) * 1.2;
-      cloud *= Math.max(0, polarFade);
-      // Threshold for distinct clouds
-      cloud = Math.max(0, (cloud - 0.4) * 2.5);
-
-      const val = Math.min(255, Math.max(0, Math.round(cloud * 255)));
+      let cl = (Math.sin(nx * 3 + ny * 1.3 + nz * 0.7) * 0.5 + 0.5) * 0.4
+        + (Math.sin((nx + 1.7) * 6 + nz * 1.1) * 0.5 + 0.5) * 0.3;
+      cl *= Math.max(0, 1 - Math.abs(v - 0.5) * 1.2);
+      cl = Math.max(0, Math.min(255, (cl - 0.4) * 2.5 * 255));
       const idx = (py * W + px) * 4;
-      imgData.data[idx] = val;
-      imgData.data[idx + 1] = val;
-      imgData.data[idx + 2] = val;
-      imgData.data[idx + 3] = 255;
+      img.data[idx] = img.data[idx + 1] = img.data[idx + 2] = cl;
+      img.data[idx + 3] = 255;
     }
   }
-
-  ctx.putImageData(imgData, 0, 0);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  return tex;
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
 }
 
-/** Generate a procedural city lights texture for the night side */
-function generateNightLightsTexture(): THREE.CanvasTexture {
-  const W = 2048, H = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-
-  // Black background (no lights)
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, W, H);
-
-  // Continents mask (same as bump map but simplified)
-  const continents: { lat: number; lon: number; rx: number; ry: number }[] = [
+function makeNightTexture(): THREE.CanvasTexture {
+  const W = 1024, H = 512;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+  const rng = srand(42);
+  const cons = [
     { lat: 0.7, lon: -1.8, rx: 0.5, ry: 0.8 },
     { lat: -0.4, lon: -1.3, rx: 0.6, ry: 0.35 },
-    { lat: 0.85, lon: 0.4, rx: 0.25, ry: 0.3 },
     { lat: 0.1, lon: 0.6, rx: 0.55, ry: 0.4 },
-    { lat: 0.7, lon: 1.6, rx: 0.55, ry: 1.0 },
-    { lat: -0.6, lon: 2.4, rx: 0.25, ry: 0.3 },
-    { lat: 1.1, lon: -0.9, rx: 0.2, ry: 0.2 },
+    { lat: 0.5, lon: 1.5, rx: 0.6, ry: 0.4 },
+    { lat: 0.85, lon: 0.4, rx: 0.25, ry: 0.3 },
   ];
-
-  const rng = srand(42);
-
-  for (const c of continents) {
-    const cx = (c.lon + Math.PI) / (2 * Math.PI) * W;
-    const cy = (Math.PI / 2 - c.lat) / Math.PI * H;
-    const rx = c.rx / (2 * Math.PI) * W;
-    const ry = c.ry / Math.PI * H;
-
-    // City clusters
-    const numCities = 20 + Math.floor(rng() * 40);
-    for (let i = 0; i < numCities; i++) {
+  for (const cn of cons) {
+    const cx = (cn.lon + Math.PI) / (2 * Math.PI) * W;
+    const cy = (Math.PI / 2 - cn.lat) / Math.PI * H;
+    const rx = cn.rx / (2 * Math.PI) * W;
+    const ry = cn.ry / Math.PI * H;
+    for (let i = 0; i < 30; i++) {
       const dx = (rng() - 0.5) * rx * 2;
       const dy = (rng() - 0.5) * ry * 2;
-      const d2 = (dx / rx) ** 2 + (dy / ry) ** 2;
-      if (d2 > 1) continue;
-
-      const px = cx + dx;
-      const py = cy + dy;
-      const size = 1 + rng() * 4;
-      const bright = 100 + Math.floor(rng() * 155);
-
-      // Warm yellow-white lights
-      ctx.fillStyle = `rgb(${bright}, ${Math.floor(bright * 0.85)}, ${Math.floor(bright * 0.5)})`;
+      if ((dx / rx) ** 2 + (dy / ry) ** 2 > 1) continue;
+      const b = 120 + Math.floor(rng() * 135);
+      ctx.fillStyle = `rgb(${b},${Math.floor(b * 0.85)},${Math.floor(b * 0.5)})`;
       ctx.beginPath();
-      ctx.arc(px, py, size, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Light glow spread
-      ctx.fillStyle = `rgba(255, 220, 100, ${0.05 + rng() * 0.1})`;
-      ctx.beginPath();
-      ctx.arc(px, py, size * 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Major city hotspots (bigger, brighter)
-    for (let i = 0; i < 3; i++) {
-      const dx = (rng() - 0.5) * rx * 1.5;
-      const dy = (rng() - 0.5) * ry * 1.5;
-      const d2 = (dx / rx) ** 2 + (dy / ry) ** 2;
-      if (d2 > 1) continue;
-
-      const px = cx + dx;
-      const py = cy + dy;
-      ctx.fillStyle = '#ffdd66';
-      ctx.beginPath();
-      ctx.arc(px, py, 3 + rng() * 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(255, 200, 80, 0.2)';
-      ctx.beginPath();
-      ctx.arc(px, py, 8 + rng() * 10, 0, Math.PI * 2);
+      ctx.arc(cx + dx, cy + dy, 1 + rng() * 3, 0, Math.PI * 2);
       ctx.fill();
     }
   }
-
-  // Coastline glow (dimmer)
-  for (const c of continents) {
-    const cx = (c.lon + Math.PI) / (2 * Math.PI) * W;
-    const cy = (Math.PI / 2 - c.lat) / Math.PI * H;
-    const rx = c.rx / (2 * Math.PI) * W;
-    const ry = c.ry / Math.PI * H;
-
-    for (let i = 0; i < 30; i++) {
-      const angle = rng() * Math.PI * 2;
-      const dist = 0.85 + rng() * 0.2;
-      const px = cx + Math.cos(angle) * rx * dist;
-      const py = cy + Math.sin(angle) * ry * dist;
-      const size = 1 + rng() * 2;
-      ctx.fillStyle = `rgba(200, 180, 100, ${0.1 + rng() * 0.15})`;
-      ctx.beginPath();
-      ctx.arc(px, py, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function generateRoughnessMap(): THREE.CanvasTexture {
-  const W = 2048, H = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-
-  const imageData = ctx.createImageData(W, H);
-  const data = imageData.data;
-
-  const continents: { lat: number; lon: number; rx: number; ry: number }[] = [
-    { lat: 0.7, lon: -1.8, rx: 0.5, ry: 0.8 },
-    { lat: -0.4, lon: -1.3, rx: 0.6, ry: 0.35 },
-    { lat: 0.85, lon: 0.4, rx: 0.25, ry: 0.3 },
-    { lat: 0.1, lon: 0.6, rx: 0.55, ry: 0.4 },
-    { lat: 0.7, lon: 1.6, rx: 0.55, ry: 1.0 },
-    { lat: -0.6, lon: 2.4, rx: 0.25, ry: 0.3 },
-    { lat: 1.1, lon: -0.9, rx: 0.2, ry: 0.2 },
-  ];
-
-  for (let py = 0; py < H; py++) {
-    for (let px = 0; px < W; px++) {
-      const u = px / W, v = py / H;
-      const lat = (v - 0.5) * Math.PI;
-      const lon = u * Math.PI * 2 - Math.PI;
-
-      let isLand = false;
-      for (const c of continents) {
-        const dlat = (lat - c.lat) / c.rx;
-        const dlon = (lon - c.lon) / c.ry;
-        if (dlat * dlat + dlon * dlon < 1) { isLand = true; break; }
-      }
-
-      // Oceans: smooth (low roughness), Land: rough (high roughness)
-      const v2 = isLand ? 180 : 40;
-      const idx = (py * W + px) * 4;
-      data[idx] = data[idx + 1] = data[idx + 2] = v2;
-      data[idx + 3] = 255;
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  return tex;
-}
-
-/** Generate a procedural Earth texture as a synchronous fallback. */
-function generateEarthTextureFallback(): THREE.CanvasTexture {
-  const W = 2048, H = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-
-  // Ocean (deeper blue, more vibrant)
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, '#2255aa');
-  grad.addColorStop(0.5, '#3399ee');
-  grad.addColorStop(1, '#2255aa');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
-
-  const continents: { lat: number; lon: number; rx: number; ry: number; color: string }[] = [
-    { lat: 0.7, lon: -2.0, rx: 0.55, ry: 0.5, color: '#4a8c2a' },
-    { lat: 0.65, lon: -1.6, rx: 0.35, ry: 0.35, color: '#5a9c3a' },
-    { lat: -0.35, lon: -1.4, rx: 0.4, ry: 0.6, color: '#5a9c3a' },
-    { lat: 0.85, lon: 0.4, rx: 0.2, ry: 0.22, color: '#6aac4a' },
-    { lat: 0.1, lon: 0.6, rx: 0.45, ry: 0.5, color: '#7a8c3a' },
-    { lat: 0.5, lon: 1.5, rx: 0.6, ry: 0.4, color: '#6a9c3a' },
-    { lat: 0.3, lon: 1.1, rx: 0.25, ry: 0.15, color: '#7aac4a' },
-    { lat: -0.4, lon: 1.7, rx: 0.15, ry: 0.35, color: '#5a9c3a' },
-    { lat: 1.0, lon: -2.5, rx: 0.08, ry: 0.1, color: '#5a9c3a' },
-    { lat: -0.7, lon: -1.1, rx: 0.08, ry: 0.08, color: '#6aac4a' },
-  ];
-
-  for (const c of continents) {
-    ctx.fillStyle = c.color;
-    ctx.beginPath();
-    const cx = (c.lon + Math.PI) / (2 * Math.PI) * W;
-    const cy = (Math.PI / 2 - c.lat) / Math.PI * H;
-    const rx = c.rx / (2 * Math.PI) * W;
-    const ry = c.ry / Math.PI * H;
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const seed = c.lat * 1000 + c.lon * 100;
-    const rng = srand(seed);
-    for (let i = 0; i < 80; i++) {
-      const dx = (rng() - 0.5) * rx * 1.8;
-      const dy = (rng() - 0.5) * ry * 1.8;
-      const d2 = (dx / rx) ** 2 + (dy / ry) ** 2;
-      if (d2 < 1) {
-        ctx.fillStyle = rng() > 0.5 ? '#2a5c1f' : '#6a9c4a';
-        ctx.beginPath();
-        ctx.arc(cx + dx, cy + dy, 1 + rng() * 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
-  // Polar caps
-  ctx.fillStyle = '#c0d8e8';
-  ctx.fillRect(0, 0, W, H * 0.05);
-  ctx.fillRect(0, H * 0.95, W, H * 0.05);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 export class Earth extends Planet {
   atmosphereGlow: AtmosphereGlow;
   private cloudMesh: THREE.Mesh;
-  private cloudTex: THREE.CanvasTexture;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('earth', EARTH_MASS, position, velocity, 6.371e6);
+    super('earth', EARTH_MASS, position, velocity, 6.371e6 * 2);
 
     const visualR = this.visualRadius;
     const SEG = 256;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
-    const roughnessMap = generateRoughnessMap();
-    // Push Earth slightly back with polygon offset to prevent z-fight with rocket
+    const posAttr = geom.attributes.position!;
+
+    // Compute terrain + vertex colors
+    const vert = new THREE.Vector3();
+    const colors: number[] = [];
+    const maxDisp = visualR * 0.025;
+    const oceanD = visualR * 0.006;
+
+    for (let i = 0; i < posAttr.count; i++) {
+      vert.fromBufferAttribute(posAttr, i);
+      const nx = vert.x / visualR, ny = vert.y / visualR, nz = vert.z / visualR;
+      const height = this.terrainAt(nx, ny, nz, maxDisp, oceanD);
+      const t = Math.max(-1, Math.min(1, height / maxDisp));
+
+      let cr: number, cg: number, cb: number;
+      if (t < -0.5) { cr = 0.01; cg = 0.06; cb = 0.28; }
+      else if (t < -0.1) { cr = 0.03; cg = 0.12; cb = 0.42; }
+      else if (t < 0.02) { cr = 0.55; cg = 0.50; cb = 0.32; }
+      else if (t < 0.25) { cr = 0.15; cg = 0.38; cb = 0.10; }
+      else if (t < 0.55) { cr = 0.22; cg = 0.28; cb = 0.10; }
+      else if (t < 0.8) { cr = 0.38; cg = 0.33; cb = 0.22; }
+      else { cr = 0.88; cg = 0.85; cb = 0.82; }
+      colors.push(cr, cg, cb);
+    }
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    // Apply displacement
+    for (let i = 0; i < posAttr.count; i++) {
+      vert.fromBufferAttribute(posAttr, i);
+      const nx = vert.x / visualR, ny = vert.y / visualR, nz = vert.z / visualR;
+      const h = this.terrainAt(nx, ny, nz, maxDisp, oceanD);
+      vert.setLength(visualR + h);
+      posAttr.setXYZ(i, vert.x, vert.y, vert.z);
+    }
+    posAttr.needsUpdate = true;
+    geom.computeVertexNormals();
+
     const mat = new THREE.MeshStandardMaterial({
-      roughness: 0.7,
-      roughnessMap,
-      metalness: 0.0,
-      bumpMap: generateEarthBumpMap(),
-      bumpScale: 0.3,
-      emissiveMap: generateNightLightsTexture(),
+      roughness: 0.85,
+      metalness: 0.05,
+      vertexColors: true,
+      emissiveMap: makeNightTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.6,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
+      emissiveIntensity: 0.3,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 
-    // Terrain displacement (synchronous, before texture)
-    this.generateTerrain(visualR);
+    this.loadTexture().catch(() => {});
 
-    const fallbackTex = generateEarthTextureFallback();
-    fallbackTex.minFilter = THREE.LinearMipmapLinearFilter;
-    fallbackTex.magFilter = THREE.LinearFilter;
-    fallbackTex.generateMipmaps = false;
-    fallbackTex.colorSpace = THREE.SRGBColorSpace;
-    mat.map = fallbackTex;
-    mat.needsUpdate = true;
-
-    // Set proper texture filtering on all Earth textures — NO mipmaps for sharpness
-    const earthTextures = [fallbackTex, roughnessMap, mat.bumpMap, mat.emissiveMap]
-      .filter(Boolean) as THREE.Texture[];
-    for (const tex of earthTextures) {
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
-      tex.needsUpdate = true;
-    }
-
-    this.loadHighResTexture().catch(() => {});
-
-    // Atmosphere glow
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 2.5, visualR * 0.10);
     this.mesh.add(this.atmosphereGlow.getMesh());
 
-    // Cloud layer
-    this.cloudTex = generateCloudTexture();
+    const cloudTex = makeCloudTexture();
     const cloudMat = new THREE.MeshStandardMaterial({
-      map: this.cloudTex,
-      transparent: true,
-      opacity: 0.35,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      roughness: 1,
-      metalness: 0,
+      map: cloudTex, transparent: true, opacity: 0.3,
+      depthWrite: false, side: THREE.DoubleSide, roughness: 1, metalness: 0,
     });
-    const cloudGeom = new THREE.SphereGeometry(visualR * 1.008, SEG, SEG);
+    const cloudGeom = new THREE.SphereGeometry(visualR * 1.008, 64, 32);
     this.cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
     this.cloudMesh.position.copy(this.mesh.position);
     this.mesh.add(this.cloudMesh);
   }
 
-  private async loadHighResTexture(): Promise<void> {
+  private terrainAt(nx: number, ny: number, nz: number, maxDisp: number, oceanD: number): number {
+    const f1 = Math.sin(nx * 5 + ny * 3.5) * 0.5 + Math.cos(ny * 4.5 - nz * 3) * 0.3;
+    const f2 = Math.sin(nz * 7 + nx * 3 + ny * 5) * 0.2 + Math.sin(nx * 13 + ny * 9 + nz * 11) * 0.12;
+    const f3 = Math.sin(nx * 20 + nz * 16) * 0.06 + Math.cos(ny * 18 + nx * 13) * 0.04;
+    const f4 = Math.sin(nx * 38 + ny * 33 + nz * 42) * 0.02;
+    const elev = ((f1 + f2 + f3 + f4) * 0.35 + 0.5) * 1.05;
+
+    if (elev > 0.48) { const h = (elev - 0.48) / 0.52; return h * h * maxDisp; }
+    if (elev > 0.38) { return (elev - 0.38) / 0.1 * maxDisp * 0.2; }
+    return -(0.38 - elev) / 0.38 * oceanD;
+  }
+
+  private async loadTexture(): Promise<void> {
     try {
-      const loader = new THREE.TextureLoader();
-      const tex = await loader.loadAsync(assetUrl('/textures/earth_daymap.jpg'));
+      const tex = await new THREE.TextureLoader().loadAsync(assetUrl('/textures/earth_daymap.jpg'));
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 16;
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
-      const mat = this.mesh.material as THREE.MeshStandardMaterial;
-      mat.map = tex;
-      mat.needsUpdate = true;
-      console.log('Earth high-res texture loaded');
-    } catch(e) {
-      console.warn('Earth texture load failed, using fallback:', e);
-    }
+      (this.mesh.material as THREE.MeshStandardMaterial).map = tex;
+      (this.mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+    } catch {}
   }
 
-  /** Update cloud rotation + day/night cycle driven by sun direction */
   updateClouds(dt: number, sunPosWC?: [number, number, number]): void {
-    this.cloudMesh.rotation.y += dt * 0.012;
-    if (!sunPosWC) return;
-
-    const mat = this.mesh.material as THREE.MeshStandardMaterial;
-    const sl = Math.sqrt(sunPosWC[0]*sunPosWC[0] + sunPosWC[1]*sunPosWC[1] + sunPosWC[2]*sunPosWC[2]) || 1;
-    const sx = sunPosWC[0] / sl, sy = sunPosWC[1] / sl, sz = sunPosWC[2] / sl;
-
-    // Turn Earth day side towards sun
-    this.mesh.lookAt(
-      this.mesh.position.x + sx * 100,
-      this.mesh.position.y + sy * 100,
-      this.mesh.position.z + sz * 100
-    );
-
-    // Compute camera position relative to Earth center
-    const ex = this.mesh.position.x, ey = this.mesh.position.y, ez = this.mesh.position.z;
-    // Get global sun light direction in world space
-    // Night side = dot(camera→earthCenter, sun→earthCenter) < 0 means camera is on night side
-    // emissive = city lights visible at night
-    // Simple: emissiveIntensity = city lights intensity modulated by day/night
-    mat.emissiveIntensity = 0.15;
-  }
-
-  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    // Multi-octave FBM for realistic terrain
-    const f1 = Math.sin(nx*5.0+ny*3.0)*0.5 + Math.cos(ny*4.0-nz*3.0)*0.3;
-    const f2 = Math.sin(nz*6.0+nx*2.0+ny*4.0)*0.15 + Math.sin(nx*12.0+ny*8.0+nz*10.0)*0.1;
-    const f3 = Math.sin(nx*20.0+nz*15.0)*0.05 + Math.cos(ny*18.0+nx*12.0)*0.04;
-    const f4 = Math.sin(nx*40.0+ny*35.0+nz*45.0)*0.02;
-    const elev = ((f1+f2+f3+f4)*0.35+0.5)*1.1;
-
-    const maxDisp = this.visualRadius * 0.025;
-    const oceanDepth = this.visualRadius * 0.006;
-
-    // Continents rise high, oceans dip deep
-    if (elev > 0.45) {
-      const h = (elev - 0.45) / 0.55;
-      const mountain = h < 0.7 ? h*0.5 : 0.35 + (h-0.7)/0.3*0.65;
-      return mountain * maxDisp;
+    this.cloudMesh.rotation.y += dt * 0.01;
+    if (sunPosWC) {
+      const mat = this.mesh.material as THREE.MeshStandardMaterial;
+      const sl = Math.sqrt(sunPosWC[0] ** 2 + sunPosWC[1] ** 2 + sunPosWC[2] ** 2) || 1;
+      this.mesh.lookAt(
+        this.mesh.position.x + sunPosWC[0] / sl * 100,
+        this.mesh.position.y + sunPosWC[1] / sl * 100,
+        this.mesh.position.z + sunPosWC[2] / sl * 100
+      );
+      mat.emissiveIntensity = 0.15;
     }
-    if (elev > 0.35) {
-      const h = (elev - 0.35) / 0.1;
-      return h * h * maxDisp * 0.3;
-    }
-    return -(0.35 - elev) / 0.35 * oceanDepth;
-  }
-
-  private generateTerrain(visualR: number): void {
-    const g = this.mesh.geometry as THREE.SphereGeometry;
-    const posAttr = g.attributes.position!;
-    const vert = new THREE.Vector3();
-    for (let i = 0; i < posAttr.count; i++) {
-      vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR;
-      const ny = vert.y / visualR;
-      const nz = vert.z / visualR;
-      const disp = this.getTerrainHeightVisual(nx, ny, nz);
-      vert.setLength(visualR + disp);
-      posAttr.setXYZ(i, vert.x, vert.y, vert.z);
-    }
-    posAttr.needsUpdate = true;
-    g.computeVertexNormals();
   }
 }
