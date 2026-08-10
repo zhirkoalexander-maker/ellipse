@@ -390,17 +390,18 @@ case 'gltf': {
 function buildCapsule(group: THREE.Group, d: { radius: number; height: number }, _id: string) {
   const r = d.radius, h = d.height, Q = 64;
 
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.4, metalness: 0.15 });
+  const tex = getTextureSet('capsule_mk1', generateCapsuleTexture);
+  const bodyMat = createMaterialFromTextureSet(tex);
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.55, metalness: 0.45 });
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
   const winMat = new THREE.MeshStandardMaterial({ color: 0x6699cc, roughness: 0.15, metalness: 0.4, emissive: 0x112233, emissiveIntensity: 0.3 });
 
   // Rounded top cone
-  const top = new THREE.Mesh(new THREE.SphereGeometry(r*0.88, Q, 32, 0, Math.PI*2, 0, Math.PI*0.48), whiteMat);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(r*0.88, Q, 32, 0, Math.PI*2, 0, Math.PI*0.48), bodyMat);
   top.position.y = h * 0.23; group.add(top);
 
   // Main body — slightly tapered
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.97, h*0.45, Q), whiteMat);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.97, h*0.45, Q), bodyMat);
   body.position.y = -h * 0.01; group.add(body);
 
   // Heat shield
@@ -425,13 +426,14 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
 function buildTank(group: THREE.Group, d: { radius: number; height: number }, size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height, Q = 64;
 
-  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf0f0ec, roughness: 0.45, metalness: 0.1 });
+  const tex = getTextureSet(`tank_${size}`, () => generateTankTexture(size));
+  const bodyMat = createMaterialFromTextureSet(tex);
   const orangeMat = new THREE.MeshStandardMaterial({ color: 0xcc6622, roughness: 0.5, metalness: 0.05 });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.5, metalness: 0.35 });
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
 
   // Main white cylinder
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*1.01, h, Q), whiteMat);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*1.01, h, Q), bodyMat);
   group.add(body);
 
   // Orange foam band (middle)
@@ -454,13 +456,15 @@ function buildTank(group: THREE.Group, d: { radius: number; height: number }, si
 function buildEngine(group: THREE.Group, d: { radius: number; height: number }, _size: 'S' | 'M' | 'L' | 'XL') {
   const r = d.radius, h = d.height, Q = 48;
 
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a24, roughness: 0.5, metalness: 0.55 });
+  const tex = getTextureSet('engine_ant', generateEngineTexture);
+  const engineMat = createMaterialFromTextureSet(tex);
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0a0a14, roughness: 0.9, metalness: 0.1 });
   const bellMat = new THREE.MeshStandardMaterial({ color: 0x282838, roughness: 0.25, metalness: 0.75 });
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
   const hotMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.5, depthWrite: false });
 
   // Turbopump housing (upper body)
-  const upper = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.72, h*0.22, Q), darkMat);
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.72, h*0.22, Q), engineMat);
   upper.position.y = h * 0.24; group.add(upper);
 
   // Turbopump exhaust pipe (small cylinder on side)

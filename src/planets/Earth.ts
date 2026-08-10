@@ -81,44 +81,36 @@ export class Earth extends Planet {
     super('earth', EARTH_MASS, position, velocity, 6.371e6 * 2);
 
     const visualR = this.visualRadius;
-    const SEG = 256;
+    const SEG = 320;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const posAttr = geom.attributes.position!;
-
-    // Compute terrain + vertex colors
     const vert = new THREE.Vector3();
     const colors: number[] = [];
-    const maxDisp = visualR * 0.025;
-    const oceanD = visualR * 0.006;
+    const maxDisp = visualR * 0.035;
+    const oceanD = visualR * 0.007;
 
-    for (let i = 0; i < posAttr.count; i++) {
-      vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR, ny = vert.y / visualR, nz = vert.z / visualR;
-      const height = this.terrainAt(nx, ny, nz, maxDisp, oceanD);
-      const t = Math.max(-1, Math.min(1, height / maxDisp));
-
-      let cr: number, cg: number, cb: number;
-      if (t < -0.5) { cr = 0.01; cg = 0.06; cb = 0.28; }
-      else if (t < -0.1) { cr = 0.03; cg = 0.12; cb = 0.42; }
-      else if (t < 0.02) { cr = 0.55; cg = 0.50; cb = 0.32; }
-      else if (t < 0.25) { cr = 0.15; cg = 0.38; cb = 0.10; }
-      else if (t < 0.55) { cr = 0.22; cg = 0.28; cb = 0.10; }
-      else if (t < 0.8) { cr = 0.38; cg = 0.33; cb = 0.22; }
-      else { cr = 0.88; cg = 0.85; cb = 0.82; }
-      colors.push(cr, cg, cb);
-    }
-    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-    // Apply displacement
+    // Single pass: compute height → displace → color
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
       const nx = vert.x / visualR, ny = vert.y / visualR, nz = vert.z / visualR;
       const h = this.terrainAt(nx, ny, nz, maxDisp, oceanD);
       vert.setLength(visualR + h);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);
+
+      const t = Math.max(-1, Math.min(1, h / maxDisp));
+      let cr: number, cg: number, cb: number;
+      if (t < -0.6) { cr = 0.005; cg = 0.04; cb = 0.22; }
+      else if (t < -0.15) { cr = 0.02; cg = 0.10; cb = 0.38; }
+      else if (t < 0.02) { cr = 0.50; cg = 0.46; cb = 0.28; }
+      else if (t < 0.22) { cr = 0.12; cg = 0.35; cb = 0.08; }
+      else if (t < 0.50) { cr = 0.18; cg = 0.25; cb = 0.08; }
+      else if (t < 0.78) { cr = 0.35; cg = 0.30; cb = 0.20; }
+      else { cr = 0.92; cg = 0.88; cb = 0.85; }
+      colors.push(cr, cg, cb);
     }
     posAttr.needsUpdate = true;
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geom.computeVertexNormals();
 
     const mat = new THREE.MeshStandardMaterial({
