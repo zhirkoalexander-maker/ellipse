@@ -40,7 +40,34 @@ export class HUD {
         if (this.onAction) this.onAction((e.target as HTMLElement).dataset.action!);
       });
     });
+
+    // Screen control buttons
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;pointer-events:auto;';
+    const addBtn = (label: string, action: string, color: string) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
+      b.addEventListener('click', () => { if (this.onAction) this.onAction(action); });
+      b.addEventListener('mousedown', () => { if (action === 'throttleUp') this._throttleBtn = true; if (action === 'throttleDown') this._throttleDn = true; });
+      b.addEventListener('mouseup', () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
+      return b;
+    };
+    bar.appendChild(addBtn('THR−', 'throttleDown', '#ff8844'));
+    bar.appendChild(addBtn('THR+', 'throttleUp', '#44ff88'));
+    bar.appendChild(addBtn('STAGE', 'stage', '#ffcc44'));
+    bar.appendChild(addBtn('MAP', 'map', '#4488ff'));
+    bar.appendChild(addBtn('SAS', 'sas', '#8888cc'));
+    bar.appendChild(addBtn('CHUTE', 'parachute', '#44cc88'));
+    this.root.appendChild(bar);
+    this._throttleBtn = false;
+    this._throttleDn = false;
   }
+
+  _throttleBtn = false;
+  _throttleDn = false;
+  get throttleUpBtn() { return this._throttleBtn; }
+  get throttleDownBtn() { return this._throttleDn; }
 
   mount(parent: HTMLElement = document.body): void {
     // Compact top-right panel
