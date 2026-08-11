@@ -887,7 +887,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }, { passive: false });
 
     this.achievements.unlock('first_launch');
-    toast.show('You are at the launchpad. W/S throttle, ↑↓ pitch, ←→ yaw, C camera, T SAS, Esc pause.');
+    toast.show('You are at the launchpad. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage, Esc pause.');
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1025,6 +1025,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
 
     this.controls.update(baseDt);
+    // Screen buttons throttle
+    if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
+    if (this.hud.throttleDownBtn) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
 
     // Camera zoom
     if (this.controls.getZoomIn()) this.chase.zoom(0.92);
@@ -1610,7 +1613,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v2.6<br>C=freecam F=reset T=SAS W=throttle`;
+        dbg.innerHTML = `v2.7<br>C=freecam F=reset T=SAS up/down=throttle`;
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,

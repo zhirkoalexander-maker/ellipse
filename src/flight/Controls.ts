@@ -17,7 +17,7 @@ export class Controls {
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
       if (e.key === 'Escape') this.pauseToggle = true;
-      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(e.key.toLowerCase())) {
+      if (['w','s','a','d','arrowup','arrowdown',' '].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
     };
@@ -38,32 +38,27 @@ export class Controls {
   }
 
   update(dt: number): void {
-    const up = this.touch?.getThrottleUp() || this.keys.has('w');
-    const down = this.touch?.getThrottleDown() || this.keys.has('s');
+    const up = this.touch?.getThrottleUp() || this.keys.has('arrowup');
+    const down = this.touch?.getThrottleDown() || this.keys.has('arrowdown');
     if (up) this.state.throttle = Math.min(1, this.state.throttle + dt * 0.5);
     if (down) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.3);
   }
 
   getPitch(): number {
     let v = 0;
-    if (this.keys.has('arrowup') || this.touch?.getPitch() === 1) v = 1;
-    if (this.keys.has('arrowdown') || this.touch?.getPitch() === -1) v = -1;
+    if (this.keys.has('w') || this.touch?.getPitch() === 1) v = 1;
+    if (this.keys.has('s') || this.touch?.getPitch() === -1) v = -1;
     return v;
   }
 
   getYaw(): number {
     let v = 0;
-    if (this.keys.has('arrowleft') || this.touch?.getYaw() === 1) v = 1;
-    if (this.keys.has('arrowright') || this.touch?.getYaw() === -1) v = -1;
+    if (this.keys.has('a') || this.touch?.getYaw() === 1) v = 1;
+    if (this.keys.has('d') || this.touch?.getYaw() === -1) v = -1;
     return v;
   }
 
-  getRoll(): number {
-    let v = 0;
-    if (this.keys.has('a') || this.touch?.getRoll() === 1) v = 1;
-    if (this.keys.has('d') || this.touch?.getRoll() === -1) v = -1;
-    return v;
-  }
+  getRoll(): number { return 0; }
 
   getZoomIn(): boolean { return this.keys.has('z'); }
   getZoomOut(): boolean { return this.keys.has('x'); }
