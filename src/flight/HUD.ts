@@ -22,6 +22,7 @@ export class HUD {
   private twrVal!: HTMLSpanElement;
   private twrFill!: HTMLDivElement;
   private sasModeEl!: HTMLSpanElement;
+  private dvVal!: HTMLSpanElement;
   private orbitAp!: HTMLSpanElement;
   private orbitPe!: HTMLSpanElement;
   private orbitTta!: HTMLSpanElement;
@@ -132,6 +133,10 @@ export class HUD {
         <span class="twr-val" style="color:#ff6644;font-size:10px;">0.0</span>
         <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="twr-fill" style="width:0%;height:100%;background:#ff6644;border-radius:2px;display:block;"></span></span></div>
       </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:rgba(244,245,242,0.5);">Δv</span>
+        <span class="dv-val" style="color:#88ccff;font-size:10px;">0 m/s</span>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
         <span style="color:rgba(244,245,242,0.5);">SAS</span>
         <span class="sas-mode" style="color:#8888cc;font-size:10px;">OFF</span>
@@ -156,6 +161,7 @@ export class HUD {
     this.twrVal = panel.querySelector('.twr-val')!;
     this.twrFill = panel.querySelector('.twr-fill')!;
     this.sasModeEl = panel.querySelector('.sas-mode')!;
+    this.dvVal = panel.querySelector('.dv-val')!;
 
     panel.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
@@ -268,6 +274,13 @@ setFreeCamera(active: boolean): void {
       mode === 'retrograde' ? '#ff8844' : '#8888cc';
     if (mode !== 'off') this.sasModeEl.classList.add('sas-active');
     else this.sasModeEl.classList.remove('sas-active');
+  }
+
+  setDeltaV(dv: number): void {
+    if (!this.dvVal) return;
+    if (dv >= 10000) this.dvVal.textContent = `${(dv / 1000).toFixed(1)} km/s`;
+    else this.dvVal.textContent = `${dv.toFixed(0)} m/s`;
+    this.dvVal.style.color = dv > 3000 ? '#44ff88' : dv > 1000 ? '#ffcc44' : '#ff6644';
   }
 
   setOrbit(o: {

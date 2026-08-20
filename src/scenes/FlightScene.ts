@@ -18,6 +18,7 @@ import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
+import { planTransfer } from '../physics/ManeuverPlanner';
 import { buildDeployedParachute } from '../parts/PartBuilder';
 import { totalGravityOn } from '../physics/Gravity';
 
@@ -395,6 +396,50 @@ export class FlightScene {
     mapUI.style.cssText = 'position:absolute;top:16px;left:16px;z-index:10;color:#EACD9E;font-family:monospace;font-size:12px;pointer-events:none;';
     mapUI.innerHTML = '<div id="map-zoom">ZOOM: 1x</div><div id="map-center">CENTER: ROCKET</div><div id="map-legend" style="margin-top:8px;font-size:10px;opacity:0.7;">SCROLL: zoom | DRAG: pan | M/TAB: close</div>';
     mapEl.appendChild(mapUI);
+
+    // Transfer planner panel (top-right of map)
+    const transferPanel = document.createElement('div');
+    transferPanel.style.cssText = 'position:absolute;top:16px;right:16px;z-index:10;background:rgba(8,10,24,0.85);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#88ccff;min-width:200px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;';
+    transferPanel.innerHTML = `
+      <div style="color:#c89838;font-size:10px;letter-spacing:0.1em;">TRANSFER PLANNER</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="color:#889;font-size:10px;">TARGET</span>
+        <select id="transfer-target" style="flex:1;background:#06080f;color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;padding:3px 6px;font:400 11px monospace;cursor:pointer;"></select>
+      </div>
+      <button id="transfer-compute" style="padding:6px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;letter-spacing:0.05em;">COMPUTE</button>
+      <div id="transfer-result" style="font-size:10px;color:#ddd;min-height:40px;line-height:1.5;"></div>
+    `;
+    mapEl.appendChild(transferPanel);
+    const targetSelect = transferPanel.querySelector('#transfer-target') as HTMLSelectElement;
+    const computeBtn = transferPanel.querySelector('#transfer-compute') as HTMLButtonElement;
+    const resultEl = transferPanel.querySelector('#transfer-result') as HTMLDivElement;
+    // Populate target list with planets (not sun, not current ref body)
+    const planetsForTransfer = this.system.bodies.filter(b => b.name !== 'sun' && b.mass > 0 && b.name !== 'moon');
+    targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
+
+    computeBtn.addEventListener('click', () => {
+      const targetName = targetSelect.value;
+      const sun = this.system.bodyByName('sun');
+      if (!sun) return;
+      // Use heliocentric state of rocket
+      const rx = this.state.position[0] - sun.position[0];
+      const ry = this.state.position[1] - sun.position[1];
+      const rz = this.state.position[2] - sun.position[2];
+      // Heliocentric velocity
+      const sunBody = sun as Body;
+      const sunVel = sunBody.velocity ?? [0, 0, 0];
+      const rvx = this.state.velocity[0] - sunVel[0];
+      const rvy = this.state.velocity[1] - sunVel[1];
+      const rvz = this.state.velocity[2] - sunVel[2];
+      const plan = planTransfer([rx, ry, rz], [rvx, rvy, rvz], this.system, targetName);
+      if (plan) {
+        resultEl.innerHTML = `<div style="color:${plan.direction === 'prograde' ? '#44ff88' : '#ff8844'};">→ ${plan.direction.toUpperCase()} burn</div><div style="color:#ddd;margin-top:3px;">Δv: <b>${plan.deltaV.toFixed(0)}</b> m/s</div><div style="color:#889;margin-top:2px;">~${(plan.transferTime/86400).toFixed(0)} days</div>`;
+        toast.show(plan.summary, 4000);
+      } else {
+        resultEl.textContent = 'Unable to compute';
+      }
+    });
+
     mapEl.appendChild(mapCanvas);
     document.body.appendChild(mapEl);
 
@@ -1813,6 +1858,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.hud.setTwr(twr);
     this.hud.setSasMode(this.sasMode);
+
+    // Delta-V budget: Tsiolkovsky Δv = Isp * g0 * ln(m0/m1)
+    const dvEng = findFirstEngine(this.state.rocket.assembly.roots);
+    const dvMass0 = this.state.rocket.totalMass();
+    const dvFuel = this.state.rocket.totalFuelMass();
+    const dvMass1 = dvMass0 - dvFuel;
+    let deltaV = 0;
+    if (dvEng && dvEng.isp && dvMass0 > 0 && dvMass1 > 0) {
+      deltaV = dvEng.isp * 9.80665 * Math.log(dvMass0 / dvMass1);
+    }
+    this.hud.setDeltaV(deltaV);
 
     this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle);
 
