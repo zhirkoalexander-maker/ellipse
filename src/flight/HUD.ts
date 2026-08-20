@@ -51,6 +51,7 @@ export class HUD {
 
     // Screen control buttons
     const bar = document.createElement('div');
+    bar.classList.add('hud-panel-in-bottom');
     bar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;pointer-events:auto;';
     const addBtn = (label: string, action: string, color: string) => {
       const b = document.createElement('button');
@@ -80,6 +81,7 @@ export class HUD {
   mount(parent: HTMLElement = document.body): void {
     // Compact top-right panel
     const panel = document.createElement('div');
+    panel.classList.add('hud-panel-in-left');
     panel.style.cssText = `
       position:fixed;top:16px;left:16px;z-index:100;pointer-events:auto;
       font-family:monospace;font-size:11px;
@@ -166,6 +168,7 @@ export class HUD {
 
     // Orbit info panel (top-right, below fuel)
     const orbitPanel = document.createElement('div');
+    orbitPanel.classList.add('hud-panel-in-right');
     orbitPanel.style.cssText = 'position:fixed;top:96px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:11px;background:rgba(8,10,24,0.8);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:8px 12px;color:#88ccff;min-width:140px;';
     orbitPanel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
@@ -194,6 +197,7 @@ export class HUD {
 
     // Navball (bottom-right)
     const navballContainer = document.createElement('div');
+    navballContainer.classList.add('hud-fade-up');
     navballContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:100;pointer-events:none;';
     const canvas = document.createElement('canvas');
     canvas.width = 150;
@@ -205,6 +209,7 @@ export class HUD {
     this.navballCtx = canvas.getContext('2d')!;
 
     const fuelRight = document.createElement('div');
+    fuelRight.classList.add('hud-panel-in-right');
     fuelRight.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:12px;background:rgba(8,10,24,0.8);border:1px solid rgba(200,152,56,0.2);border-radius:6px;padding:8px 12px;color:#ffaa44;';
     fuelRight.innerHTML = '<span style="color:rgba(244,245,242,0.5);">FUEL</span> <span class="fuel-r-kg">4500 kg</span><br><div style="width:80px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px;"><div class="fuel-r-bar" style="width:100%;height:100%;background:#ffaa44;border-radius:3px;"></div></div>';
     this.root.appendChild(fuelRight);

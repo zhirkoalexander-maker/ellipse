@@ -57,6 +57,7 @@ export class FlightScene {
   private timeWarp = 1;
   private parachuteDeployed = false;
   private deployedChuteMesh: THREE.Group | null = null;
+  private chuteDeployProgress = 0; // 0 = closed, 1 = fully open
   private crashed = false;
   private paused = false;
   private debris: Debris[] = [];
@@ -119,14 +120,19 @@ export class FlightScene {
       `;
       document.body.appendChild(this.countdownEl);
     }
+    // Restart pop animation on each new text
     this.countdownEl.textContent = text;
     this.countdownEl.style.opacity = '1';
+    this.countdownEl.classList.remove('countdown-pulse');
+    // Force reflow to restart the keyframe animation
+    void this.countdownEl.offsetWidth;
     if (text === 'LIFTOFF!') {
       this.countdownEl.style.color = '#FF8844';
       this.countdownEl.style.fontSize = '48px';
     } else {
       this.countdownEl.style.color = '#FFFFFF';
       this.countdownEl.style.fontSize = '72px';
+      this.countdownEl.classList.add('countdown-pulse');
     }
   }
 
@@ -507,6 +513,8 @@ if (sunPos) {
         ctx.strokeStyle = colors[b.name] + '30';
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 6]);
+        // Animated dash flow → orbit appears to "move"
+        ctx.lineDashOffset = -(mapFrame * 0.5) % 9;
         const firstX = cx + (predOrbit.points[0]![0] + sunPos[0]) * s;
         const firstY = cy - (predOrbit.points[0]![1] + sunPos[2]) * s;
         ctx.moveTo(firstX, firstY);
@@ -517,6 +525,7 @@ if (sunPos) {
         }
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
       }
     }
   }
@@ -675,9 +684,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
       const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
       if (prediction.points.length > 1) {
-        // Glow under line
+        // Glow under line — pulsing opacity for "live" feel
+        const pulse = 0.12 + 0.06 * (0.5 + 0.5 * Math.sin(mapFrame * 0.18));
         ctx.beginPath();
-        ctx.strokeStyle = prediction.bound ? 'rgba(68,136,204,0.15)' : 'rgba(221,170,68,0.15)';
+        ctx.strokeStyle = prediction.bound ? `rgba(68,136,204,${pulse})` : `rgba(221,170,68,${pulse})`;
         ctx.lineWidth = 8;
         const firstX = cx + prediction.points[0]![0] * s;
         const firstY = cy - prediction.points[0]![1] * s;
@@ -814,10 +824,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           if (this.parachuteDeployed) {
             const d = { radius: 0.6 * PART_SCALE, height: 1.0 * PART_SCALE };
             this.deployedChuteMesh = buildDeployedParachute(d);
+            this.deployedChuteMesh.scale.setScalar(0.001); // start collapsed
+            this.chuteDeployProgress = 0;
             this.sceneMgr.scene.add(this.deployedChuteMesh);
           } else if (this.deployedChuteMesh) {
             this.sceneMgr.scene.remove(this.deployedChuteMesh);
             this.deployedChuteMesh = null;
+            this.chuteDeployProgress = 0;
           }
           toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
         }
@@ -1210,7 +1223,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.engineFlame.update(baseDt);
     if (this.exhaustLight) {
-      this.exhaustLight.intensity = this.state.throttle * 3;
+      // Flicker: subtle noise on intensity for combustion realism
+      const flicker = 1 + (Math.random() - 0.5) * 0.18;
+      this.exhaustLight.intensity = this.state.throttle * 3 * flicker;
       this.exhaustLight.color.setHSL(0.08 - this.state.throttle * 0.05, 1, 0.5 + this.state.throttle * 0.3);
     }
 
@@ -1337,8 +1352,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
         if (reentryIntensity > 0.05 && this.reentryGlowMesh) {
           this.reentryGlowMesh.visible = true;
-          this.reentryGlowMesh.scale.setScalar(1 + reentryIntensity * 2);
-          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity);
+          // Plasma flicker: scale jitters at high intensity
+          const flicker = 1 + (Math.random() - 0.5) * 0.12 * reentryIntensity;
+          this.reentryGlowMesh.scale.setScalar((1 + reentryIntensity * 2) * flicker);
+          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity * (0.85 + Math.random() * 0.15));
           const tempColor = reentryIntensity > 0.8 ? 0xffffff : reentryIntensity > 0.5 ? 0xffcc44 : 0xff8844;
           (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).color.setHex(tempColor);
         } else if (this.reentryGlowMesh) {
@@ -1622,7 +1639,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v2.9';
+        dbg.textContent = 'ELLIPSE  v3.0';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -1640,6 +1657,18 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
         this.state.position[2] * VISUAL_SCALE + (upZv / upLenV) * visualOffset
       );
+
+      // Stage separation pulse: scale overshoot then settle
+      if (this.stagePulseTimer > 0) {
+        this.stagePulseTimer -= baseDt;
+        const t = 1 - Math.max(0, this.stagePulseTimer / 0.35); // 0→1
+        // back-out: bump up to ~1.04 then back to 1
+        const c1 = 1.70158, c3 = c1 + 1;
+        const bump = 1 + (c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)) * 0.04;
+        this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE * Math.max(1, bump));
+      } else if (this.rocketGroup.scale.x !== ROCKET_VISUAL_SCALE) {
+        this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
+      }
 
       if (this.cameraMode === 'free') {
         // Free camera: orbit around rocket - WASD keys + mouse/touch drag
@@ -1680,6 +1709,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           this.state.position[2] * VISUAL_SCALE
         );
         this.deployedChuteMesh.rotation.copy(this.rocketGroup.rotation);
+        // Animate deployment: ease-out with slight overshoot (back-out)
+        if (this.chuteDeployProgress < 1) {
+          this.chuteDeployProgress = Math.min(1, this.chuteDeployProgress + baseDt * 0.8);
+          const t = this.chuteDeployProgress;
+          // back-out easing: overshoot ~1.1 at t≈0.7, settle to 1
+          const c1 = 1.70158;
+          const c3 = c1 + 1;
+          const scale = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+          this.deployedChuteMesh.scale.setScalar(Math.max(0.001, scale));
+        }
       }
     }
 
@@ -1867,12 +1906,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.rocketGroup.position.z += shakeY;
     }
 
-    // Dynamic FOV based on speed (warp effect at high speeds)
+    // Dynamic FOV based on speed — subtle zoom-out at high speed for sense of motion
     const speedKms = speed / 1000;
-    // Fixed FOV for sharp rendering — no dynamic zoom
-    // const targetFov = 35 + Math.min(30, speedKms * 0.1);
-    // this.sceneMgr.camera.fov += (targetFov - this.sceneMgr.camera.fov) * baseDt * 2;
-    this.sceneMgr.camera.updateProjectionMatrix();
+    const targetFov = 45 + Math.min(15, speedKms * 0.08);
+    const curFov = this.sceneMgr.camera.fov;
+    const newFov = curFov + (targetFov - curFov) * baseDt * 1.5;
+    if (Math.abs(newFov - curFov) > 0.01) {
+      this.sceneMgr.camera.fov = newFov;
+      this.sceneMgr.camera.updateProjectionMatrix();
+    }
 
     // Dynamic sky color — smooth blue→black transition from surface to space
     const nearestAltSky = nearestAlt ?? 0;
@@ -2033,7 +2075,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.rocket.removeStage(decoupler);
     this.positionFlameAtNozzle();
     this.achievements.unlock('stage_separate');
+    // Visual feedback: brief white flash + rocket scale pulse
+    this.triggerStageFlash();
+    this.stagePulseTimer = 0.35;
     toast.show('Stage separated!');
+  }
+
+  private stagePulseTimer = 0;
+
+  private triggerStageFlash(): void {
+    const flash = document.createElement('div');
+    flash.className = 'stage-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 400);
   }
 
   private findLowestDecoupler(nodes: AssemblyNode[]): AssemblyNode | null {
@@ -2056,10 +2110,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (this.parachuteDeployed) {
         const d = { radius: 0.6 * PART_SCALE, height: 1.0 * PART_SCALE };
         this.deployedChuteMesh = buildDeployedParachute(d);
+        this.deployedChuteMesh.scale.setScalar(0.001); // start collapsed
+        this.chuteDeployProgress = 0;
         this.sceneMgr.scene.add(this.deployedChuteMesh);
       } else if (this.deployedChuteMesh) {
         this.sceneMgr.scene.remove(this.deployedChuteMesh);
         this.deployedChuteMesh = null;
+        this.chuteDeployProgress = 0;
       }
       toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
     }
