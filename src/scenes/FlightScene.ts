@@ -1202,9 +1202,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this._camSnapped = false; // reset camera snap on liftoff
       this.achievements.unlock('reach_space');
       this.sound.startEngine();
-      // Liftoff ignition flash + camera shake
-      this.triggerIgnitionFlash();
-      this.screenShake = 1.2;
+      // Brief camera shake on liftoff
+      this.screenShake = 0.8;
     }
 
     // Flame and sound always show when engine is active (even if thrust < weight)
@@ -1226,8 +1225,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.engineFlame.update(baseDt);
     if (this.exhaustLight) {
-      // Flicker: subtle noise on intensity for combustion realism
-      const flicker = 1 + (Math.random() - 0.5) * 0.18;
+      // Subtle combustion flicker
+      const flicker = 1 + (Math.random() - 0.5) * 0.08;
       this.exhaustLight.intensity = this.state.throttle * 3 * flicker;
       this.exhaustLight.color.setHSL(0.08 - this.state.throttle * 0.05, 1, 0.5 + this.state.throttle * 0.3);
     }
@@ -1355,10 +1354,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
         if (reentryIntensity > 0.05 && this.reentryGlowMesh) {
           this.reentryGlowMesh.visible = true;
-          // Plasma flicker: scale jitters at high intensity
-          const flicker = 1 + (Math.random() - 0.5) * 0.12 * reentryIntensity;
+          // Subtle plasma flicker
+          const flicker = 1 + (Math.random() - 0.5) * 0.06 * reentryIntensity;
           this.reentryGlowMesh.scale.setScalar((1 + reentryIntensity * 2) * flicker);
-          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity * (0.85 + Math.random() * 0.15));
+          (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, reentryIntensity * (0.92 + Math.random() * 0.08));
           const tempColor = reentryIntensity > 0.8 ? 0xffffff : reentryIntensity > 0.5 ? 0xffcc44 : 0xff8844;
           (this.reentryGlowMesh.material as THREE.MeshBasicMaterial).color.setHex(tempColor);
         } else if (this.reentryGlowMesh) {
@@ -1703,14 +1702,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         };
         this.chase.follow(this.state, baseDt, camUp, warpActive || !this._camSnapped, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
-        // Idle camera sway while on the pad (pre-launch) — gentle breathing
-        if (this.grounded && !this.launched) {
-          const t = this.missionTime;
-          const swayX = Math.sin(t * 0.6) * 0.04;
-          const swayY = Math.sin(t * 0.43 + 1.2) * 0.03;
-          this.sceneMgr.camera.position.x += swayX;
-          this.sceneMgr.camera.position.y += swayY;
-        }
       }
 
       if (this.deployedChuteMesh) {
@@ -1917,11 +1908,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.rocketGroup.position.z += shakeY;
     }
 
-    // Dynamic FOV based on speed — subtle zoom-out at high speed for sense of motion
+    // Dynamic FOV — subtle widen at very high speed only
     const speedKms = speed / 1000;
-    const targetFov = 45 + Math.min(15, speedKms * 0.08);
+    const targetFov = 45 + Math.min(8, Math.max(0, speedKms - 3) * 0.06);
     const curFov = this.sceneMgr.camera.fov;
-    const newFov = curFov + (targetFov - curFov) * baseDt * 1.5;
+    const newFov = curFov + (targetFov - curFov) * baseDt * 1.2;
     if (Math.abs(newFov - curFov) > 0.01) {
       this.sceneMgr.camera.fov = newFov;
       this.sceneMgr.camera.updateProjectionMatrix();
@@ -2098,16 +2089,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const flash = document.createElement('div');
     flash.className = 'stage-flash';
     document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 400);
-  }
-
-  private triggerIgnitionFlash(): void {
-    const flash = document.createElement('div');
-    flash.style.cssText = 'position:fixed;inset:0;z-index:400;background:radial-gradient(circle at 50% 70%, rgba(255,180,80,0.4), rgba(255,120,40,0.15) 40%, transparent 70%);pointer-events:none;opacity:0;transition:opacity 300ms ease-out;';
-    document.body.appendChild(flash);
-    requestAnimationFrame(() => { flash.style.opacity = '1'; });
-    setTimeout(() => { flash.style.opacity = '0'; }, 120);
-    setTimeout(() => flash.remove(), 480);
+    setTimeout(() => flash.remove(), 240);
   }
 
   private findLowestDecoupler(nodes: AssemblyNode[]): AssemblyNode | null {
