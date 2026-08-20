@@ -19,6 +19,14 @@ export class HUD {
   private navballCanvas!: HTMLCanvasElement;
   private navballCtx!: CanvasRenderingContext2D;
   private camModeEl!: HTMLDivElement;
+  private twrVal!: HTMLSpanElement;
+  private twrFill!: HTMLDivElement;
+  private sasModeEl!: HTMLSpanElement;
+  private orbitAp!: HTMLSpanElement;
+  private orbitPe!: HTMLSpanElement;
+  private orbitTta!: HTMLSpanElement;
+  private orbitEcc!: HTMLSpanElement;
+  private orbitPanel!: HTMLDivElement;
   onAction: ((action: string) => void) | null = null;
 
   constructor() {
@@ -116,10 +124,14 @@ export class HUD {
         <span style="font-size:9px;"><span class="throt-pct" style="color:#aaaacc;">0%</span></span>
         <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="throt-fill" style="width:0%;height:100%;background:#4488ff;border-radius:2px;display:block;"></span></span></div>
       </div>
-      <div style="display:flex;gap:4px;margin-top:4px;">
-        <button data-action="stage" style="flex:1;padding:3px 4px;font-size:9px;background:rgba(200,152,56,0.2);color:#c89838;border:1px solid rgba(200,152,56,0.3);border-radius:3px;cursor:pointer;">STAGE</button>
-        <button data-action="chute" style="flex:1;padding:3px 4px;font-size:9px;background:rgba(100,120,200,0.2);color:#88aacc;border:1px solid rgba(100,120,200,0.3);border-radius:3px;cursor:pointer;">CHUTE</button>
-        <button data-action="map" style="flex:1;padding:3px 4px;font-size:9px;background:rgba(100,200,100,0.2);color:#88cc88;border:1px solid rgba(100,200,100,0.3);border-radius:3px;cursor:pointer;">MAP</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:rgba(244,245,242,0.5);">TWR</span>
+        <span class="twr-val" style="color:#ff6644;font-size:10px;">0.0</span>
+        <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="twr-fill" style="width:0%;height:100%;background:#ff6644;border-radius:2px;display:block;"></span></span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+        <span style="color:rgba(244,245,242,0.5);">SAS</span>
+        <span class="sas-mode" style="color:#8888cc;font-size:10px;">OFF</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;">
         <span style="color:rgba(244,245,242,0.5);">WARP</span>
@@ -138,6 +150,9 @@ export class HUD {
     this.throttleFill = panel.querySelector('.throt-fill')!;
     this.throttlePct = panel.querySelector('.throt-pct')!;
     this.warpLabel = panel.querySelector('.warp-val')!;
+    this.twrVal = panel.querySelector('.twr-val')!;
+    this.twrFill = panel.querySelector('.twr-fill')!;
+    this.sasModeEl = panel.querySelector('.sas-mode')!;
 
     panel.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
@@ -148,6 +163,34 @@ export class HUD {
     this.camModeEl = document.createElement('div');
     this.camModeEl.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:100;color:rgba(200,152,56,0.5);font-size:9px;font-family:monospace;pointer-events:none;';
     this.root.appendChild(this.camModeEl);
+
+    // Orbit info panel (top-right, below fuel)
+    const orbitPanel = document.createElement('div');
+    orbitPanel.style.cssText = 'position:fixed;top:96px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:11px;background:rgba(8,10,24,0.8);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:8px 12px;color:#88ccff;min-width:140px;';
+    orbitPanel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+        <span style="color:rgba(244,245,242,0.5);font-size:9px;letter-spacing:0.1em;">ORBIT</span>
+        <span class="orbit-ecc" style="color:#88ccff;font-size:9px;">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:#ff8844;font-size:10px;">Ap</span>
+        <span class="orbit-ap" style="color:#ddd;">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:#44dd88;font-size:10px;">Pe</span>
+        <span class="orbit-pe" style="color:#ddd;">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="color:rgba(244,245,242,0.5);font-size:10px;">T→Ap</span>
+        <span class="orbit-tta" style="color:#ddd;">—</span>
+      </div>
+    `;
+    this.root.appendChild(orbitPanel);
+    this.orbitPanel = orbitPanel;
+    this.orbitAp = orbitPanel.querySelector('.orbit-ap')!;
+    this.orbitPe = orbitPanel.querySelector('.orbit-pe')!;
+    this.orbitTta = orbitPanel.querySelector('.orbit-tta')!;
+    this.orbitEcc = orbitPanel.querySelector('.orbit-ecc')!;
 
     // Navball (bottom-right)
     const navballContainer = document.createElement('div');
@@ -187,6 +230,59 @@ setFreeCamera(active: boolean): void {
 
   setWarp(value: number): void {
     if (this.warpLabel) this.warpLabel.textContent = `x${value}`;
+  }
+
+  setTwr(twr: number): void {
+    if (!this.twrVal) return;
+    this.twrVal.textContent = twr.toFixed(2);
+    this.twrVal.style.color = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
+    const pct = Math.min(100, (twr / 2) * 100);
+    this.twrFill.style.width = `${pct}%`;
+    this.twrFill.style.background = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
+  }
+
+  setSasMode(mode: 'off' | 'hold' | 'prograde' | 'retrograde'): void {
+    if (!this.sasModeEl) return;
+    const labels: Record<string, string> = {
+      off: 'OFF', hold: 'HOLD', prograde: 'PRO', retrograde: 'RET',
+    };
+    this.sasModeEl.textContent = labels[mode]!;
+    this.sasModeEl.style.color =
+      mode === 'off' ? '#666' :
+      mode === 'prograde' ? '#44ff88' :
+      mode === 'retrograde' ? '#ff8844' : '#8888cc';
+  }
+
+  setOrbit(o: {
+    apoapsis?: number; periapsis?: number;
+    timeToAp?: number; timeToPe?: number;
+    eccentricity?: number; period?: number; bound: boolean;
+  }): void {
+    if (!this.orbitPanel) return;
+    if (!o.bound || o.apoapsis === undefined || o.periapsis === undefined) {
+      this.orbitAp.textContent = '—';
+      this.orbitPe.textContent = '—';
+      this.orbitTta.textContent = '—';
+      this.orbitEcc.textContent = 'suborbital';
+      this.orbitPanel.style.borderColor = 'rgba(221,170,68,0.25)';
+      return;
+    }
+    const fmt = (m: number) => {
+      const km = m / 1000;
+      return km > 1000 ? `${(km/1000).toFixed(1)} Mm` : `${km.toFixed(0)} km`;
+    };
+    const fmtT = (s?: number) => {
+      if (s === undefined || !isFinite(s)) return '—';
+      if (s > 86400) return `${(s/86400).toFixed(1)} d`;
+      if (s > 3600) return `${(s/3600).toFixed(1)} h`;
+      if (s > 60) return `${(s/60).toFixed(0)} min`;
+      return `${s.toFixed(0)} s`;
+    };
+    this.orbitAp.textContent = fmt(o.apoapsis);
+    this.orbitPe.textContent = fmt(o.periapsis);
+    this.orbitTta.textContent = fmtT(o.timeToAp);
+    this.orbitEcc.textContent = o.eccentricity !== undefined ? `e=${o.eccentricity.toFixed(2)}` : '—';
+    this.orbitPanel.style.borderColor = 'rgba(68,136,204,0.4)';
   }
 
   setPaused(paused: boolean): void {
