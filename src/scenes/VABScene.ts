@@ -4,6 +4,8 @@ import { Assembly } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
 import { gltfCache } from '../parts/PartBuilder';
+import { saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
+import { toast } from '../ui/Toast';
 
 const PH: Record<string,number> = { S:0.7, M:1.1, L:1.6, XL:2.2 };
 
@@ -51,15 +53,28 @@ export class VABScene {
             <button id="vu" style="flex:1;padding:8px;background:transparent;color:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.05);font:400 10px system-ui;cursor:pointer;">UNDO</button>
             <button id="vc" style="flex:1;padding:8px;background:transparent;color:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.03);font:400 10px system-ui;cursor:pointer;">CLEAR</button>
           </div>
+          <div style="display:flex;gap:4px;">
+            <button id="vs" style="flex:1;padding:8px;background:rgba(200,152,56,0.08);color:#c89838;border:1px solid rgba(200,152,56,0.15);font:400 10px system-ui;cursor:pointer;">SAVE</button>
+            <button id="vlb" style="flex:1;padding:8px;background:rgba(68,136,204,0.08);color:#88ccff;border:1px solid rgba(68,136,204,0.15);font:400 10px system-ui;cursor:pointer;">LOAD</button>
+          </div>
           <button id="vb" style="width:100%;padding:8px;background:transparent;color:rgba(255,255,255,0.1);border:none;font:400 10px system-ui;cursor:pointer;">BACK</button>
         </div>
       </div>
       <div style="flex:1;"></div>`;
     this.info = this.root.querySelector('#vi')!;
     this.build();
-    this.root.querySelector('#vg')!.addEventListener('click', () => { if(this.assembly.roots.length) this.ol(this.assembly); });
+    this.root.querySelector('#vg')!.addEventListener('click', () => {
+      if(this.assembly.roots.length) {
+        saveLastAssembly(this.assembly);
+        this.ol(this.assembly);
+      } else {
+        toast.show('Add parts first!');
+      }
+    });
     this.root.querySelector('#vu')!.addEventListener('click', () => this.undo());
     this.root.querySelector('#vc')!.addEventListener('click', () => { this.assembly=new Assembly(); this.st=0; this.nm=[]; this.rf(); this.up(); });
+    this.root.querySelector('#vs')!.addEventListener('click', () => this.showSaveDialog());
+    this.root.querySelector('#vlb')!.addEventListener('click', () => this.showLoadDialog());
     this.root.querySelector('#vb')!.addEventListener('click', () => this.ob());
   }
 
@@ -114,4 +129,94 @@ export class VABScene {
   private cam(){const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
   mount(){document.body.appendChild(this.root);}
   unmount(){this.root.remove();}
+
+  private showSaveDialog(): void {
+    if (!this.assembly.roots.length) { toast.show('Nothing to save — build first!'); return; }
+    const overlay = this.makeOverlay();
+    const card = document.createElement('div');
+    card.className = 'guide-card';
+    card.style.cssText = 'max-width:380px;padding:24px;font-family:system-ui,sans-serif;color:#ddd;background:#0c1020;border:1px solid rgba(200,152,56,0.2);border-radius:8px;';
+    card.innerHTML = `
+      <div style="color:#c89838;font-size:14px;letter-spacing:0.1em;margin-bottom:12px;">SAVE ASSEMBLY</div>
+      <input id="save-name" placeholder="rocket name" style="width:100%;padding:10px;background:#06080f;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:#fff;font:400 13px monospace;box-sizing:border-box;margin-bottom:12px;" />
+      <div style="display:flex;gap:8px;">
+        <button id="save-ok" class="btn btn--primary" style="flex:1;padding:10px;font-size:12px;">SAVE</button>
+        <button id="save-cancel" class="btn btn--ghost" style="flex:1;padding:10px;font-size:12px;">CANCEL</button>
+      </div>`;
+    overlay.appendChild(card);
+    const input = card.querySelector('#save-name') as HTMLInputElement;
+    input.focus();
+    const close = () => overlay.remove();
+    card.querySelector('#save-cancel')!.addEventListener('click', close);
+    const doSave = () => {
+      const name = input.value.trim() || `Rocket ${new Date().toLocaleDateString()}`;
+      saveAssembly(name, this.assembly);
+      toast.show(`Saved: "${name}"`);
+      close();
+    };
+    card.querySelector('#save-ok')!.addEventListener('click', doSave);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') close(); });
+  }
+
+  private showLoadDialog(): void {
+    const names = listAssemblies().filter(n => n !== 'ellipse_assembly_last');
+    const overlay = this.makeOverlay();
+    const card = document.createElement('div');
+    card.className = 'guide-card';
+    card.style.cssText = 'max-width:380px;max-height:60vh;padding:24px;font-family:system-ui,sans-serif;color:#ddd;background:#0c1020;border:1px solid rgba(68,136,204,0.2);border-radius:8px;display:flex;flex-direction:column;';
+    card.innerHTML = `
+      <div style="color:#88ccff;font-size:14px;letter-spacing:0.1em;margin-bottom:12px;">LOAD ASSEMBLY</div>
+      <div id="load-list" style="flex:1;overflow-y:auto;margin-bottom:12px;"></div>
+      <button id="load-cancel" class="btn btn--ghost" style="padding:10px;font-size:12px;">CANCEL</button>`;
+    overlay.appendChild(card);
+    const list = card.querySelector('#load-list') as HTMLDivElement;
+    if (names.length === 0) {
+      list.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:20px;">No saved rockets yet</div>';
+    } else {
+      for (const name of names) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:4px;margin-bottom:4px;';
+        row.innerHTML = `<span style="font-size:12px;color:#ddd;">${name}</span>`;
+        const btns = document.createElement('div');
+        btns.style.cssText = 'display:flex;gap:4px;';
+        const loadBtn = document.createElement('button');
+        loadBtn.textContent = 'LOAD';
+        loadBtn.style.cssText = 'padding:4px 10px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;';
+        loadBtn.addEventListener('click', () => {
+          const a = loadAssembly(name);
+          if (a) {
+            this.assembly = a;
+            this.st = 0; this.nm = a.roots.map(r => r.part.name);
+            this.rf(); this.up();
+            toast.show(`Loaded: "${name}"`);
+            overlay.remove();
+          } else {
+            toast.show('Failed to load');
+          }
+        });
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✕';
+        delBtn.style.cssText = 'padding:4px 8px;background:rgba(255,68,68,0.1);color:#ff6666;border:1px solid rgba(255,68,68,0.2);border-radius:3px;font:600 10px system-ui;cursor:pointer;';
+        delBtn.addEventListener('click', () => {
+          deleteAssembly(name);
+          row.remove();
+          toast.show(`Deleted: "${name}"`);
+        });
+        btns.appendChild(loadBtn);
+        btns.appendChild(delBtn);
+        row.appendChild(btns);
+        list.appendChild(row);
+      }
+    }
+    card.querySelector('#load-cancel')!.addEventListener('click', () => overlay.remove());
+  }
+
+  private makeOverlay(): HTMLDivElement {
+    const overlay = document.createElement('div');
+    overlay.className = 'guide-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.8);';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    return overlay;
+  }
 }

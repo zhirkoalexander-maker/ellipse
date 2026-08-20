@@ -4,6 +4,7 @@ import { findPart } from '../parts/PartCatalog';
 
 const KEY_PREFIX = 'ellipse_assembly_';
 const INDEX_KEY = 'ellipse_assemblies';
+const LAST_KEY = 'ellipse_assembly_last';
 
 function serializeNode(n: AssemblyNode): any {
   return { partId: n.part.id, position: n.position, rotation: n.rotation, children: n.children.map(serializeNode) };
@@ -44,3 +45,24 @@ export function loadAssembly(name: string): Assembly | null {
 export function listAssemblies(): string[] {
   return JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
 }
+
+export function deleteAssembly(name: string): void {
+  localStorage.removeItem(KEY_PREFIX + name);
+  const idx = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
+  const next = idx.filter(n => n !== name);
+  localStorage.setItem(INDEX_KEY, JSON.stringify(next));
+}
+
+/** Persist the most recent build so "Continue" can resume it. */
+export function saveLastAssembly(assembly: Assembly): void {
+  saveAssembly(LAST_KEY, assembly);
+}
+
+export function loadLastAssembly(): Assembly | null {
+  return loadAssembly(LAST_KEY);
+}
+
+export function hasLastAssembly(): boolean {
+  return localStorage.getItem(KEY_PREFIX + LAST_KEY) !== null;
+}
+
