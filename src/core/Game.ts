@@ -24,6 +24,7 @@ import { toast } from '../ui/Toast';
 import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
+import { loadLastAssembly, hasLastAssembly } from '../storage/SaveLoad';
 import * as THREE from 'three';
 
 export class Game {
@@ -122,7 +123,12 @@ export class Game {
     this.transitionTo(() => {
       this.unmountCurrent();
       this.sceneMgr.scene.background = new THREE.Color(0x000000);
-      this.mainMenu = new MainMenuScene(() => this.showFlight(), () => this.showVab(), () => this.showSettings());
+      const onContinue = hasLastAssembly() ? () => {
+        const a = loadLastAssembly();
+        if (a) { const r = new Rocket(a); this.showFlight(r); }
+        else this.showFlight();
+      } : null;
+      this.mainMenu = new MainMenuScene(() => this.showFlight(), () => this.showVab(), () => this.showSettings(), onContinue ?? undefined);
       this.mainMenu.mount();
     });
   }
