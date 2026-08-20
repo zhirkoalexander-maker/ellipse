@@ -44,13 +44,12 @@ export class Stars {
           return smoothstep(size, 0.0, dist) * bright;
         }
 
-        // Twinkle: per-star phase + slow brightness modulation
+        // Twinkle: per-star phase + slow brightness modulation (subtle)
         float twinklingStar(vec2 uv, float density, float amp) {
           vec2 g = floor(uv * density);
           float h = hash(g);
-          // Phase unique per star; slow 0.5–2 Hz twinkle
           float phase = h * 6.2832;
-          float tw = 0.5 + 0.5 * sin(uTime * (0.6 + h * 1.4) + phase);
+          float tw = 0.5 + 0.5 * sin(uTime * (0.4 + h * 0.8) + phase);
           return star(uv, density) * (1.0 + (tw - 0.5) * amp);
         }
 
@@ -69,12 +68,12 @@ export class Stars {
           col += vec3(0.01, 0.04, 0.12) * neb2 * 0.08;
 
           // Dense dim stars (background) — gentle twinkle
-          float s1 = twinklingStar(vUv, 200.0, 0.25) * 0.6;
+          float s1 = twinklingStar(vUv, 200.0, 0.15) * 0.6;
           col += vec3(s1);
 
-          // Bright foreground stars — stronger twinkle
-          float s2 = twinklingStar(vUv, 60.0, 0.6) * 1.5;
-          float s3 = twinklingStar(vUv + vec2(13.7, 7.3), 40.0, 0.7) * 2.0;
+          // Bright foreground stars — moderate twinkle
+          float s2 = twinklingStar(vUv, 60.0, 0.35) * 1.5;
+          float s3 = twinklingStar(vUv + vec2(13.7, 7.3), 40.0, 0.4) * 2.0;
           col += vec3(s2 + s3);
 
           gl_FragColor = vec4(col, 1.0);
