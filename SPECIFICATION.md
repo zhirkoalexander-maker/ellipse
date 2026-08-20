@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v2.5)
+# Ellipse — Space Flight Simulator (v2.8)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -78,8 +78,13 @@ Staging required for orbit
 ## Saturn V
 - GLTF model, 30000 kg dry, 500000 kg fuel, 60000 kN thrust, Isp 310
 
-## Controls
-W/S throttle, ↑↓ pitch, ←→ yaw, Space stage, M map, C freecam, T SAS, Q/E warp, Esc pause, Mouse orbit/zoom
+## Controls (v2.8)
+↑/↓ Engine Power (throttle), W/S Pitch (tilt up/down), A/D Yaw (turn left/right), Space Stage Separation, M/Tab Map view, C Free Camera, F Reset Camera, T SAS (stability assist), [/] Time warp, P Deploy Parachute, Esc Pause/Menu, Mouse Orbit/Zoom
+
+### In-game Guide (v2.8)
+- 4-step build & launch walkthrough (VAB → stack capsule→tank→engine → optional decoupler/parachute/legs → FLIGHT)
+- Flight tips panel: TWR ≥ 1.0 gate, gravity turn east at ~10km, stage when empty, soft landing (<5 m/s, chute + legs)
+- Renamed control labels: "Throttle"→"Engine Power", "Stage"→"Stage Separation", "SAS toggle"→"SAS — Stability Assist", "Parachute"→"Deploy Parachute", "Map view"→"Map / orbit view", "Free/Reset camera"→"Free Camera"/"Reset Camera", "Time warp"→"Time Warp slower / faster"
 
 ## Scenes
 - **MainMenu** (v1.0 style): SVG ellipse logo, gold accent, FLIGHT/VEHICLE ASSEMBLY/SETTINGS/GUIDE buttons via CSS classes
