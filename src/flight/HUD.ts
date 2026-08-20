@@ -235,7 +235,13 @@ setFreeCamera(active: boolean): void {
   }
 
   setWarp(value: number): void {
-    if (this.warpLabel) this.warpLabel.textContent = `x${value}`;
+    if (this.warpLabel) {
+      this.warpLabel.textContent = `x${value}`;
+      // Brief pulse on change
+      this.warpLabel.classList.remove('warp-pulse');
+      void this.warpLabel.offsetWidth; // reflow to restart animation
+      this.warpLabel.classList.add('warp-pulse');
+    }
   }
 
   setTwr(twr: number): void {
@@ -245,6 +251,9 @@ setFreeCamera(active: boolean): void {
     const pct = Math.min(100, (twr / 2) * 100);
     this.twrFill.style.width = `${pct}%`;
     this.twrFill.style.background = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
+    // Pulse warning when insufficient thrust to lift off
+    if (twr > 0 && twr < 1.0) this.twrVal.classList.add('twr-warn');
+    else this.twrVal.classList.remove('twr-warn');
   }
 
   setSasMode(mode: 'off' | 'hold' | 'prograde' | 'retrograde'): void {
@@ -257,6 +266,8 @@ setFreeCamera(active: boolean): void {
       mode === 'off' ? '#666' :
       mode === 'prograde' ? '#44ff88' :
       mode === 'retrograde' ? '#ff8844' : '#8888cc';
+    if (mode !== 'off') this.sasModeEl.classList.add('sas-active');
+    else this.sasModeEl.classList.remove('sas-active');
   }
 
   setOrbit(o: {
