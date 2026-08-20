@@ -53,23 +53,29 @@ export class MainMenuScene {
     if (this.helpOverlay) { this.helpOverlay.remove(); this.helpOverlay = null; return; }
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,8,20,0.95);';
-    overlay.innerHTML = `<div style="max-width:520px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;">` +
-      `<h2 style="color:#c89838;font-size:20px;margin-bottom:12px;">HOW TO BUILD & LAUNCH</h2>` +
-      `<p style="font-size:13px;color:#889;margin-bottom:8px;">1. Click <b>VEHICLE ASSEMBLY</b> to build rocket</p>` +
-      `<p style="font-size:13px;color:#889;margin-bottom:8px;">2. Add capsule → tank → engine (bottom to top)</p>` +
-      `<p style="font-size:13px;color:#889;margin-bottom:16px;">3. Click <b>FLIGHT</b> — press <b>↑</b>, wait countdown</p>` +
-      `<h2 style="color:#c89838;font-size:20px;margin-bottom:8px;">CONTROLS</h2>` +
+    overlay.innerHTML = `<div style="max-width:560px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;">` +
+      `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 HOW TO BUILD & LAUNCH</h2>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">VEHICLE ASSEMBLY</b> — build your rocket</p>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack parts bottom→top: <b>capsule</b> → <b>fuel tank</b> → <b>engine</b></p>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">3. (optional) Add <b>decoupler</b> between stages, <b>parachute</b> + <b>legs</b> for landing</p>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Hit <b style="color:#c89838;">FLIGHT</b>, hold <b>↑</b> to spool engines, wait for countdown</p>` +
+      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">💡 FLIGHT TIPS</h2>` +
+      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>TWR ≥ 1.0</b> required to lift off — check the gauge on HUD</p>` +
+      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Tilt east (<b>A</b>) at ~10km to build horizontal speed for orbit</p>` +
+      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>Space</b> drops empty stages — watch the stage panel</p>` +
+      `<p style="font-size:12px;color:#889;margin-bottom:14px;">• Land slow (< 5 m/s). Deploy <b>parachute</b> in atmosphere, extend <b>legs</b></p>` +
+      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">⌨ ROCKET CONTROLS</h2>` +
       `<table style="width:100%;font-size:13px;border-collapse:collapse;">` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">↑/↓</td><td>Throttle</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">W/S</td><td>Pitch up/down</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">A/D</td><td>Yaw left/right</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">C</td><td>Free camera</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">F</td><td>Reset camera</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">T</td><td>SAS toggle</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Space</td><td>Stage</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">M/Tab</td><td>Map view</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">[/]</td><td>Time warp</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">P</td><td>Parachute</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">↑ / ↓</td><td>Engine Power (throttle)</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">W / S</td><td>Pitch — Tilt Up / Down</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">A / D</td><td>Yaw — Turn Left / Right</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Space</td><td>Stage Separation</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">T</td><td>SAS — Stability Assist</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">P</td><td>Deploy Parachute</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">M / Tab</td><td>Map / Orbit view</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">[ / ]</td><td>Time Warp slower / faster</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">C</td><td>Free Camera</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">F</td><td>Reset Camera</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">Mouse</td><td>Orbit / Zoom camera</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">Esc</td><td>Pause / Menu</td></tr>` +
       `</table><button class="btn btn--primary" style="margin-top:20px;width:100%;padding:12px;" id="help-close">CLOSE</button></div>`;
