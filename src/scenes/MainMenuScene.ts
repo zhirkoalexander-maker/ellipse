@@ -1,3 +1,6 @@
+import { MISSIONS } from '../core/MissionData';
+import type { Missions } from '../core/Missions';
+
 export class MainMenuScene {
   private root: HTMLDivElement;
   private helpOverlay: HTMLDivElement | null = null;
@@ -5,12 +8,16 @@ export class MainMenuScene {
   private onVab: () => void;
   private onSettings: () => void;
   private onContinue: (() => void) | null;
+  private missionsOverlay: HTMLDivElement | null = null;
+  private scoreEl!: HTMLDivElement;
+  private missions: Missions | null;
 
-  constructor(onPlay: () => void, onVab: () => void, onSettings: () => void, onContinue?: () => void) {
+  constructor(onPlay: () => void, onVab: () => void, onSettings: () => void, onContinue?: () => void, missions?: Missions) {
     this.onPlay = onPlay;
     this.onVab = onVab;
     this.onSettings = onSettings;
     this.onContinue = onContinue ?? null;
+    this.missions = missions ?? null;
 
     this.root = document.createElement('div');
     this.root.className = 'panel';
@@ -49,8 +56,65 @@ export class MainMenuScene {
     this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay));
     if (this.onContinue) this.root.appendChild(btn('CONTINUE', 'secondary', this.onContinue));
     this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab));
+    this.root.appendChild(btn('MISSIONS', 'ghost', () => this.toggleMissions()));
     this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
     this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
+
+    // Score badge (top-right)
+    if (this.missions) {
+      const score = document.createElement('div');
+      score.style.cssText = 'position:fixed;top:16px;right:16px;z-index:500;color:var(--accent-gold);font:600 12px/1 monospace;letter-spacing:0.1em;background:rgba(8,10,24,0.6);border:1px solid rgba(200,152,56,0.2);border-radius:12px;padding:6px 12px;pointer-events:none;';
+      score.textContent = `★ ${this.missions.totalScore}`;
+      this.root.appendChild(score);
+      this.scoreEl = score;
+      this.missions.onScore((s) => { if (this.scoreEl) this.scoreEl.textContent = `★ ${s}`; });
+    } else {
+      this.scoreEl = document.createElement('div');
+    }
+  }
+
+  private toggleMissions(): void {
+    if (this.missionsOverlay) { this.missionsOverlay.remove(); this.missionsOverlay = null; return; }
+    if (!this.missions) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'guide-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.9);';
+    const card = document.createElement('div');
+    card.className = 'guide-card';
+    card.style.cssText = 'max-width:520px;max-height:80vh;overflow-y:auto;padding:28px;font-family:system-ui,sans-serif;color:#ddd;background:#0c1020;border:1px solid rgba(200,152,56,0.2);border-radius:8px;';
+    const completed = new Set(this.missions.getCompleted());
+    let totalReward = 0, earnedReward = 0;
+    for (const m of MISSIONS) totalReward += m.reward;
+    for (const m of MISSIONS) if (completed.has(m.id)) earnedReward += m.reward;
+    card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;">
+        <div style="color:#c89838;font-size:18px;letter-spacing:0.05em;">★ MISSIONS</div>
+        <div style="color:#c89838;font-size:12px;">${earnedReward} / ${totalReward} pts</div>
+      </div>`;
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+    for (const m of MISSIONS) {
+      const done = completed.has(m.id);
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:4px;background:${done ? 'rgba(124,255,178,0.06)' : 'rgba(255,255,255,0.02)'};border-left:3px solid ${done ? '#7CFFB2' : '#3A4055'};`;
+      row.innerHTML = `
+        <div>
+          <div style="font-size:13px;color:${done ? '#7CFFB2' : '#ddd'};font-weight:600;">${done ? '☑' : '☐'} ${m.name}</div>
+          <div style="font-size:11px;color:#889;margin-top:2px;">${m.description}</div>
+        </div>
+        <div style="color:${done ? '#7CFFB2' : '#c89838'};font-size:12px;font-weight:600;white-space:nowrap;">+${m.reward}</div>`;
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+    const close = document.createElement('button');
+    close.className = 'btn btn--primary';
+    close.style.cssText = 'margin-top:18px;width:100%;padding:10px;font-size:12px;';
+    close.textContent = 'CLOSE';
+    close.addEventListener('click', () => { overlay.remove(); this.missionsOverlay = null; });
+    card.appendChild(close);
+    overlay.appendChild(card);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); this.missionsOverlay = null; } });
+    document.body.appendChild(overlay);
+    this.missionsOverlay = overlay;
   }
 
   private toggleHelp(): void {
