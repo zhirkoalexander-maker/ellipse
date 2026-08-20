@@ -110,6 +110,22 @@ export class VABScene {
     const ng=this.assembly.roots.some(n=>n.part.kind==='gltf'&&n.part.gltfUrl&&!gltfCache.has(n.part.gltfUrl));
     if(ng){const{loadGLTF}=await import('../parts/PartBuilder');for(const r of this.assembly.roots)if(r.part.kind==='gltf'&&r.part.gltfUrl&&!gltfCache.has(r.part.gltfUrl))await loadGLTF(r.part.gltfUrl,r.part.gltfScale??1);}
     this.rg.add(this.assembly.toMesh());
+    // Animate the last-added part dropping in
+    const last = this.rg.children[this.rg.children.length - 1] as THREE.Object3D | undefined;
+    if (last) {
+      const targetScale = last.scale.x;
+      last.scale.setScalar(0.001);
+      const start = performance.now();
+      const tween = () => {
+        const t = Math.min(1, (performance.now() - start) / 360);
+        const c1 = 1.70158, c3 = c1 + 1;
+        const s = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        last.scale.setScalar(Math.max(0.001, targetScale * s));
+        if (t < 1) requestAnimationFrame(tween);
+        else last.scale.setScalar(targetScale);
+      };
+      requestAnimationFrame(tween);
+    }
   }
   private cam(){const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
   mount(){document.body.appendChild(this.root);}
