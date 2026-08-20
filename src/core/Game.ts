@@ -20,6 +20,7 @@ import { Assembly } from '../rocket/Assembly';
 import { findPart } from '../parts/PartCatalog';
 import { Achievements } from './Achievements';
 import { ACHIEVEMENTS } from './AchievementData';
+import { Missions } from './Missions';
 import { toast } from '../ui/Toast';
 import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
@@ -32,6 +33,7 @@ export class Game {
   sceneMgr: SceneManager;
   system: System;
   achievements: Achievements;
+  missions: Missions;
   private mainMenu?: MainMenuScene;
   private vab?: VABScene;
   private flight?: FlightScene;
@@ -41,6 +43,7 @@ export class Game {
     this.renderer = new Renderer();
     this.sceneMgr = new SceneManager();
     this.achievements = new Achievements();
+    this.missions = new Missions();
 
     this.system = new System();
     const sunMass = 2e26;
@@ -128,7 +131,7 @@ export class Game {
         if (a) { const r = new Rocket(a); this.showFlight(r); }
         else this.showFlight();
       } : null;
-      this.mainMenu = new MainMenuScene(() => this.showFlight(), () => this.showVab(), () => this.showSettings(), onContinue ?? undefined);
+      this.mainMenu = new MainMenuScene(() => this.showFlight(), () => this.showVab(), () => this.showSettings(), onContinue ?? undefined, this.missions);
       this.mainMenu.mount();
     });
   }
@@ -173,7 +176,7 @@ export class Game {
         a.addRoot({ part: findPart('engine_mammoth')!, position: [0, s1engY, 0], rotation: 0, children: [] });
       }
       const r = new Rocket(a);
-      this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements);
+      this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions);
       this.flight.onCrashAction = (action) => { if (action === 'menu') this.showMainMenu(); else this.showFlight(rocket); };
     });
   }
