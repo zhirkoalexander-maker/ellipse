@@ -134,32 +134,35 @@ export class TouchControls {
     const [throttleUpBtn, throttleUpWrap] = btnStyle('THR+', 70, 44);
     const [throttleDownBtn, throttleDownWrap] = btnStyle('THR-', 70, 44);
     const [stageBtn, stageWrap] = btnStyle('STAGE', 70, 44);
-    const [rollLeftBtn, rollLeftWrap] = btnStyle('R-', 60, 44);
-    const [rollRightBtn, rollRightWrap] = btnStyle('R+', 60, 44);
+    const [sasBtn, sasWrap] = btnStyle('SAS', 60, 44);
+    const [chuteBtn, chuteWrap] = btnStyle('CHUTE', 60, 44);
 
-    const pressKey = (key: string, btn: HTMLButtonElement) => {
-      this.keys.add(key);
-      btn.style.background = 'rgba(255,255,255,0.3)';
+    this._sasAction = null;
+    this._chuteAction = null;
+
+    const setupHold = (btn: HTMLButtonElement, key: string) => {
+      const press = () => { this.keys.add(key); btn.style.background = 'rgba(255,255,255,0.3)'; };
+      const release = () => { this.keys.delete(key); btn.style.background = 'rgba(255,255,255,0.1)'; };
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); press(); }, { passive: false });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); release(); }, { passive: false });
+      btn.addEventListener('touchcancel', release);
+      btn.addEventListener('mousedown', press);
+      btn.addEventListener('mouseup', release);
+      btn.addEventListener('mouseleave', release);
     };
 
-    const releaseKey = (key: string, btn: HTMLButtonElement) => {
-      this.keys.delete(key);
-      btn.style.background = 'rgba(255,255,255,0.1)';
+    setupHold(throttleUpBtn, 'w');
+    setupHold(throttleDownBtn, 's');
+
+    const tap = (btn: HTMLButtonElement, fn: () => void) => {
+      const fire = () => { btn.style.background = 'rgba(255,255,255,0.3)';
+        setTimeout(() => btn.style.background = 'rgba(255,255,255,0.1)', 120); fn(); };
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); fire(); }, { passive: false });
+      btn.addEventListener('mousedown', fire);
     };
 
-    const setupBtn = (btn: HTMLButtonElement, key: string) => {
-      btn.addEventListener('touchstart', (e) => { e.preventDefault(); pressKey(key, btn); }, { passive: false });
-      btn.addEventListener('touchend', (e) => { e.preventDefault(); releaseKey(key, btn); }, { passive: false });
-      btn.addEventListener('touchcancel', () => releaseKey(key, btn));
-      btn.addEventListener('mousedown', () => pressKey(key, btn));
-      btn.addEventListener('mouseup', () => releaseKey(key, btn));
-      btn.addEventListener('mouseleave', () => releaseKey(key, btn));
-    };
-
-    setupBtn(throttleUpBtn, 'w');
-    setupBtn(throttleDownBtn, 's');
-    setupBtn(rollLeftBtn, 'a');
-    setupBtn(rollRightBtn, 'd');
+    tap(sasBtn, () => { if (this._sasAction) this._sasAction(); });
+    tap(chuteBtn, () => { if (this._chuteAction) this._chuteAction(); });
 
     stageBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.stagePressed = true; }, { passive: false });
     stageBtn.addEventListener('mousedown', () => { this.stagePressed = true; });
@@ -173,12 +176,17 @@ export class TouchControls {
     const row2 = document.createElement('div');
     row2.style.cssText = 'display:flex; gap:8px;';
     row2.appendChild(throttleDownWrap);
-    row2.appendChild(rollLeftWrap);
-    row2.appendChild(rollRightWrap);
+    row2.appendChild(sasWrap);
+    row2.appendChild(chuteWrap);
     right.appendChild(row2);
 
     c.appendChild(right);
   }
+
+  _sasAction: (() => void) | null = null;
+  _chuteAction: (() => void) | null = null;
+  onSasAction(fn: () => void) { this._sasAction = fn; }
+  onChuteAction(fn: () => void) { this._chuteAction = fn; }
 
   private updateStick(stick: HTMLElement, center: { x: number; y: number }, pos: { x: number; y: number }): void {
     const dx = pos.x - center.x;

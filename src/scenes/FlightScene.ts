@@ -335,6 +335,11 @@ export class FlightScene {
     // Auto-detect touch device
     if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       this.controls.enableTouch();
+      // Wire mobile SAS/CHUTE buttons
+      if (this.controls.touch) {
+        this.controls.touch.onSasAction(() => this.cycleSasMode());
+        this.controls.touch.onChuteAction(() => this.toggleParachute());
+      }
     }
 
     this.sound = new SoundManager();
@@ -343,6 +348,7 @@ export class FlightScene {
     this.hud.onAction = (action) => {
       if (action === 'stage') this.performStage();
       else if (action === 'parachute') this.toggleParachute();
+      else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') {
         mapActive = !mapActive;
         mapEl.style.display = mapActive ? 'block' : 'none';
@@ -818,6 +824,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         e.preventDefault();
       } else if (e.key === 'g') {
         this.toggleGear();
+        e.preventDefault();
+      } else if (e.key === 't') {
+        this.cycleSasMode();
         e.preventDefault();
       } else if (e.key === 'f') {
         this.chase.reset();
@@ -1611,9 +1620,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (!this._debugShown) {
         this._debugShown = true;
         const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;top:120px;right:16px;z-index:600;font-family:monospace;font-size:11px;color:#0f0;background:rgba(0,0,0,0.85);padding:8px;border-radius:4px;pointer-events:none;max-width:300px;';
+        dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.innerHTML = `v2.8<br>↑↓=throttle W/S=pitch A/D=yaw C=freecam F=reset T=SAS`;
+        dbg.textContent = 'ELLIPSE  v2.9';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -1740,7 +1749,37 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const activeStage = this.stageInfo.filter(s => s.active).length > 0
       ? this.stageInfo.findIndex(s => s.active) + 1
       : 1;
+
+    // Live TWR: thrust*throttle / (mass * local_g)
+    let twr = 0;
+    const twrRefBody = getReferenceBody(this.state.position, this.system);
+    if (twrRefBody && (twrRefBody as any).mass > 0) {
+      const tgdx = this.state.position[0] - twrRefBody.position[0];
+      const tgdy = this.state.position[1] - twrRefBody.position[1];
+      const tgdz = this.state.position[2] - twrRefBody.position[2];
+      const tgr = Math.sqrt(tgdx*tgdx + tgdy*tgdy + tgdz*tgdz) || 1;
+      const localG = (G * (twrRefBody as any).mass) / (tgr * tgr);
+      const eng = findFirstEngine(this.state.rocket.assembly.roots);
+      const mass = this.state.rocket.totalMass();
+      if (eng && eng.thrust && localG > 0 && mass > 0) {
+        twr = (eng.thrust * 1000 * this.state.throttle) / (mass * localG);
+      }
+    }
+    this.hud.setTwr(twr);
+    this.hud.setSasMode(this.sasMode);
+
     this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle);
+
+    // Orbit info → HUD
+    this.hud.setOrbit({
+      apoapsis: ape,
+      periapsis: pe,
+      timeToAp,
+      timeToPe,
+      eccentricity,
+      period,
+      bound: ape !== undefined && pe !== undefined,
+    });
 
     // Draw 3D orbit path
     const refBodyOrbit = getReferenceBody(this.state.position, this.system);
@@ -2024,6 +2063,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
     }
+  }
+
+  private cycleSasMode(): void {
+    const order: Array<'off' | 'hold' | 'prograde' | 'retrograde'> =
+      ['off', 'hold', 'prograde', 'retrograde'];
+    const idx = order.indexOf(this.sasMode);
+    this.sasMode = order[(idx + 1) % order.length]!;
+    if (this.sasMode === 'hold') {
+      this.sasTargetQuat.copy(this.rocketQuat);
+    }
+    const labels: Record<string, string> = {
+      off: 'SAS: OFF',
+      hold: 'SAS: HOLD attitude',
+      prograde: 'SAS: PROGRADE',
+      retrograde: 'SAS: RETROGRADE',
+    };
+    toast.show(labels[this.sasMode]!);
+    this.hud.setSasMode(this.sasMode);
   }
 
   private toggleGear(): void {
