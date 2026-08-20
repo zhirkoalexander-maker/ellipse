@@ -7,6 +7,7 @@ import { Body } from '../physics/Body';
 import type { Rocket } from '../rocket/Rocket';
 import type { AssemblyNode } from '../rocket/Assembly';
 import type { Achievements } from '../core/Achievements';
+import type { Missions } from '../core/Missions';
 import { FlightState } from '../flight/FlightState';
 import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
@@ -35,6 +36,7 @@ export class FlightScene {
   private sceneMgr: SceneManager;
   private system: System;
   private achievements: Achievements;
+  private missions: Missions;
   private state: FlightState;
   private rocket: Rocket;
   private rocketGroup: THREE.Group;
@@ -149,11 +151,13 @@ export class FlightScene {
   onCrashAction: ((action: 'menu' | 'restart') => void) | null = null;
 
 
-  constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements) {
+  constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements, missions: Missions) {
     this.renderer = renderer;
     this.sceneMgr = sceneMgr;
     this.system = system;
     this.achievements = achievements;
+    this.missions = missions;
+    this.missions.resetFlight();
     this.rocket = rocket;
 
     const earth = system.bodyByName('earth')!;
@@ -1471,6 +1475,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
               else if (bodyName === 'mars') this.achievements.unlock('land_mars');
               else if (bodyName === 'venus') this.achievements.unlock('land_venus');
               else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
+              this.missions.recordLanding(bodyName);
             }
           } else if (isFinite(vertSpeed)) {
             this.state.velocity = [0, 0, 0];
@@ -1822,6 +1827,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       bound: ape !== undefined && pe !== undefined,
     });
 
+    // Evaluate missions against current flight state
+    const orbitRefBodyForMission = getReferenceBody(this.state.position, this.system);
+    this.missions.evaluate({
+      launched: this.launched,
+      altitude: nearestAlt,
+      maxAltitude: this.maxAlt,
+      speed,
+      maxSpeed: this.maxSpeed,
+      grounded: this.grounded,
+      nearestBody: nearRef.name,
+      refBody: orbitRefBodyForMission.name,
+      bound: ape !== undefined && pe !== undefined,
+      apoapsis: ape ?? -1,
+      periapsis: pe ?? -1,
+      stageSeparations: 0,
+      softLanded: false,
+    });
+
     // Draw 3D orbit path
     const refBodyOrbit = getReferenceBody(this.state.position, this.system);
     const relPosOrbit: [number, number, number] = [
@@ -2077,6 +2100,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.rocket.removeStage(decoupler);
     this.positionFlameAtNozzle();
     this.achievements.unlock('stage_separate');
+    this.missions.recordStageSeparation();
     // Visual feedback: brief white flash + rocket scale pulse
     this.triggerStageFlash();
     this.stagePulseTimer = 0.35;
