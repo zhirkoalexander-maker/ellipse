@@ -1691,7 +1691,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v3.0';
+        dbg.textContent = 'ELLIPSE  v3.5';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
