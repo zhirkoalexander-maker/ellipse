@@ -34,7 +34,7 @@ export class HUD {
     this.root.style.cssText = 'position:fixed;inset:0;z-index:100;pointer-events:none;';
 
     this.pauseOverlay = document.createElement('div');
-    this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(6,8,20,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;';
+    this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(6,8,20,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;opacity:0;transition:opacity 220ms ease-out;';
     this.pauseOverlay.innerHTML = `
       <div style="width:280px;display:flex;flex-direction:column;gap:8px;align-items:center;">
         <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:center;">▶ RESUME</button>
@@ -55,6 +55,7 @@ export class HUD {
     bar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;pointer-events:auto;';
     const addBtn = (label: string, action: string, color: string) => {
       const b = document.createElement('button');
+      b.className = 'hud-ctrl-btn';
       b.textContent = label;
       b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
       b.addEventListener('click', () => { if (this.onAction) this.onAction(action); });
@@ -291,7 +292,13 @@ setFreeCamera(active: boolean): void {
   }
 
   setPaused(paused: boolean): void {
-    this.pauseOverlay.style.display = paused ? 'flex' : 'none';
+    if (paused) {
+      this.pauseOverlay.style.display = 'flex';
+      requestAnimationFrame(() => { this.pauseOverlay.style.opacity = '1'; });
+    } else {
+      this.pauseOverlay.style.opacity = '0';
+      setTimeout(() => { if (!paused) this.pauseOverlay.style.display = 'none'; }, 230);
+    }
   }
 
   setThrottle(throttle: number): void {

@@ -104,8 +104,13 @@ Staging required for orbit
 - **Parachute**: deploy scale-in from 0 with back-out overshoot over ~1.25s
 - **Engine exhaust light**: combustion flicker (±9% noise)
 - **Reentry plasma**: scale + opacity flicker proportional to intensity
-- **Map orbit trails**: animated dash flow (lineDashOffset) + pulsing trajectory glow
+- **Map view**: fade in/out (220ms); animated dash flow on orbit trails (lineDashOffset) + pulsing trajectory glow
+- **Pause overlay**: fade in/out
+- **Crash overlay**: fade in + shake on "CRASH!" text
 - **Achievements**: slide-in card from right with pop + glow, auto-dismiss after 3.2s
+- **VAB part add**: back-out scale drop-in of the newly added part
+- **Bottom control bar**: button press scale feedback
+- **Dynamic FOV**: FOV widens slightly at high speed for sense of motion
 
 ### In-game Guide (v3.0)
 - 4-step build & launch walkthrough (VAB → stack capsule→tank→engine → optional decoupler/parachute/legs → FLIGHT)

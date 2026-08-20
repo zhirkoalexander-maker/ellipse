@@ -357,8 +357,8 @@ export class FlightScene {
       else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') {
         mapActive = !mapActive;
-        mapEl.style.display = mapActive ? 'block' : 'none';
-        if (mapActive) requestAnimationFrame(drawMap);
+        if (mapActive) { mapEl.style.display = 'block'; requestAnimationFrame(() => { mapEl.style.opacity = '1'; }); requestAnimationFrame(drawMap); }
+        else { mapEl.style.opacity = '0'; setTimeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
       }
       else if (action === 'resume') {
         this.paused = false;
@@ -380,7 +380,7 @@ export class FlightScene {
     let mapDragStart: { x: number; y: number } | null = null;
 
     const mapEl = document.createElement('div');
-    mapEl.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(6,8,20,0.95);display:none;';
+    mapEl.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(6,8,20,0.95);display:none;opacity:0;transition:opacity 220ms ease-out;';
     const mapCanvas = document.createElement('canvas');
     mapCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
     mapEl.appendChild(mapCanvas);
@@ -797,8 +797,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'm' || e.key === 'Tab') {
         mapActive = !mapActive;
-        mapEl.style.display = mapActive ? 'block' : 'none';
-        if (mapActive) requestAnimationFrame(drawMap);
+        if (mapActive) { mapEl.style.display = 'block'; requestAnimationFrame(() => { mapEl.style.opacity = '1'; }); if (mapActive) requestAnimationFrame(drawMap); }
+        else { mapEl.style.opacity = '0'; setTimeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
         e.preventDefault();
       }
     });
@@ -2197,17 +2197,21 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       background:rgba(0,0,0,0.7);z-index:9999;
       font-family:system-ui,sans-serif;color:#ff0;
+      opacity:0;transition:opacity 360ms ease-out;
     `;
     overlay.innerHTML = `
-      <div style="font-size:48px;font-weight:bold;color:#ff4444;margin-bottom:8px;">CRASH!</div>
-      <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
+      <div class="crash-shake" style="text-align:center;">
+        <div style="font-size:48px;font-weight:bold;color:#ff4444;margin-bottom:8px;text-shadow:0 0 24px rgba(255,68,68,0.6);">CRASH!</div>
+        <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
+      </div>
       <div style="display:flex;gap:16px;">
-        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#ff0;cursor:pointer;">MENU</button>
-        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#ff0;cursor:pointer;">LAUNCH AGAIN</button>
+        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#ff0;cursor:pointer;transition:all 0.15s;">MENU</button>
+        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#ff0;cursor:pointer;transition:all 0.15s;">LAUNCH AGAIN</button>
       </div>
     `;
     document.body.appendChild(overlay);
     this.crashOverlay = overlay;
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
 
     overlay.querySelector('#crash-menu')!.addEventListener('click', () => {
       this.onCrashAction?.('menu');
