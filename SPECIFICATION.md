@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v2.9)
+# Ellipse — Space Flight Simulator (v3.0)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -18,7 +18,7 @@ ROCKET_VISUAL_SCALE = 60
 EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ```
 
-## Physics (v2.9)
+## Physics (v3.0)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
 - **Realistic rocket equation**: mass flow = thrust / (Isp * G0)
@@ -79,23 +79,40 @@ Staging required for orbit
 ## Saturn V
 - GLTF model, 30000 kg dry, 500000 kg fuel, 60000 kN thrust, Isp 310
 
-## Controls (v2.9)
+## Controls (v3.0)
 ↑/↓ Engine Power (throttle), W/S Pitch (tilt up/down), A/D Yaw (turn left/right), Space Stage Separation, M/Tab Map view, C Free Camera, F Reset Camera, T SAS (cycle OFF/HOLD/PROGRADE/RETROGRADE), [/] Time warp, P Deploy Parachute, G Gear, Esc Pause/Menu, Mouse Orbit/Zoom, F1 Toggle HUD
 
-### HUD (v2.9)
+### HUD (v3.0)
 - **Telemetry panel** (top-left): SPD, ALT, V/S, FUEL, MASS, HEAT, THR, **TWR** (live, color-coded green≥1.0), **SAS mode**, WARP
 - **Fuel panel** (top-right): current/total fuel + bar
 - **Orbit panel** (top-right, below fuel): Ap, Pe, T→Ap, eccentricity; "suborbital" when not bound
 - **Navball** (bottom-right): prograde/retrograde markers, up/down, planet markers
 - **Control bar** (bottom-center): THR−/THR+/STAGE/MAP/SAS/CHUTE screen buttons
-- **Version badge** (top-center): minimal ELLIPSE v2.9 pill
+- **Version badge** (top-center): minimal ELLIPSE v3.0 pill
+- **Dynamic FOV** (v3.0): FOV widens slightly at high speed for sense of motion
 
-### In-game Guide (v2.9)
+### Animations (v3.0)
+- **Starfield**: per-star twinkle (shader uTime) + drifting nebula bands
+- **Toast**: pop-in (back-out) + slide-out; vertical stack container
+- **Main menu**: logo + buttons stagger rise-in; ellipse rings continuous drift; title glow pulse
+- **Guide overlay**: fade + card rise-in
+- **HUD panels**: slide-in from edges on flight start (left/right/bottom/fade-up)
+- **Scene transitions**: fade-to-black overlay between MainMenu/VAB/Flight (280ms in, swap, 320ms out)
+- **Loading screen**: animated spinner + model preload progress (shown during GLTF preload)
+- **Countdown**: scale-pop on each 3/2/1 number
+- **Stage separation**: white flash overlay + rocket scale pulse (back-out overshoot)
+- **Parachute**: deploy scale-in from 0 with back-out overshoot over ~1.25s
+- **Engine exhaust light**: combustion flicker (±9% noise)
+- **Reentry plasma**: scale + opacity flicker proportional to intensity
+- **Map orbit trails**: animated dash flow (lineDashOffset) + pulsing trajectory glow
+- **Achievements**: slide-in card from right with pop + glow, auto-dismiss after 3.2s
+
+### In-game Guide (v3.0)
 - 4-step build & launch walkthrough (VAB → stack capsule→tank→engine → optional decoupler/parachute/legs → FLIGHT)
 - Flight tips panel: TWR ≥ 1.0 gate, gravity turn east at ~10km, ORBIT panel reading, SAS usage, staging, soft landing (<5 m/s, chute + legs)
 - Renamed control labels: "Throttle"→"Engine Power", "Stage"→"Stage Separation", "SAS toggle"→"SAS — cycle OFF/HOLD/PROGRADE/RETROGRADE", "Parachute"→"Deploy Parachute", "Map view"→"Map / orbit view", "Free/Reset camera"→"Free Camera"/"Reset Camera", "Time warp"→"Time Warp slower / faster"
 
-### Touch Controls (v2.9)
+### Touch Controls (v3.0)
 - Left: pitch/yaw joystick
 - Right: THR+/THR-/STAGE/**SAS**/**CHUTE** buttons (SAS/CHUTE wired to same actions as desktop)
 
@@ -104,7 +121,7 @@ Staging required for orbit
 - **VAB**: dark sidebar, part list grouped by type, color-coded indicators, rocket breadcrumbs, UNDO/CLEAR/LAUNCH/BACK
 - **Flight**: physics, rendering, HUD, map, effects, staging, SAS — 2300+ lines
 
-## Known Issues (v2.9)
+## Known Issues (v3.0)
 - FlightScene.ts needs decomposition into modules (~2300 lines)
 - Flat assembly model limits radial/staged complexity
 - No symmetry mode for boosters

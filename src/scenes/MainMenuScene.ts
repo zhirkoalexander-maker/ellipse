@@ -20,24 +20,25 @@ export class MainMenuScene {
     `;
 
     const logo = document.createElement('div');
+    logo.className = 'menu-logo';
     logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
       <svg viewBox="0 0 120 40" fill="none" style="width:100px;height:36px;display:block;margin:0 auto var(--space-2);">
-        <ellipse cx="60" cy="20" rx="52" ry="16" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.2" opacity="0.4"/>
-        <ellipse cx="60" cy="20" rx="36" ry="10" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.8" opacity="0.25"/>
-        <ellipse cx="60" cy="20" rx="18" ry="5" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.6" opacity="0.15"/>
+        <ellipse class="ellipse-ring" cx="60" cy="20" rx="52" ry="16" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.2" opacity="0.4"/>
+        <ellipse class="ellipse-ring" cx="60" cy="20" rx="36" ry="10" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.8" opacity="0.25"/>
+        <ellipse class="ellipse-ring" cx="60" cy="20" rx="18" ry="5" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.6" opacity="0.15"/>
         <circle cx="60" cy="20" r="2.5" fill="var(--accent-gold)"/>
         <line x1="10" y1="20" x2="110" y2="20" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
         <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
       </svg>
-      <div class="text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
+      <div class="menu-title text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
       <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.15em;">SPACE FLIGHT SIMULATOR</div>
     `;
     this.root.appendChild(logo);
 
     const btn = (label: string, variant: string, cb: () => void): HTMLButtonElement => {
       const b = document.createElement('button');
-      b.className = `btn btn--${variant}`;
+      b.className = `btn btn--${variant} menu-btn`;
       b.textContent = label;
       b.style.cssText = 'margin: 6px; min-width: 220px; padding: 12px 24px; font-size: 14px;';
       b.addEventListener('click', cb);
@@ -52,8 +53,12 @@ export class MainMenuScene {
   private toggleHelp(): void {
     if (this.helpOverlay) { this.helpOverlay.remove(); this.helpOverlay = null; return; }
     const overlay = document.createElement('div');
+    overlay.className = 'guide-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,8,20,0.95);';
-    overlay.innerHTML = `<div style="max-width:560px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;">` +
+    const card = document.createElement('div');
+    card.className = 'guide-card';
+    card.style.cssText = 'max-width:560px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;';
+    card.innerHTML =
       `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 HOW TO BUILD & LAUNCH</h2>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">VEHICLE ASSEMBLY</b> — build your rocket</p>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack parts bottom→top: <b>capsule</b> → <b>fuel tank</b> → <b>engine</b></p>` +
@@ -80,8 +85,10 @@ export class MainMenuScene {
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">F</td><td>Reset Camera</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">Mouse</td><td>Orbit / Zoom camera</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">Esc</td><td>Pause / Menu</td></tr>` +
-      `</table><button class="btn btn--primary" style="margin-top:20px;width:100%;padding:12px;" id="help-close">CLOSE</button></div>`;
-    overlay.querySelector('#help-close')!.addEventListener('click', () => { overlay.remove(); this.helpOverlay = null; });
+      `</table><button class="btn btn--primary" style="margin-top:20px;width:100%;padding:12px;" id="help-close">CLOSE</button>`;
+    const closeBtn = card.querySelector('#help-close') as HTMLButtonElement;
+    closeBtn.addEventListener('click', () => { overlay.remove(); this.helpOverlay = null; });
+    overlay.appendChild(card);
     document.body.appendChild(overlay);
     this.helpOverlay = overlay;
   }

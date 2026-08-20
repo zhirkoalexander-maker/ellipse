@@ -2,6 +2,7 @@ import { Game } from './core/Game';
 import '../styles/tokens.css';
 import '../styles/typography.css';
 import '../styles/components.css';
+import '../styles/animations.css';
 
 function hideLoadingScreen(): void {
   const el = document.getElementById('loading-screen');
