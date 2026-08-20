@@ -111,6 +111,8 @@ Staging required for orbit
 - **VAB part add**: back-out scale drop-in of the newly added part
 - **Bottom control bar**: button press scale feedback
 - **Dynamic FOV**: FOV widens slightly at high speed for sense of motion
+- **Liftoff ignition**: orange radial flash + camera shake at LIFTOFF
+- **Idle camera sway**: gentle breathing bob while grounded on pad (pre-launch)
 
 ### In-game Guide (v3.0)
 - 4-step build & launch walkthrough (VAB → stack capsule→tank→engine → optional decoupler/parachute/legs → FLIGHT)
