@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v3.0)
+# Ellipse — Space Flight Simulator (v3.5)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -18,7 +18,7 @@ ROCKET_VISUAL_SCALE = 60
 EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ```
 
-## Physics (v3.0)
+## Physics (v3.5)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
 - **Realistic rocket equation**: mass flow = thrust / (Isp * G0)
@@ -69,27 +69,49 @@ Total wet: 6450 kg, TWR ≈ 1.6 at g≈176
 Staging required for orbit
 ```
 
-## Part Catalog (18 parts)
+## Part Catalog (32 parts)
 - **Capsule**: MK-1 (M, 1200 kg) — textured body, dark heat shield, blue window, gold ring
 - **Tanks**: S(5000)/M(50000)/L(100000)/XL(250000) kg fuel, all LFO — textured, dark connector rings, gold accents
-- **Engines**: Ant(1800kN,Isp350)/Vector(3000,Isp340)/Mastodon(7500,Isp330)/Mammoth(18000,Isp310) — textured upper, gunmetal bell, dark cavity, gold rim, orange glow
-- **Utility**: Parachute Mk16, Landini legs, 3 Heat shields, TD-1 Decoupler
+- **Engines (9)**: Ant(1800kN,Isp350)/Sparkler(600,Isp385 vac)/Vector(3000,Isp340)/Reliant(2400,Isp290)/Mastodon(7500,Isp330)/Poodle(4000,Isp370 vac)/TwinBoar(14000,Isp300)/Mammoth(18000,Isp310)/Kickback(22000,Isp280)
+- **Decouplers (3)**: TD-0 (S, 40kg), TD-1 (M, 100kg), TD-2 (L, 250kg)
+- **Fairings (3)**: Nose Cone S/M + Payload Fairing L — aerodynamic cones, dragCoeff 0.1
+- **RCS**: Thruster Block (S, 20kN, Isp 240) — 4-nozzle attitude control
+- **Solar**: Panel (S, 25kg) — decorative, future power
+- **Utility**: Parachute Mk16, Landini legs, 3 Heat shields
 - **GLTF models**: Agena, Apollo-Soyuz, Saturn V, Ares I, Apollo LM, Atlas 6/9, Crawler
 
 ## Saturn V
 - GLTF model, 30000 kg dry, 500000 kg fuel, 60000 kN thrust, Isp 310
 
-## Controls (v3.0)
+## Controls (v3.5)
 ↑/↓ Engine Power (throttle), W/S Pitch (tilt up/down), A/D Yaw (turn left/right), Space Stage Separation, M/Tab Map view, C Free Camera, F Reset Camera, T SAS (cycle OFF/HOLD/PROGRADE/RETROGRADE), [/] Time warp, P Deploy Parachute, G Gear, Esc Pause/Menu, Mouse Orbit/Zoom, F1 Toggle HUD
 
-### HUD (v3.0)
-- **Telemetry panel** (top-left): SPD, ALT, V/S, FUEL, MASS, HEAT, THR, **TWR** (live, color-coded green≥1.0), **SAS mode**, WARP
+### HUD (v3.5)
+- **Telemetry panel** (top-left): SPD, ALT, V/S, FUEL, MASS, HEAT, THR, **TWR** (live, color-coded green≥1.0), **Δv** (Tsiolkovsky budget), **SAS mode**, WARP
 - **Fuel panel** (top-right): current/total fuel + bar
 - **Orbit panel** (top-right, below fuel): Ap, Pe, T→Ap, eccentricity; "suborbital" when not bound
 - **Navball** (bottom-right): prograde/retrograde markers, up/down, planet markers
 - **Control bar** (bottom-center): THR−/THR+/STAGE/MAP/SAS/CHUTE screen buttons
-- **Version badge** (top-center): minimal ELLIPSE v3.0 pill
-- **Dynamic FOV** (v3.0): FOV widens slightly at high speed for sense of motion
+- **Version badge** (top-center): minimal ELLIPSE v3.5 pill
+- **Dynamic FOV** (v3.0): FOV widens subtly at very high speed
+
+## Missions (v3.4)
+- 12 objectives across 6 categories (launch/altitude/orbit/landing/speed/staging)
+- Score points persist in localStorage (`ellipse_missions_score`)
+- Live evaluation during flight; toast on completion
+- Mission list panel in main menu (★ MISSIONS button) with progress + rewards
+
+## Save System (v3.2)
+- VAB **SAVE** dialog: name and persist assembly to localStorage
+- VAB **LOAD** dialog: list saved rockets, load or delete
+- **Autosave last build**: persists on LAUNCH; **CONTINUE** button in main menu resumes it
+
+## Transfer Planner (v3.5)
+- In map view: **TRANSFER PLANNER** panel (top-right)
+- Select target planet → COMPUTE Hohmann transfer
+- Output: Δv (m/s), direction (prograde/retrograde), travel time (days)
+- Uses Sun's μ and circular-orbit approximation
+- HUD **Δv budget** readout (Tsiolkovsky) shows if rocket has enough Δv
 
 ### Animations (v3.0)
 - **Starfield**: per-star twinkle (shader uTime) + drifting nebula bands
@@ -131,9 +153,11 @@ Staging required for orbit
 - **VAB**: dark sidebar, part list grouped by type, color-coded indicators, rocket breadcrumbs, UNDO/CLEAR/LAUNCH/BACK
 - **Flight**: physics, rendering, HUD, map, effects, staging, SAS — 2300+ lines
 
-## Known Issues (v3.0)
-- FlightScene.ts needs decomposition into modules (~2300 lines)
+## Known Issues (v3.5)
+- FlightScene.ts needs decomposition into modules (~2500 lines)
 - Flat assembly model limits radial/staged complexity
 - No symmetry mode for boosters
 - Map redraw throttled to every 5th frame to avoid lag
 - Roll disabled (getRoll always 0) — 2-axis attitude control only
+- Transfer planner uses circular-orbit approximation (no phase-angle timing yet)
+- RCS/Solar parts are visual-only (no attitude/thrust or power simulation)
