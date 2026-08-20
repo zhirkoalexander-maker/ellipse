@@ -284,6 +284,9 @@ export async function buildPartMeshAsync(part: Part): Promise<THREE.Group> {
     case 'legs': buildLegs(g, d); break;
     case 'decoupler': buildDecoupler(g, d); break;
     case 'heatshield': buildHeatshield(g, d); break;
+    case 'fairing': buildFairing(g, d); break;
+    case 'rcs': buildRcs(g, d); break;
+    case 'solar': buildSolar(g, d); break;
   }
   return g;
 }
@@ -300,6 +303,9 @@ export function buildPartMesh(part: Part): THREE.Group {
     case 'legs': buildLegs(g, d); break;
     case 'decoupler': buildDecoupler(g, d); break;
     case 'heatshield': buildHeatshield(g, d); break;
+    case 'fairing': buildFairing(g, d); break;
+    case 'rcs': buildRcs(g, d); break;
+    case 'solar': buildSolar(g, d); break;
 case 'gltf': {
       // Use cached GLTF model if available, otherwise placeholder
       if (part.gltfUrl && gltfCache.has(part.gltfUrl)) {
@@ -670,4 +676,63 @@ function buildHeatshield(group: THREE.Group, d: { radius: number; height: number
   const backing = new THREE.Mesh(backGeom, mat);
   backing.position.y = -h * 0.2;
   group.add(backing);
+}
+
+function buildFairing(group: THREE.Group, d: { radius: number; height: number }) {
+  const r = d.radius, h = d.height;
+  const tex = getTextureSet('tank', generateTankTexture);
+  const mat = createMaterialFromTextureSet(tex);
+  // Aerodynamic nose cone — smooth pointed cap
+  const coneGeom = new THREE.ConeGeometry(r, h * 0.9, SEG);
+  applyCylindricalUV(coneGeom);
+  const cone = new THREE.Mesh(coneGeom, mat);
+  cone.position.y = h * 0.45;
+  group.add(cone);
+  // Base ring
+  const ringGeom = new THREE.CylinderGeometry(r, r, h * 0.08, SEG);
+  applyCylindricalUV(ringGeom);
+  const ring = new THREE.Mesh(ringGeom, mat);
+  ring.position.y = -h * 0.04;
+  group.add(ring);
+}
+
+function buildRcs(group: THREE.Group, d: { radius: number; height: number }) {
+  const r = d.radius * 0.35, h = d.height * 0.25;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.5, metalness: 0.4, emissive: 0x000000, emissiveIntensity: 0 });
+  // Central block
+  const blockGeom = new THREE.BoxGeometry(r * 2, h, r * 2);
+  const block = new THREE.Mesh(blockGeom, mat);
+  group.add(block);
+  // Four small nozzles
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const nozzleGeom = new THREE.CylinderGeometry(r * 0.2, r * 0.3, h * 0.8, 12);
+    const nozzle = new THREE.Mesh(nozzleGeom, mat);
+    nozzle.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+    nozzle.rotation.z = Math.PI / 2;
+    nozzle.rotation.y = -angle;
+    group.add(nozzle);
+  }
+}
+
+function buildSolar(group: THREE.Group, d: { radius: number; height: number }) {
+  const r = d.radius, h = d.height;
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x1133aa, roughness: 0.3, metalness: 0.6, emissive: 0x001133, emissiveIntensity: 0.2 });
+  const armMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.5, emissive: 0x000000, emissiveIntensity: 0 });
+  // Central mount
+  const mountGeom = new THREE.CylinderGeometry(r * 0.15, r * 0.15, h * 0.15, 16);
+  const mount = new THREE.Mesh(mountGeom, armMat);
+  group.add(mount);
+  // Two panels
+  for (const sign of [-1, 1]) {
+    const panelGeom = new THREE.BoxGeometry(r * 1.2, h * 0.04, r * 0.6);
+    const panel = new THREE.Mesh(panelGeom, panelMat);
+    panel.position.set(sign * r * 0.7, 0, 0);
+    group.add(panel);
+    // Arm connecting to mount
+    const armGeom = new THREE.BoxGeometry(r * 0.4, h * 0.04, h * 0.06);
+    const arm = new THREE.Mesh(armGeom, armMat);
+    arm.position.set(sign * r * 0.3, 0, 0);
+    group.add(arm);
+  }
 }
