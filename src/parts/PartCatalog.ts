@@ -60,8 +60,18 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-thrust: 1800,
+    thrust: 1800,
     isp: 350,
+    fuelType: 'LFO'
+  },
+  {
+    id: 'engine_sparkler',
+    name: '"Sparkler" Vac Engine',
+    kind: 'engine',
+    size: 'S',
+    mass: 80,
+    thrust: 600,
+    isp: 385,
     fuelType: 'LFO'
   },
   {
@@ -75,6 +85,16 @@ thrust: 1800,
     fuelType: 'LFO'
   },
   {
+    id: 'engine_reliant',
+    name: '"Reliant" Engine',
+    kind: 'engine',
+    size: 'M',
+    mass: 300,
+    thrust: 2400,
+    isp: 290,
+    fuelType: 'LFO'
+  },
+  {
     id: 'engine_mastodon',
     name: '"Mastodon" Engine',
     kind: 'engine',
@@ -85,6 +105,26 @@ thrust: 1800,
     fuelType: 'LFO'
   },
   {
+    id: 'engine_poodle',
+    name: '"Poodle" Vac Engine',
+    kind: 'engine',
+    size: 'L',
+    mass: 900,
+    thrust: 4000,
+    isp: 370,
+    fuelType: 'LFO'
+  },
+  {
+    id: 'engine_twinboar',
+    name: '"TwinBoar" Booster',
+    kind: 'engine',
+    size: 'L',
+    mass: 1800,
+    thrust: 14000,
+    isp: 300,
+    fuelType: 'LFO'
+  },
+  {
     id: 'engine_mammoth',
     name: '"Mammoth" Engine',
     kind: 'engine',
@@ -92,6 +132,16 @@ thrust: 1800,
     mass: 3000,
     thrust: 18000,
     isp: 310,
+    fuelType: 'LFO'
+  },
+  {
+    id: 'engine_kickback',
+    name: '"Kickback" Heavy Booster',
+    kind: 'engine',
+    size: 'XL',
+    mass: 4500,
+    thrust: 22000,
+    isp: 280,
     fuelType: 'LFO'
   },
   // Parachute (separate part that attaches to capsule)
@@ -148,6 +198,68 @@ thrust: 1800,
     size: 'M',
     mass: 100,
     dragCoeff: 0.3
+  },
+  {
+    id: 'decoupler_s',
+    name: 'TD-0 Decoupler (S)',
+    kind: 'decoupler',
+    size: 'S',
+    mass: 40,
+    dragCoeff: 0.3
+  },
+  {
+    id: 'decoupler_l',
+    name: 'TD-2 Decoupler (L)',
+    kind: 'decoupler',
+    size: 'L',
+    mass: 250,
+    dragCoeff: 0.3
+  },
+  // Fairings (aerodynamic nose cones — reduce drag in atmosphere)
+  {
+    id: 'fairing_s',
+    name: 'Nose Cone S',
+    kind: 'fairing',
+    size: 'S',
+    mass: 20,
+    dragCoeff: 0.1
+  },
+  {
+    id: 'fairing_m',
+    name: 'Nose Cone M',
+    kind: 'fairing',
+    size: 'M',
+    mass: 50,
+    dragCoeff: 0.1
+  },
+  {
+    id: 'fairing_l',
+    name: 'Payload Fairing L',
+    kind: 'fairing',
+    size: 'L',
+    mass: 120,
+    dragCoeff: 0.1
+  },
+  // RCS thruster block (small attitude control)
+  {
+    id: 'rcs_block',
+    name: 'RCS Thruster Block',
+    kind: 'rcs',
+    size: 'S',
+    mass: 10,
+    thrust: 20,
+    isp: 240,
+    fuelType: 'LFO',
+    dragCoeff: 0.05
+  },
+  // Solar panel (decorative + future power)
+  {
+    id: 'solar_panel',
+    name: 'Solar Panel',
+    kind: 'solar',
+    size: 'S',
+    mass: 25,
+    dragCoeff: 0.2
   },
 // GLTF Models (scales calibrated: GLTF in meters → game units via gltfScale)
 // Target: ~0.0015 scale for all (1 meter = 0.0015 game units)

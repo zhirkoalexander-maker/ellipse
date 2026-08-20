@@ -81,7 +81,7 @@ export class VABScene {
   private build() {
     const el = this.root.querySelector('#vl')!;
     const groups = new Map<string,{parts:Part[],color:string}>();
-    const cmap: Record<string,string> = { capsule:'#a0b0c0', tank:'#6090c0', engine:'#c08060', decoupler:'#c06070', parachute:'#60a070', legs:'#8090a0', heatshield:'#b08060', gltf:'#b080a0' };
+    const cmap: Record<string,string> = { capsule:'#a0b0c0', tank:'#6090c0', engine:'#c08060', decoupler:'#c06070', parachute:'#60a070', legs:'#8090a0', heatshield:'#b08060', gltf:'#b080a0', fairing:'#a0c0e0', rcs:'#c0a0d0', solar:'#4080d0' };
     for (const p of PART_CATALOG) {
       if (!groups.has(p.kind)) groups.set(p.kind, {parts:[],color:cmap[p.kind]||'#888'});
       groups.get(p.kind)!.parts.push(p);
@@ -93,7 +93,7 @@ export class VABScene {
       el.appendChild(h);
       for (const p of g.parts) {
         const b = document.createElement('button');
-        const has = p.kind==='engine'?`${(p.thrust!/1000).toFixed(0)}kN`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:'';
+        const has = p.kind==='engine'?`${(p.thrust!/1000).toFixed(0)}kN · Isp ${p.isp}`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:p.kind==='rcs'?`${p.thrust}kN`:p.kind==='fairing'?'aero':'';
         b.innerHTML = `<span style="width:2px;height:12px;background:${g.color};border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.6;"></span><span style="vertical-align:middle;">${p.name}</span><span style="float:right;color:rgba(255,255,255,0.12);font-size:9px;margin-top:1px;">${has}</span>`;
         b.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:rgba(255,255,255,0.35);border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
         b.addEventListener('mouseenter', () => { b.style.background='rgba(255,255,255,0.02)'; b.style.color='rgba(255,255,255,0.7)'; });
