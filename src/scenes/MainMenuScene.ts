@@ -4,11 +4,13 @@ export class MainMenuScene {
   private onPlay: () => void;
   private onVab: () => void;
   private onSettings: () => void;
+  private onContinue: (() => void) | null;
 
-  constructor(onPlay: () => void, onVab: () => void, onSettings: () => void) {
+  constructor(onPlay: () => void, onVab: () => void, onSettings: () => void, onContinue?: () => void) {
     this.onPlay = onPlay;
     this.onVab = onVab;
     this.onSettings = onSettings;
+    this.onContinue = onContinue ?? null;
 
     this.root = document.createElement('div');
     this.root.className = 'panel';
@@ -45,6 +47,7 @@ export class MainMenuScene {
       return b;
     };
     this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay));
+    if (this.onContinue) this.root.appendChild(btn('CONTINUE', 'secondary', this.onContinue));
     this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab));
     this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
     this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
