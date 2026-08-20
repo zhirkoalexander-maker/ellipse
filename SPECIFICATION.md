@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v2.8)
+# Ellipse — Space Flight Simulator (v2.9)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -18,7 +18,7 @@ ROCKET_VISUAL_SCALE = 60
 EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ```
 
-## Physics (v2.5)
+## Physics (v2.9)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
 - **Realistic rocket equation**: mass flow = thrust / (Isp * G0)
@@ -31,6 +31,7 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **Aerodynamic stability**: rocket aligns with velocity in atmosphere (<70km)
 - **Rotation**: yaw around surface normal, pitch around horizon tangent — realistic
 - **Gravity/drag**: use warped dt — consistent at all time warp levels
+- **SAS (v2.9)**: 4 modes cycled by `T` — OFF / HOLD (locks current attitude) / PROGRADE (tracks velocity) / RETROGRADE (tracks -velocity). Drives angular velocity toward target quaternion. Works only at x1 warp.
 
 ## Solar System
 | Body | Mass (kg) | Radius (m) | Orbital radius |
@@ -78,21 +79,34 @@ Staging required for orbit
 ## Saturn V
 - GLTF model, 30000 kg dry, 500000 kg fuel, 60000 kN thrust, Isp 310
 
-## Controls (v2.8)
-↑/↓ Engine Power (throttle), W/S Pitch (tilt up/down), A/D Yaw (turn left/right), Space Stage Separation, M/Tab Map view, C Free Camera, F Reset Camera, T SAS (stability assist), [/] Time warp, P Deploy Parachute, Esc Pause/Menu, Mouse Orbit/Zoom
+## Controls (v2.9)
+↑/↓ Engine Power (throttle), W/S Pitch (tilt up/down), A/D Yaw (turn left/right), Space Stage Separation, M/Tab Map view, C Free Camera, F Reset Camera, T SAS (cycle OFF/HOLD/PROGRADE/RETROGRADE), [/] Time warp, P Deploy Parachute, G Gear, Esc Pause/Menu, Mouse Orbit/Zoom, F1 Toggle HUD
 
-### In-game Guide (v2.8)
+### HUD (v2.9)
+- **Telemetry panel** (top-left): SPD, ALT, V/S, FUEL, MASS, HEAT, THR, **TWR** (live, color-coded green≥1.0), **SAS mode**, WARP
+- **Fuel panel** (top-right): current/total fuel + bar
+- **Orbit panel** (top-right, below fuel): Ap, Pe, T→Ap, eccentricity; "suborbital" when not bound
+- **Navball** (bottom-right): prograde/retrograde markers, up/down, planet markers
+- **Control bar** (bottom-center): THR−/THR+/STAGE/MAP/SAS/CHUTE screen buttons
+- **Version badge** (top-center): minimal ELLIPSE v2.9 pill
+
+### In-game Guide (v2.9)
 - 4-step build & launch walkthrough (VAB → stack capsule→tank→engine → optional decoupler/parachute/legs → FLIGHT)
-- Flight tips panel: TWR ≥ 1.0 gate, gravity turn east at ~10km, stage when empty, soft landing (<5 m/s, chute + legs)
-- Renamed control labels: "Throttle"→"Engine Power", "Stage"→"Stage Separation", "SAS toggle"→"SAS — Stability Assist", "Parachute"→"Deploy Parachute", "Map view"→"Map / orbit view", "Free/Reset camera"→"Free Camera"/"Reset Camera", "Time warp"→"Time Warp slower / faster"
+- Flight tips panel: TWR ≥ 1.0 gate, gravity turn east at ~10km, ORBIT panel reading, SAS usage, staging, soft landing (<5 m/s, chute + legs)
+- Renamed control labels: "Throttle"→"Engine Power", "Stage"→"Stage Separation", "SAS toggle"→"SAS — cycle OFF/HOLD/PROGRADE/RETROGRADE", "Parachute"→"Deploy Parachute", "Map view"→"Map / orbit view", "Free/Reset camera"→"Free Camera"/"Reset Camera", "Time warp"→"Time Warp slower / faster"
+
+### Touch Controls (v2.9)
+- Left: pitch/yaw joystick
+- Right: THR+/THR-/STAGE/**SAS**/**CHUTE** buttons (SAS/CHUTE wired to same actions as desktop)
 
 ## Scenes
 - **MainMenu** (v1.0 style): SVG ellipse logo, gold accent, FLIGHT/VEHICLE ASSEMBLY/SETTINGS/GUIDE buttons via CSS classes
 - **VAB**: dark sidebar, part list grouped by type, color-coded indicators, rocket breadcrumbs, UNDO/CLEAR/LAUNCH/BACK
 - **Flight**: physics, rendering, HUD, map, effects, staging, SAS — 2300+ lines
 
-## Known Issues (v2.5)
-- FlightScene.ts needs decomposition into modules
+## Known Issues (v2.9)
+- FlightScene.ts needs decomposition into modules (~2300 lines)
 - Flat assembly model limits radial/staged complexity
 - No symmetry mode for boosters
 - Map redraw throttled to every 5th frame to avoid lag
+- Roll disabled (getRoll always 0) — 2-axis attitude control only
