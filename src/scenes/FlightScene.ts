@@ -1202,6 +1202,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this._camSnapped = false; // reset camera snap on liftoff
       this.achievements.unlock('reach_space');
       this.sound.startEngine();
+      // Liftoff ignition flash + camera shake
+      this.triggerIgnitionFlash();
+      this.screenShake = 1.2;
     }
 
     // Flame and sound always show when engine is active (even if thrust < weight)
@@ -1700,6 +1703,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         };
         this.chase.follow(this.state, baseDt, camUp, warpActive || !this._camSnapped, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
+        // Idle camera sway while on the pad (pre-launch) — gentle breathing
+        if (this.grounded && !this.launched) {
+          const t = this.missionTime;
+          const swayX = Math.sin(t * 0.6) * 0.04;
+          const swayY = Math.sin(t * 0.43 + 1.2) * 0.03;
+          this.sceneMgr.camera.position.x += swayX;
+          this.sceneMgr.camera.position.y += swayY;
+        }
       }
 
       if (this.deployedChuteMesh) {
@@ -2088,6 +2099,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     flash.className = 'stage-flash';
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 400);
+  }
+
+  private triggerIgnitionFlash(): void {
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;inset:0;z-index:400;background:radial-gradient(circle at 50% 70%, rgba(255,180,80,0.4), rgba(255,120,40,0.15) 40%, transparent 70%);pointer-events:none;opacity:0;transition:opacity 300ms ease-out;';
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => { flash.style.opacity = '1'; });
+    setTimeout(() => { flash.style.opacity = '0'; }, 120);
+    setTimeout(() => flash.remove(), 480);
   }
 
   private findLowestDecoupler(nodes: AssemblyNode[]): AssemblyNode | null {
