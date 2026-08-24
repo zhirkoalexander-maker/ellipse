@@ -152,18 +152,18 @@ export class Game {
       this.unmountCurrent();
       const a = rocket?.assembly ?? new Assembly();
       if (!rocket) {
-        // Realistic 2-stage rocket (like Saturn V)
+        // 2-stage rocket balanced for g≈176: total wet ~106t, TWR≈1.13 with both engines
         const p = PART_SCALE;
-        const s2capH = 1.1*p, s2tankH = 0.7*p, s2engH = 0.7*p;
-        const s1tankH = 2.2*p, s1engH = 2.2*p;
+        const s2capH = 1.1*p, s2tankH = 1.1*p, s2engH = 0.7*p;
+        const s1tankH = 1.1*p, s1engH = 2.2*p;
         const gap = 0.005;
 
-        // Stage 1: XL tank + Mammoth (booster)
+        // Stage 1: M tank (50t fuel) + Mammoth (18000kN)
         const s1engY = 0;
         const s1tankY = s1engY + s1engH/2 + gap + s1tankH/2;
         // Decoupler
         const decY = s1tankY + s1tankH/2 + gap + 0.6*p/2;
-        // Stage 2: M tank + Vector (upper stage)
+        // Stage 2: M tank (50t fuel) + Vector (3000kN)
         const s2engY = decY + 0.6*p/2 + gap + s2engH/2;
         const s2tankY = s2engY + s2engH/2 + gap + s2tankH/2;
         const capY = s2tankY + s2tankH/2 + gap + s2capH/2;
@@ -172,7 +172,7 @@ export class Game {
         a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, s2tankY, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('engine_vector')!, position: [0, s2engY, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('decoupler_1')!, position: [0, decY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, s1tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, s1tankY, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('engine_mammoth')!, position: [0, s1engY, 0], rotation: 0, children: [] });
       }
       const r = new Rocket(a);
