@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v3.5)
+# Ellipse — Space Flight Simulator (v3.7)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -109,12 +109,16 @@ Staging required for orbit
 - VAB **LOAD** dialog: list saved rockets, load or delete
 - **Autosave last build**: persists on LAUNCH; **CONTINUE** button in main menu resumes it
 
-## Transfer Planner (v3.5)
+## Transfer Planner & Autopilot (v3.7)
 - In map view: **TRANSFER PLANNER** panel (top-right)
-- Select target planet → COMPUTE Hohmann transfer
-- Output: Δv (m/s), direction (prograde/retrograde), travel time (days)
-- Uses Sun's μ and circular-orbit approximation
-- HUD **Δv budget** readout (Tsiolkovsky) shows if rocket has enough Δv
+- Select target planet → COMPUTE Hohmann transfer (Δv, direction, travel time)
+- **AUTOPILOT GO** button: rocket automatically flies to selected planet
+  - **BURN phase**: sets throttle=100%, SAS=prograde/retrograde, burns until Δv achieved
+  - **COAST phase**: time-warp to 100000x, monitors distance to target
+  - **ARRIVAL**: shows "YOU HAVE ARRIVED" overlay with travel time, fuel consumed, mass lost
+  - Live status badge (top-center) shows phase + progress — click to cancel
+  - Validates: not grounded, has fuel, has engines before starting
+  - Abort: out of fuel, cancelled by user, target not found
 
 ### Animations (v3.0)
 - **Starfield**: per-star twinkle (shader uTime) + drifting nebula bands

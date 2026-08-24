@@ -18,7 +18,7 @@ import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
-import { planTransfer } from '../physics/ManeuverPlanner';
+import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
 import { buildDeployedParachute } from '../parts/PartBuilder';
 import { totalGravityOn } from '../physics/Gravity';
 
@@ -110,6 +110,19 @@ export class FlightScene {
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
   private _camSnapped = false;
+
+  // Autopilot state
+  private autopilotActive = false;
+  private autopilotPhase: 'idle' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
+  private autopilotTarget = '';
+  private autopilotDeltaV = 0;
+  private autopilotDirection: 'prograde' | 'retrograde' = 'prograde';
+  private autopilotBurnStartSpeed = 0;
+  private autopilotStartMissionTime = 0;
+  private autopilotStartFuel = 0;
+  private autopilotStartMass = 0;
+  private autopilotMaxWarpIndex = 6; // 100000x for coast
+  private autopilotStatusEl: HTMLDivElement | null = null;
 
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
@@ -408,11 +421,14 @@ export class FlightScene {
       </div>
       <button id="transfer-compute" style="padding:6px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;letter-spacing:0.05em;">COMPUTE</button>
       <div id="transfer-result" style="font-size:10px;color:#ddd;min-height:40px;line-height:1.5;"></div>
+      <button id="transfer-go" style="padding:8px;background:rgba(124,255,178,0.12);color:#7CFFB2;border:1px solid rgba(124,255,178,0.3);border-radius:3px;font:700 11px system-ui;cursor:pointer;letter-spacing:0.08em;display:none;">▶ AUTOPILOT GO</button>
     `;
     mapEl.appendChild(transferPanel);
     const targetSelect = transferPanel.querySelector('#transfer-target') as HTMLSelectElement;
     const computeBtn = transferPanel.querySelector('#transfer-compute') as HTMLButtonElement;
     const resultEl = transferPanel.querySelector('#transfer-result') as HTMLDivElement;
+    const goBtn = transferPanel.querySelector('#transfer-go') as HTMLButtonElement;
+    let lastPlan: TransferPlan | null = null;
     // Populate target list with planets (not sun, not current ref body)
     const planetsForTransfer = this.system.bodies.filter(b => b.name !== 'sun' && b.mass > 0 && b.name !== 'moon');
     targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
@@ -421,11 +437,9 @@ export class FlightScene {
       const targetName = targetSelect.value;
       const sun = this.system.bodyByName('sun');
       if (!sun) return;
-      // Use heliocentric state of rocket
       const rx = this.state.position[0] - sun.position[0];
       const ry = this.state.position[1] - sun.position[1];
       const rz = this.state.position[2] - sun.position[2];
-      // Heliocentric velocity
       const sunBody = sun as Body;
       const sunVel = sunBody.velocity ?? [0, 0, 0];
       const rvx = this.state.velocity[0] - sunVel[0];
@@ -433,11 +447,52 @@ export class FlightScene {
       const rvz = this.state.velocity[2] - sunVel[2];
       const plan = planTransfer([rx, ry, rz], [rvx, rvy, rvz], this.system, targetName);
       if (plan) {
+        lastPlan = plan;
         resultEl.innerHTML = `<div style="color:${plan.direction === 'prograde' ? '#44ff88' : '#ff8844'};">→ ${plan.direction.toUpperCase()} burn</div><div style="color:#ddd;margin-top:3px;">Δv: <b>${plan.deltaV.toFixed(0)}</b> m/s</div><div style="color:#889;margin-top:2px;">~${(plan.transferTime/86400).toFixed(0)} days</div>`;
         toast.show(plan.summary, 4000);
+        goBtn.style.display = 'block';
       } else {
         resultEl.textContent = 'Unable to compute';
+        goBtn.style.display = 'none';
       }
+    });
+
+    goBtn.addEventListener('click', () => {
+      if (!lastPlan) return;
+      if (this.grounded) {
+        toast.show('Launch first — autopilot works in space!', 3500);
+        return;
+      }
+      const fuel = this.state.rocket.totalFuelMass();
+      if (fuel < 1) {
+        toast.show('No fuel left for transfer burn!', 3500);
+        return;
+      }
+      const sumThrust = totalThrust(this.state.rocket.assembly.roots);
+      if (sumThrust <= 0) {
+        toast.show('No engines — cannot burn!', 3500);
+        return;
+      }
+      // Start autopilot
+      this.autopilotActive = true;
+      this.autopilotPhase = 'burn';
+      this.autopilotTarget = lastPlan.targetName;
+      this.autopilotDeltaV = lastPlan.deltaV;
+      this.autopilotDirection = lastPlan.direction;
+      this.autopilotBurnStartSpeed = Math.sqrt(
+        this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+      );
+      this.autopilotStartMissionTime = this.missionTime;
+      this.autopilotStartFuel = fuel;
+      this.autopilotStartMass = this.state.rocket.totalMass();
+      // Close map, set SAS to prograde/retrograde
+      mapActive = false;
+      mapEl.style.opacity = '0';
+      setTimeout(() => { mapEl.style.display = 'none'; }, 240);
+      this.sasMode = this.autopilotDirection;
+      this.hud.setSasMode(this.sasMode);
+      toast.show(`AUTOPILOT: burning ${this.autopilotDirection} to reach ${lastPlan.targetName.toUpperCase()}`, 4000);
+      this.showAutopilotStatus();
     });
 
     mapEl.appendChild(mapCanvas);
@@ -1104,15 +1159,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.controls.getZoomIn()) this.chase.zoom(0.92);
     if (this.controls.getZoomOut()) this.chase.zoom(1.08);
 
-    // Disable controls in warp (only allow on x1)
+    // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
+    this.updateAutopilot(baseDt);
+
+    // Disable controls in warp (only allow on x1) — but not during autopilot burn
     const warpActive = this.timeWarp > 1;
-    if (warpActive) {
+    if (warpActive && !(this.autopilotActive && this.autopilotPhase === 'burn')) {
       this.state.throttle = 0;
     }
-    // In freecam mode, disable rocket throttle and rotation
-    if (this.cameraMode === 'free') {
+    // In freecam mode, disable rocket throttle and rotation — but not during autopilot
+    if (this.cameraMode === 'free' && !this.autopilotActive) {
       this.state.throttle = 0;
     }
+
     if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
     // Auto-stage when engine has no fuel and there's a decoupler
@@ -1692,7 +1751,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v3.5';
+        dbg.textContent = 'ELLIPSE  v3.7';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -2051,6 +2110,165 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       [normX / normLen, normY / normLen, normZ / normLen],
       bodyDirs
     );
+  }
+
+  private showAutopilotStatus(): void {
+    if (this.autopilotStatusEl) this.autopilotStatusEl.remove();
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:250;background:rgba(8,10,24,0.85);border:1px solid rgba(124,255,178,0.3);border-radius:6px;padding:6px 14px;font:600 11px system-ui;color:#7CFFB2;letter-spacing:0.05em;pointer-events:auto;cursor:pointer;text-align:center;';
+    el.innerHTML = `<div id="ap-phase">AUTOPILOT: BURN</div><div id="ap-detail" style="font-size:9px;color:#889;margin-top:2px;font-weight:400;"></div><div style="font-size:8px;color:#ff6644;margin-top:3px;font-weight:400;">click to cancel</div>`;
+    el.addEventListener('click', () => this.abortAutopilot('Cancelled by user'));
+    document.body.appendChild(el);
+    this.autopilotStatusEl = el;
+  }
+
+  private hideAutopilotStatus(): void {
+    if (this.autopilotStatusEl) { this.autopilotStatusEl.remove(); this.autopilotStatusEl = null; }
+  }
+
+  private updateAutopilotStatus(phase: string, detail: string): void {
+    if (!this.autopilotStatusEl) return;
+    const phaseEl = this.autopilotStatusEl.querySelector('#ap-phase') as HTMLElement;
+    const detailEl = this.autopilotStatusEl.querySelector('#ap-detail') as HTMLElement;
+    if (phaseEl) phaseEl.textContent = `AUTOPILOT: ${phase}`;
+    if (detailEl) detailEl.textContent = detail;
+  }
+
+  private updateAutopilot(baseDt: number): void {
+    if (!this.autopilotActive) return;
+
+    const speed = Math.sqrt(
+      this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+    );
+    const fuel = this.state.rocket.totalFuelMass();
+
+    // --- BURN PHASE ---
+    if (this.autopilotPhase === 'burn') {
+      // Force max throttle and SAS direction
+      this.state.throttle = 1.0;
+      this.sasMode = this.autopilotDirection;
+      // Ensure warp is 1x for burn
+      if (this.timeWarp > 1) {
+        this.warpIndex = 0;
+        this.timeWarp = 1;
+        this.hud.setWarp(1);
+      }
+      // Track velocity change
+      const dvBurned = this.autopilotDirection === 'prograde'
+        ? speed - this.autopilotBurnStartSpeed
+        : this.autopilotBurnStartSpeed - speed;
+      this.updateAutopilotStatus('BURN', `Δv ${dvBurned.toFixed(0)}/${this.autopilotDeltaV.toFixed(0)} m/s · fuel ${fuel.toFixed(0)}kg`);
+      // Check completion
+      if (dvBurned >= this.autopilotDeltaV) {
+        // Burn complete → coast
+        this.autopilotPhase = 'coast';
+        this.state.throttle = 0;
+        this.sasMode = 'off';
+        this.hud.setSasMode('off');
+        // Set max warp for coast
+        this.warpIndex = this.autopilotMaxWarpIndex;
+        this.timeWarp = this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.timeWarp);
+        toast.show('Burn complete — coasting to target', 3000);
+      }
+      // Abort if out of fuel and not enough dv
+      else if (fuel < 0.1) {
+        this.autopilotPhase = 'aborted';
+        this.state.throttle = 0;
+        this.sasMode = 'off';
+        this.hud.setSasMode('off');
+        this.autopilotActive = false;
+        this.hideAutopilotStatus();
+        toast.show('AUTOPILOT ABORTED: out of fuel before reaching target Δv', 5000);
+      }
+      return;
+    }
+
+    // --- COAST PHASE ---
+    if (this.autopilotPhase === 'coast') {
+      this.state.throttle = 0;
+      // Keep warp at max
+      if (this.timeWarp !== this.warpLevels[this.autopilotMaxWarpIndex]) {
+        this.warpIndex = this.autopilotMaxWarpIndex;
+        this.timeWarp = this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.timeWarp);
+      }
+      // Check distance to target
+      const target = this.system.bodyByName(this.autopilotTarget);
+      if (!target) { this.abortAutopilot('Target not found'); return; }
+      const dx = target.position[0] - this.state.position[0];
+      const dy = target.position[1] - this.state.position[1];
+      const dz = target.position[2] - this.state.position[2];
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const targetR = (target as any).radius ?? 6e6;
+      const refBody = getReferenceBody(this.state.position, this.system);
+      // Arrived: within 3x target radius OR entered target's SOI
+      const arrived = dist < targetR * 3 || refBody.name === this.autopilotTarget;
+      // Time limit: 3x expected transfer time
+      const expectedTime = this.autopilotStartMissionTime + this.autopilotDeltaV * 0 + 999999; // no hard limit, use distance
+      const elapsed = this.missionTime - this.autopilotStartMissionTime;
+      this.updateAutopilotStatus('COAST', `${(dist/1000).toFixed(0)}km to ${this.autopilotTarget.toUpperCase()} · elapsed ${(elapsed/86400).toFixed(1)}d`);
+      if (arrived) {
+        this.autopilotPhase = 'arrived';
+        this.autopilotActive = false;
+        // Stop warp
+        this.warpIndex = 0;
+        this.timeWarp = 1;
+        this.hud.setWarp(1);
+        // Compute stats
+        const totalTime = this.missionTime - this.autopilotStartMissionTime;
+        const fuelConsumed = this.autopilotStartFuel - fuel;
+        const massLost = this.autopilotStartMass - this.state.rocket.totalMass();
+        this.hideAutopilotStatus();
+        this.showArrivalOverlay(this.autopilotTarget, totalTime, fuelConsumed, massLost);
+      }
+      // Abort if way past expected transfer time (5x)
+      else if (elapsed > 5 * (this.autopilotDeltaV > 0 ? 1e7 : 1e7)) {
+        // Very long time — give it a generous limit
+        // Don't abort too easily; interplanetary trips are long
+      }
+      return;
+    }
+  }
+
+  private abortAutopilot(reason: string): void {
+    this.autopilotActive = false;
+    this.autopilotPhase = 'aborted';
+    this.state.throttle = 0;
+    this.sasMode = 'off';
+    this.hud.setSasMode('off');
+    this.warpIndex = 0;
+    this.timeWarp = 1;
+    this.hud.setWarp(1);
+    this.hideAutopilotStatus();
+    toast.show(`AUTOPILOT ABORTED: ${reason}`, 5000);
+  }
+
+  private showArrivalOverlay(target: string, timeS: number, fuelKg: number, massKg: number): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.7);opacity:0;transition:opacity 400ms ease-out;';
+    const card = document.createElement('div');
+    card.style.cssText = 'max-width:420px;padding:32px;background:#0c1020;border:1px solid rgba(124,255,178,0.4);border-radius:10px;text-align:center;font-family:system-ui,sans-serif;box-shadow:0 0 40px rgba(124,255,178,0.15);';
+    const days = timeS / 86400;
+    const timeStr = days >= 1 ? `${days.toFixed(1)} days` : `${(timeS/3600).toFixed(1)} hours`;
+    card.innerHTML = `
+      <div style="font-size:28px;font-weight:700;color:#7CFFB2;letter-spacing:0.05em;margin-bottom:6px;text-shadow:0 0 20px rgba(124,255,178,0.4);">YOU HAVE ARRIVED</div>
+      <div style="font-size:14px;color:#ddd;margin-bottom:20px;">Destination: <b style="color:#88ccff;">${target.toUpperCase()}</b></div>
+      <div style="display:flex;justify-content:center;gap:24px;margin-bottom:24px;">
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">TRAVEL TIME</div><div style="font-size:18px;color:#c89838;font-weight:600;margin-top:4px;">${timeStr}</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">FUEL USED</div><div style="font-size:18px;color:#ffaa44;font-weight:600;margin-top:4px;">${(fuelKg/1000).toFixed(1)} t</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">MASS LOST</div><div style="font-size:18px;color:#ff6644;font-weight:600;margin-top:4px;">${(massKg/1000).toFixed(1)} t</div></div>
+      </div>
+      <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">CONTINUE</button>
+    `;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+    card.querySelector('#arrival-close')!.addEventListener('click', () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 420);
+    });
+    this.achievements.unlock('reach_space');
   }
 
   private performStage(): void {
@@ -2473,6 +2691,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.crashOverlay.remove();
       this.crashOverlay = null;
     }
+    this.hideAutopilotStatus();
     this.sceneMgr.scene.remove(this.rocketGroup);
     for (const d of this.debris) {
       this.sceneMgr.scene.remove(d.mesh);
