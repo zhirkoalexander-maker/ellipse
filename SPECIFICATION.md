@@ -25,7 +25,7 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **Multiple engines** — all engines fire simultaneously, thrust summed
 - **Drag** CdA ∝ mass, exponential atmosphere density
 - **Landing**: soft <5m/s (8 with chute), rough <20m/s (15 with chute), crash above
-- **TWR gate**: must have TWR ≥ 1.0 at CURRENT throttle to lift off
+- **TWR gate**: must have TWR ≥ 1.0 at CURRENT throttle to lift off — sums ALL engines' thrust (v3.6 fix)
 - **Countdown**: 3-2-1-LIFTOFF, 5s cooldown after TWR failure
 - **Spawn protection**: 2 seconds (120 frames) after launch
 - **Aerodynamic stability**: rocket aligns with velocity in atmosphere (<70km)
@@ -61,11 +61,14 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 
 ## Default Rocket (Quick Flight)
 ```
-capsule_mk1  — 1200 kg, crew 1, parachute
-tank_s_lfo   — 200 kg dry, 5000 kg fuel (LFO)
-engine_ant   — 50 kg, 1800 kN, Isp 350s
+capsule_mk1   — 1200 kg, crew 1, parachute
+tank_m_lfo    — 600 kg dry, 50000 kg fuel (LFO)   ×2 (stage 1 + 2)
+engine_mammoth — 3000 kg, 18000 kN, Isp 310s      (stage 1)
+engine_vector  — 400 kg, 3000 kN, Isp 340s        (stage 2)
+decoupler_1   — 100 kg
 
-Total wet: 6450 kg, TWR ≈ 1.6 at g≈176
+Total wet: ~106 t, total thrust: 21000 kN
+TWR ≈ 1.13 at g≈176 (both engines fire)
 Staging required for orbit
 ```
 

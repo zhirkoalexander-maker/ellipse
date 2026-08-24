@@ -36,6 +36,36 @@ export function findFirstEngine(nodes: any[]): { thrust: number; isp: number } |
   return null;
 }
 
+/** Sum of all engine thrusts (kN) — used for TWR calculation. */
+export function totalThrust(nodes: any[]): number {
+  let total = 0;
+  const walk = (ns: any[]) => {
+    for (const n of ns) {
+      if (n.part.thrust && n.part.isp) total += n.part.thrust;
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return total;
+}
+
+/** Average Isp weighted by thrust — for delta-V calculations with mixed engines. */
+export function weightedIsp(nodes: any[]): number {
+  let totalThrustVal = 0;
+  let weighted = 0;
+  const walk = (ns: any[]) => {
+    for (const n of ns) {
+      if (n.part.thrust && n.part.isp) {
+        totalThrustVal += n.part.thrust;
+        weighted += n.part.isp * n.part.thrust;
+      }
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return totalThrustVal > 0 ? weighted / totalThrustVal : 0;
+}
+
 function findAllEngines(nodes: any[]): { thrust: number; isp: number }[] {
   const result: { thrust: number; isp: number }[] = [];
   const walk = (ns: any[]) => {

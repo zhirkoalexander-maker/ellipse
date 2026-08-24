@@ -12,7 +12,7 @@ import { FlightState } from '../flight/FlightState';
 import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
-import { applyThrust, findFirstEngine } from '../flight/Thrust';
+import { applyThrust, findFirstEngine, totalThrust, weightedIsp } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
@@ -1214,15 +1214,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           this.countdownActive = false;
           this.launched = true;
           // Check thrust-to-weight ratio using actual local gravity
-          const eng = findFirstEngine(this.state.rocket.assembly.roots);
+          // Sum ALL engines' thrust (not just first found)
+          const sumThrust = totalThrust(this.state.rocket.assembly.roots);
           const refBody = getReferenceBody(this.state.position, this.system);
           const gdx = this.state.position[0] - refBody.position[0];
           const gdy = this.state.position[1] - refBody.position[1];
           const gdz = this.state.position[2] - refBody.position[2];
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
-          if (eng && eng.thrust && localGrav > 0) {
-             const twr = (eng.thrust * 1000 * this.state.throttle) / (this.state.rocket.totalMass() * localGrav);
+          if (sumThrust > 0 && localGrav > 0) {
+             const twr = (sumThrust * 1000 * this.state.throttle) / (this.state.rocket.totalMass() * localGrav);
             if (twr >= 1.0) {
               canLiftOff = true;
             } else {
@@ -1841,7 +1842,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       ? this.stageInfo.findIndex(s => s.active) + 1
       : 1;
 
-    // Live TWR: thrust*throttle / (mass * local_g)
+    // Live TWR: total thrust*throttle / (mass * local_g)
     let twr = 0;
     const twrRefBody = getReferenceBody(this.state.position, this.system);
     if (twrRefBody && (twrRefBody as any).mass > 0) {
@@ -1850,23 +1851,23 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const tgdz = this.state.position[2] - twrRefBody.position[2];
       const tgr = Math.sqrt(tgdx*tgdx + tgdy*tgdy + tgdz*tgdz) || 1;
       const localG = (G * (twrRefBody as any).mass) / (tgr * tgr);
-      const eng = findFirstEngine(this.state.rocket.assembly.roots);
+      const sumThrustLive = totalThrust(this.state.rocket.assembly.roots);
       const mass = this.state.rocket.totalMass();
-      if (eng && eng.thrust && localG > 0 && mass > 0) {
-        twr = (eng.thrust * 1000 * this.state.throttle) / (mass * localG);
+      if (sumThrustLive > 0 && localG > 0 && mass > 0) {
+        twr = (sumThrustLive * 1000 * this.state.throttle) / (mass * localG);
       }
     }
     this.hud.setTwr(twr);
     this.hud.setSasMode(this.sasMode);
 
     // Delta-V budget: Tsiolkovsky Δv = Isp * g0 * ln(m0/m1)
-    const dvEng = findFirstEngine(this.state.rocket.assembly.roots);
+    const dvIsp = weightedIsp(this.state.rocket.assembly.roots);
     const dvMass0 = this.state.rocket.totalMass();
     const dvFuel = this.state.rocket.totalFuelMass();
     const dvMass1 = dvMass0 - dvFuel;
     let deltaV = 0;
-    if (dvEng && dvEng.isp && dvMass0 > 0 && dvMass1 > 0) {
-      deltaV = dvEng.isp * 9.80665 * Math.log(dvMass0 / dvMass1);
+    if (dvIsp > 0 && dvMass0 > 0 && dvMass1 > 0) {
+      deltaV = dvIsp * 9.80665 * Math.log(dvMass0 / dvMass1);
     }
     this.hud.setDeltaV(deltaV);
 
