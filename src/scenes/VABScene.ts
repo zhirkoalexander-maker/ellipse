@@ -18,7 +18,7 @@ export class VABScene {
   private info!: HTMLElement;
   private st = 0;
   private nm: string[] = [];
-  private az = 0; private po = Math.PI/2; private dt = 5;
+  private az = 0; private po = Math.PI/2; private readonly dt = 5;
   private dr = false; private pr = { x:0, y:0 };
   private tg = new THREE.Vector3(0, PART_SCALE, 0);
 
@@ -27,16 +27,12 @@ export class VABScene {
     this.scene.add(new THREE.AmbientLight(0x445566, 0.5));
     const d = new THREE.DirectionalLight(0xffffff, 2.5); d.position.set(2,5,4); this.scene.add(d);
     this.scene.add(new THREE.HemisphereLight(0x8899bb, 0x334455, 0.5));
-    const g = new THREE.GridHelper(10,20,0x1a2a3a,0x0d1520); g.position.y=-0.3; this.scene.add(g);
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(PART_SCALE*4,0.001,PART_SCALE*4), new THREE.MeshStandardMaterial({color:0x101828,roughness:0.9}));
-    pad.position.y=-PART_SCALE*0.3; this.scene.add(pad);
     this.scene.add(this.rg); this.cam();
 
     const m = (e:MouseEvent) => { if(e.button===0){this.dr=true;this.pr={x:e.clientX,y:e.clientY};} };
     document.addEventListener('mousedown', m);
     document.addEventListener('mousemove', e => { if(!this.dr)return; this.az-=(e.clientX-this.pr.x)*0.005; this.po=Math.max(0.05,Math.min(Math.PI-0.05,this.po+(e.clientY-this.pr.y)*0.005)); this.pr={x:e.clientX,y:e.clientY}; this.cam(); });
     document.addEventListener('mouseup', () => this.dr=false);
-    document.addEventListener('wheel', e => { this.dt*=e.deltaY>0?1.1:0.9; this.dt=Math.max(0.5,Math.min(50,this.dt)); this.cam(); }, {passive:true});
 
     this.root = document.createElement('div');
     this.root.style.cssText = 'position:fixed;inset:0;z-index:150;pointer-events:none;display:flex;';
