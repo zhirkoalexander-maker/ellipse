@@ -124,6 +124,8 @@ export class FlightScene {
   private autopilotMaxWarpIndex = 6; // 100000x for coast
   private autopilotStatusEl: HTMLDivElement | null = null;
 
+  private lastCountdownText = '';
+
   private showCountdown(text: string): void {
     if (!this.countdownEl) {
       this.countdownEl = document.createElement('div');
@@ -136,6 +138,14 @@ export class FlightScene {
       `;
       document.body.appendChild(this.countdownEl);
     }
+    // Update ONLY when the text changes — the update loop calls this
+    // every frame within each 1s window; per-frame reflow restarts
+    // caused the countdown to jank/lag.
+    if (text === this.lastCountdownText) {
+      this.countdownEl.style.opacity = '1';
+      return;
+    }
+    this.lastCountdownText = text;
     // Restart pop animation on each new text
     this.countdownEl.textContent = text;
     this.countdownEl.style.opacity = '1';
