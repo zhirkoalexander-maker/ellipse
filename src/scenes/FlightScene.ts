@@ -1751,7 +1751,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v3.7';
+        dbg.textContent = 'ELLIPSE  v4.0';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -2280,7 +2280,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     this.sound.playStaging();
 
-    const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.part.id);
+    const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.uid ?? decoupler.part.id);
     if (decouplerMesh) {
       // Capture world positions before detaching
       const worldPositions: THREE.Vector3[] = [];
@@ -2309,11 +2309,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         (pMesh as any)._vz = Math.sin(angle) * (0.8 + Math.random() * 1.5);
         this.explosionMeshes.push(pMesh);
       }
-      // Detach lower roots (flat assembly)
+      // Detach lower roots (flat assembly) — look up by unique node uid
+      // (identical parts like two tank_m_lfo would collide via part.id)
       const roots = this.rocket.assembly.roots;
       const decIdx = roots.indexOf(decoupler);
       if (decIdx >= 0) for (let i = decIdx; i < roots.length; i++) {
-        const m = this.rocketGroup.getObjectByName(roots[i]!.part.id);
+        const m = this.rocketGroup.getObjectByName(roots[i]!.uid ?? roots[i]!.part.id);
         if (m) { const wp = new THREE.Vector3(); m.getWorldPosition(wp); worldPositions.push(wp); meshes.push(m); m.removeFromParent(); }
       }
       while (decouplerMesh.children.length > 0) {
@@ -2354,12 +2355,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
         scene.add(debrisGroup);
 
-        // Velocity: rocket velocity + push away + random
+        // Velocity: rocket velocity + push toward planet (down, away from rocket) + random
         const pushForce = 1 + Math.random() * 2;
         const sepVel: Vec3 = [
-          this.state.velocity[0] - pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
-          this.state.velocity[1] - pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
-          this.state.velocity[2] - pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
         ];
 
         const debrisBody = new Body('debris', 100, pos, sepVel);
