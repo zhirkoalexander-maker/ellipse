@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v3.7)
+# Ellipse — Space Flight Simulator (v4.0)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -59,6 +59,14 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - Night city lights (emissive map, 5 continents)
 - Optional high-res texture (/textures/earth_daymap.jpg)
 
+## Staging Fixes (v4.0)
+- **Unique node uid** (`part.id#N`): every assembly node gets a runtime-unique mesh name. Fixes `getObjectByName` collisions — before, two identical parts (e.g. two `tank_m_lfo` in the default rocket) caused the WRONG mesh to detach on staging (upper tank flew away as debris, lower stayed glued → broken visuals, "teleport").
+- **Debris push direction fixed**: separated stages now push DOWN toward the planet (away from the continuing rocket); before, the sign error pushed them UP.
+- **Fuel drain order fixed**: tanks sorted top-first, consumed bottom-first — lower-stage (booster) tanks drain before upper-stage tanks. Correct staging: booster fuel is used up, then SPACE drops the empty booster.
+- **Saturn V (GLTF)**: thrust 60000 → 120000 kN — TWR 1.29 at full load (530t), lifts off alone.
+- **Heavy engines boosted** for g≈176 heavy lifting: Mammoth 55000 kN, Kickback 70000 kN, TwinBoar 45000 kN.
+- **VAB preset "Saturn V (2-stage)"**: one click builds Mammoth + XL tank + TD-2 decoupler + Saturn V GLTF. Total TWR 1.27; after booster separation Saturn V alone TWR 1.29.
+
 ## Default Rocket (Quick Flight)
 ```
 capsule_mk1   — 1200 kg, crew 1, parachute
@@ -67,15 +75,15 @@ engine_mammoth — 3000 kg, 18000 kN, Isp 310s      (stage 1)
 engine_vector  — 400 kg, 3000 kN, Isp 340s        (stage 2)
 decoupler_1   — 100 kg
 
-Total wet: ~106 t, total thrust: 21000 kN
-TWR ≈ 1.13 at g≈176 (both engines fire)
+Total wet: ~106 t, total thrust: 58000 kN
+TWR ≈ 3.1 at g≈176 (both engines fire)
 Staging required for orbit
 ```
 
 ## Part Catalog (32 parts)
 - **Capsule**: MK-1 (M, 1200 kg) — textured body, dark heat shield, blue window, gold ring
 - **Tanks**: S(5000)/M(50000)/L(100000)/XL(250000) kg fuel, all LFO — textured, dark connector rings, gold accents
-- **Engines (9)**: Ant(1800kN,Isp350)/Sparkler(600,Isp385 vac)/Vector(3000,Isp340)/Reliant(2400,Isp290)/Mastodon(7500,Isp330)/Poodle(4000,Isp370 vac)/TwinBoar(14000,Isp300)/Mammoth(18000,Isp310)/Kickback(22000,Isp280)
+- **Engines (9)**: Ant(1800kN,Isp350)/Sparkler(600,Isp385 vac)/Vector(3000,Isp340)/Reliant(2400,Isp290)/Mastodon(7500,Isp330)/Poodle(4000,Isp370 vac)/TwinBoar(45000,Isp300)/Mammoth(55000,Isp310)/Kickback(70000,Isp280)
 - **Decouplers (3)**: TD-0 (S, 40kg), TD-1 (M, 100kg), TD-2 (L, 250kg)
 - **Fairings (3)**: Nose Cone S/M + Payload Fairing L — aerodynamic cones, dragCoeff 0.1
 - **RCS**: Thruster Block (S, 20kN, Isp 240) — 4-nozzle attitude control

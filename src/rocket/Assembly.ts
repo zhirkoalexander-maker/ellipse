@@ -16,13 +16,22 @@ export interface AssemblyNode {
   position: Vec3;
   rotation: number;
   children: AssemblyNode[];
+  /** Runtime-unique mesh name (part.id#N) — prevents getObjectByName collisions between identical parts */
+  uid?: string;
 }
 
 export class Assembly {
   roots: AssemblyNode[] = [];
+  private uidCounter = 0;
 
   addRoot(node: AssemblyNode): void {
+    this.assignUid(node);
     this.roots.push(node);
+  }
+
+  private assignUid(node: AssemblyNode): void {
+    node.uid = `${node.part.id}#${this.uidCounter++}`;
+    node.children.forEach(c => this.assignUid(c));
   }
 
   totalFuelCapacity(): number {
@@ -76,6 +85,7 @@ export class Assembly {
     const group = new THREE.Group();
     const walk = (n: AssemblyNode, parent: THREE.Object3D) => {
       const mesh = buildPartMesh(n.part);
+      mesh.name = n.uid ?? n.part.id;
       mesh.position.set(n.position[0], n.position[1], n.position[2]);
       mesh.rotation.y = n.rotation;
       parent.add(mesh);

@@ -14,6 +14,9 @@ export class Rocket {
     this.assembly = assembly;
     this.fuelTanks = [];
     collectTanks(assembly.roots, this.fuelTanks);
+    // Sort tanks top-first (highest Y first) — consumeFuel iterates in reverse,
+    // so bottom tanks (feeding lower-stage engines) drain first. Correct staging.
+    this.fuelTanks.sort((a, b) => b.node.position[1] - a.node.position[1]);
   }
 
   dryMass(): number { return this.assembly.totalMass(); }
