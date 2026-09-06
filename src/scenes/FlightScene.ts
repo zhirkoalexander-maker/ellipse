@@ -1781,7 +1781,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v4.2';
+        dbg.textContent = 'ELLIPSE  v4.3';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -2700,20 +2700,26 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
   private positionFlameAtNozzle(): void {
-    // Find the lowest point of rocket meshes (engine nozzle)
-    // Skip landing gear and other non-rocket parts that were added separately
+    // Find the lowest point of rocket meshes (engine nozzle) in the GROUP's LOCAL space.
+    // Box3.setFromObject returns WORLD-space coordinates once the scene has rendered;
+    // at construction time (before first render) matrixWorld is identity and the box
+    // happens to be local. A mid-flight re-call (staging) would otherwise store a huge
+    // world coordinate (~+1400 near Earth) in rocketBottomY, exploding visualOffset
+    // and teleporting the rocket + camera inside the planet ("planets disappear" bug).
     let minY = Infinity;
-    let maxY = -Infinity;
+    const inv = this.rocketGroup.matrixWorld.clone().invert();
     this.rocketGroup.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
-        // Skip gear meshes (they're tracked in gearMeshes and can be far below)
         if (this.gearMeshes.includes(obj)) return;
         if (obj === this.rocketShadow) return;
         if (obj === this.reentryGlow) return;
         if (obj === this.reentryGlowMesh) return;
-        const box = new THREE.Box3().setFromObject(obj);
-        if (box.min.y < minY) minY = box.min.y;
-        if (box.max.y > maxY) maxY = box.max.y;
+        if (obj.name === 'reentry-outer') return; // reentry glow effect — not rocket structure
+        const worldBox = new THREE.Box3().setFromObject(obj);
+        // Convert to rocket-group local space (applyMatrix4 covers all 8 corners,
+        // so rotation of the rocket mid-flight is handled correctly)
+        const localBox = worldBox.applyMatrix4(inv);
+        if (localBox.min.y < minY) minY = localBox.min.y;
       }
     });
     this.rocketBottomY = minY === Infinity ? -0.1 : minY;

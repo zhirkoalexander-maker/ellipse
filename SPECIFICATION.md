@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v4.2)
+# Ellipse — Space Flight Simulator (v4.3)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -72,6 +72,10 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **No drag full-stop**: drag never removes more than 90% of speed per frame — the old `velocity = 0` overshoot (especially at high time warp) halted rockets mid-air and made ground impacts impossible.
 - **Atmosphere warp clamp (KSP-style)**: below 70 km altitude, time warp auto-limits to 10x — prevents tunneling through the 200 m crash band at high warp (rockets "landed" instead of crashing).
 - **Countdown fix (v4.1)**: 3-2-1 DOM updated only on digit change (was every frame — reflow jank).
+
+## Staging "Planets Disappear" Fix (v4.3)
+- **Root cause**: `positionFlameAtNozzle` reads `Box3.setFromObject` which returns WORLD-space coordinates once the scene has rendered (at construction, before first render, matrixWorld is identity and it happens to return local coords). On staging the function re-runs mid-flight → `rocketBottomY` becomes a huge world coordinate (~+1400 near Earth) → `visualOffset = -rocketBottomY` explodes to ~-1400 → rocket visual + chase camera teleport deep INSIDE the planet → "planets disappear".
+- **Fix**: convert the world-space box to the rocket group's LOCAL space via `Box3.applyMatrix4(inverse(matrixWorld))` (handles rocket rotation mid-flight); also exclude the `reentry-outer` glow effect mesh from bounds so the flame stays at the true nozzle.
 
 ## Default Rocket (Quick Flight)
 ```
