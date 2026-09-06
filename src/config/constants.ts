@@ -13,6 +13,12 @@ export const FIXED_DT = 1 / 60;
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
 
+/** Fuel burn rate multiplier (game balance).
+ *  Raw rocket equation at thrust levels needed for g≈176 drains a 50t tank
+ *  in ~3 seconds (mass flow = thrust/(Isp·g0) ≈ 18 t/s). ×0.1 slows burn 10×
+ *  so ascents take ~1-2 minutes. Δv readout divides by this to stay honest. */
+export const FUEL_FLOW_MULT = 0.1;
+
 /** Earth mass (kg) — g≈176 m/s² at 2× radius */
 export const EARTH_MASS = 8.92e24 * 48;
 

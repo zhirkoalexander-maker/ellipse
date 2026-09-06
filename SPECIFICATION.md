@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v4.0)
+# Ellipse — Space Flight Simulator (v4.2)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -21,7 +21,7 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ## Physics (v3.5)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
-- **Realistic rocket equation**: mass flow = thrust / (Isp * G0)
+- **Realistic rocket equation**: mass flow = thrust / (Isp * G0) **× FUEL_FLOW_MULT (0.1)** — game-balance slowdown; raw flow at g≈176 thrust levels would empty a 50t tank in ~3s. Burn times now ~1-2 min. Δv readout uses effective exhaust velocity (Isp·g0/FUEL_FLOW_MULT).
 - **Multiple engines** — all engines fire simultaneously, thrust summed
 - **Drag** CdA ∝ mass, exponential atmosphere density
 - **Landing**: soft <5m/s (8 with chute), rough <20m/s (15 with chute), crash above
@@ -59,13 +59,19 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - Night city lights (emissive map, 5 continents)
 - Optional high-res texture (/textures/earth_daymap.jpg)
 
-## Staging Fixes (v4.0)
+## Staging Fixes (v4.2)
+- **Position-based staging**: decoupler selection and stage removal now use PHYSICAL Y position (bottom-most decoupler; drop everything below its Y) — order-agnostic. Before, staging used root array order: VAB adds parts bottom-first but Game default top-first, so VAB-built rockets (e.g. Saturn V preset) dropped the UPPER stage and kept the booster — inverted staging.
 - **Unique node uid** (`part.id#N`): every assembly node gets a runtime-unique mesh name. Fixes `getObjectByName` collisions — before, two identical parts (e.g. two `tank_m_lfo` in the default rocket) caused the WRONG mesh to detach on staging (upper tank flew away as debris, lower stayed glued → broken visuals, "teleport").
 - **Debris push direction fixed**: separated stages now push DOWN toward the planet (away from the continuing rocket); before, the sign error pushed them UP.
 - **Fuel drain order fixed**: tanks sorted top-first, consumed bottom-first — lower-stage (booster) tanks drain before upper-stage tanks. Correct staging: booster fuel is used up, then SPACE drops the empty booster.
 - **Saturn V (GLTF)**: thrust 60000 → 120000 kN — TWR 1.29 at full load (530t), lifts off alone.
 - **Heavy engines boosted** for g≈176 heavy lifting: Mammoth 55000 kN, Kickback 70000 kN, TwinBoar 45000 kN.
 - **VAB preset "Saturn V (2-stage)"**: one click builds Mammoth + XL tank + TD-2 decoupler + Saturn V GLTF. Total TWR 1.27; after booster separation Saturn V alone TWR 1.29.
+
+## Crash & Atmosphere Fixes (v4.2)
+- **No drag full-stop**: drag never removes more than 90% of speed per frame — the old `velocity = 0` overshoot (especially at high time warp) halted rockets mid-air and made ground impacts impossible.
+- **Atmosphere warp clamp (KSP-style)**: below 70 km altitude, time warp auto-limits to 10x — prevents tunneling through the 200 m crash band at high warp (rockets "landed" instead of crashing).
+- **Countdown fix (v4.1)**: 3-2-1 DOM updated only on digit change (was every frame — reflow jank).
 
 ## Default Rocket (Quick Flight)
 ```

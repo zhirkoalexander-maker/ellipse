@@ -1,5 +1,5 @@
 import type { FlightState } from './FlightState';
-import { G0 } from '../config/constants';
+import { G0, FUEL_FLOW_MULT } from '../config/constants';
 
 export function applyThrust(state: FlightState, dt: number, direction?: [number, number, number]): void {
   if (state.throttle <= 0) return;
@@ -12,6 +12,9 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
     totalForceN += forceN;
     totalMassFlow += forceN / (eng.isp * G0);
   }
+  // Game-balance burn rate (see FUEL_FLOW_MULT) — full thrust at g≈176
+  // would otherwise empty a 50t tank in ~3 seconds.
+  totalMassFlow *= FUEL_FLOW_MULT;
   const dir = direction ?? [0, 1, 0];
   const mass = state.rocket.totalMass();
   const ax = totalForceN * dir[0] / mass;
