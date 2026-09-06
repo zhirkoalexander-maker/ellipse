@@ -15,7 +15,7 @@ import { HUD } from '../flight/HUD';
 import { applyThrust, findFirstEngine, totalThrust, weightedIsp } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
-import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
+import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE, FUEL_FLOW_MULT } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
@@ -1048,8 +1048,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
    * the next is above. Spent stages had their decoupler already activated.
    */
   private computeStageData(): Array<{ label: string; fuelMass: number; dryMass: number; active: boolean; spent: boolean }> {
-    const roots = this.rocket.assembly.roots;
-    if (roots.length === 0) return [];
+    const allRoots = this.rocket.assembly.roots;
+    if (allRoots.length === 0) return [];
+    // Sort top-first by Y — decoupler chunks assume upper stage comes before decoupler.
+    // Root array order differs between VAB (bottom-first) and Game default (top-first).
+    const roots = [...allRoots].sort((a, b) => b.position[1] - a.position[1]);
 
     const decouplerIndices: number[] = [];
     for (let i = 0; i < roots.length; i++) {
@@ -1156,6 +1159,26 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Track mission time (only when not crashed/paused)
     this.missionTime += baseDt;
     this.missionTime = Math.min(this.missionTime, 99999);
+
+    // Atmosphere warp clamp: high warp in atmosphere tunnels through the 200m
+    // crash band (and drag overshot) — rockets "landed" instead of crashing.
+    // Limit to 10x below 70km altitude (KSP-style).
+    {
+      const clampRef = getReferenceBody(this.state.position, this.system);
+      const cdx = this.state.position[0] - clampRef.position[0];
+      const cdy = this.state.position[1] - clampRef.position[1];
+      const cdz = this.state.position[2] - clampRef.position[2];
+      const cd = Math.sqrt(cdx*cdx + cdy*cdy + cdz*cdz) || 1;
+      const cR = (clampRef as any).radius ?? 0;
+      const cAlt = cd - cR;
+      const atmoWarpLimit = 3; // index of 10x in warpLevels
+      if (cR > 0 && cAlt < 70000 && this.warpIndex > atmoWarpLimit) {
+        this.warpIndex = atmoWarpLimit;
+        this.timeWarp = this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.timeWarp);
+        toast.show('Time warp limited in atmosphere', 1800);
+      }
+    }
 
     _dt *= this.timeWarp;
     if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
@@ -1457,16 +1480,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const dragForce = q * CdA;
           const dragAccel = dragForce / mass;
           const dragDelta = dragAccel * _dt;
-          if (dragDelta >= speed) {
-            this.state.velocity[0] = 0;
-            this.state.velocity[1] = 0;
-            this.state.velocity[2] = 0;
-          } else {
-            const f = 1 - dragDelta / speed;
-            this.state.velocity[0] *= f;
-            this.state.velocity[1] *= f;
-            this.state.velocity[2] *= f;
-          }
+          // Never kill more than 90% of speed in one frame — the old full-stop
+          // (velocity = 0) at high time warp halted rockets mid-air and made
+          // impacts impossible.
+          const f = Math.max(0.1, 1 - dragDelta / speed);
+          this.state.velocity[0] *= f;
+          this.state.velocity[1] *= f;
+          this.state.velocity[2] *= f;
           this.sanitize(this.state.velocity);
 
         // Reentry glow effect (plasma)
@@ -1761,7 +1781,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v4.0';
+        dbg.textContent = 'ELLIPSE  v4.2';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -1929,14 +1949,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.hud.setTwr(twr);
     this.hud.setSasMode(this.sasMode);
 
-    // Delta-V budget: Tsiolkovsky Δv = Isp * g0 * ln(m0/m1)
+    // Delta-V budget: Tsiolkovsky with game fuel-flow scaling
+    // (effective exhaust velocity = Isp * g0 / FUEL_FLOW_MULT)
     const dvIsp = weightedIsp(this.state.rocket.assembly.roots);
     const dvMass0 = this.state.rocket.totalMass();
     const dvFuel = this.state.rocket.totalFuelMass();
     const dvMass1 = dvMass0 - dvFuel;
     let deltaV = 0;
     if (dvIsp > 0 && dvMass0 > 0 && dvMass1 > 0) {
-      deltaV = dvIsp * 9.80665 * Math.log(dvMass0 / dvMass1);
+      deltaV = (dvIsp * 9.80665 / FUEL_FLOW_MULT) * Math.log(dvMass0 / dvMass1);
     }
     this.hud.setDeltaV(deltaV);
 
@@ -2319,12 +2340,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         (pMesh as any)._vz = Math.sin(angle) * (0.8 + Math.random() * 1.5);
         this.explosionMeshes.push(pMesh);
       }
-      // Detach lower roots (flat assembly) — look up by unique node uid
-      // (identical parts like two tank_m_lfo would collide via part.id)
+      // Detach decoupler + everything physically BELOW it (Y < decoupler Y) — look up by unique uid.
+      // Position-based: works for both VAB (bottom-first) and Game (top-first) root orderings.
       const roots = this.rocket.assembly.roots;
-      const decIdx = roots.indexOf(decoupler);
-      if (decIdx >= 0) for (let i = decIdx; i < roots.length; i++) {
-        const m = this.rocketGroup.getObjectByName(roots[i]!.uid ?? roots[i]!.part.id);
+      const decY = decoupler.position[1];
+      for (const r of roots) {
+        if (r !== decoupler && r.position[1] >= decY) continue;
+        const m = this.rocketGroup.getObjectByName(r.uid ?? r.part.id);
         if (m) { const wp = new THREE.Vector3(); m.getWorldPosition(wp); worldPositions.push(wp); meshes.push(m); m.removeFromParent(); }
       }
       while (decouplerMesh.children.length > 0) {
@@ -2402,16 +2424,20 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     setTimeout(() => flash.remove(), 240);
   }
 
+  /** Bottom-most decoupler by PHYSICAL position (lowest Y) — stages drop bottom-first.
+   *  Independent of root array order (VAB vs Game ordering differ). */
   private findLowestDecoupler(nodes: AssemblyNode[]): AssemblyNode | null {
-    let last: AssemblyNode | null = null;
+    let best: AssemblyNode | null = null;
     const walk = (ns: AssemblyNode[]) => {
       for (const n of ns) {
-        if (n.part.kind === 'decoupler') last = n;
+        if (n.part.kind === 'decoupler') {
+          if (!best || n.position[1] < best.position[1]) best = n;
+        }
         walk(n.children);
       }
     };
     walk(nodes);
-    return last;
+    return best;
   }
 
   private toggleParachute(): void {
