@@ -41,24 +41,21 @@ export class Rocket {
     return consumed;
   }
 
+  /** Position-based staging: drop the decoupler + everything physically BELOW it (Y < decoupler Y).
+   *  Works regardless of root array order (VAB adds bottom-first, Game default top-first). */
   removeStage(decouplerNode: AssemblyNode): void {
     const roots = this.assembly.roots;
-    const decIdx = roots.indexOf(decouplerNode);
-    if (decIdx < 0) return;
-    const count = roots.length - decIdx;
+    const decY = decouplerNode.position[1];
 
     const removedNodes = new Set<AssemblyNode>();
     const walk = (n: AssemblyNode) => { removedNodes.add(n); n.children.forEach(walk); };
-    // Collect ALL nodes to remove BEFORE splicing
-    walk(decouplerNode);
-    for (let i = 1; i < count; i++) {
-      const node = roots[decIdx + i];
-      if (node) walk(node);
-    }
-    this.fuelTanks = this.fuelTanks.filter(t => !removedNodes.has(t.node));
 
-    // Remove decoupler and all roots below it
-    roots.splice(decIdx, count);
+    for (const r of roots) {
+      if (r === decouplerNode || r.position[1] < decY) walk(r);
+    }
+
+    this.fuelTanks = this.fuelTanks.filter(t => !removedNodes.has(t.node));
+    this.assembly.roots = roots.filter(r => !removedNodes.has(r));
     decouplerNode.children = [];
   }
 }
