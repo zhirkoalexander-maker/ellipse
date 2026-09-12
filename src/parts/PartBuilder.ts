@@ -481,20 +481,20 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   const flange = new THREE.Mesh(new THREE.TorusGeometry(r*0.7, r*0.04, 8, Q), goldMat);
   flange.position.y = h*0.13; flange.rotation.x = Math.PI/2; group.add(flange);
 
-  // Nozzle bell
-  const bell = new THREE.Mesh(new THREE.CylinderGeometry(r*0.5, r*0.84, h*0.38, Q), bellMat);
+  // Nozzle bell — slim profile (narrow + slightly elongated; was fat 0.84r flare)
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(r*0.42, r*0.60, h*0.44, Q), bellMat);
   bell.position.y = -h*0.07; group.add(bell);
 
   // Inner dark cavity
-  const inner = new THREE.Mesh(new THREE.CylinderGeometry(r*0.30, r*0.55, h*0.30, Q), darkMat);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(r*0.25, r*0.40, h*0.36, Q), darkMat);
   inner.position.y = -h*0.05; group.add(inner);
 
   // Exit rim
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(r*0.78, r*0.035, 6, Q), goldMat);
-  rim.position.y = -h*0.07 - h*0.19; rim.rotation.x = Math.PI/2; group.add(rim);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(r*0.58, r*0.028, 6, Q), goldMat);
+  rim.position.y = -h*0.07 - h*0.22; rim.rotation.x = Math.PI/2; group.add(rim);
 
   // Glow
-  const glow = new THREE.Mesh(new THREE.RingGeometry(r*0.28, r*0.48, Q), hotMat);
+  const glow = new THREE.Mesh(new THREE.RingGeometry(r*0.20, r*0.36, Q), hotMat);
   glow.position.y = -h*0.07 - h*0.15; glow.rotation.x = -Math.PI/2; group.add(glow);
 }
 
