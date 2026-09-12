@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v4.3)
+# Ellipse — Space Flight Simulator (v4.4)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -66,7 +66,8 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **Fuel drain order fixed**: tanks sorted top-first, consumed bottom-first — lower-stage (booster) tanks drain before upper-stage tanks. Correct staging: booster fuel is used up, then SPACE drops the empty booster.
 - **Saturn V (GLTF)**: thrust 60000 → 120000 kN — TWR 1.29 at full load (530t), lifts off alone.
 - **Heavy engines boosted** for g≈176 heavy lifting: Mammoth 55000 kN, Kickback 70000 kN, TwinBoar 45000 kN.
-- **VAB preset "Saturn V (2-stage)"**: one click builds Mammoth + XL tank + TD-2 decoupler + Saturn V GLTF. Total TWR 1.27; after booster separation Saturn V alone TWR 1.29.
+- **VAB preset "Saturn V (2-stage)"** (v4.4): slim L-profile booster — TwinBoar + 2× L tank + TD-2 decoupler + Saturn V GLTF. Total TWR 1.28; after booster separation Saturn V alone TWR 1.29.
+- **Engine bells slimmed** (v4.4): nozzle exit flare 0.84r → 0.60r, elongated 0.38h → 0.44h — sleeker, less "fat" look on all engines.
 
 ## Crash & Atmosphere Fixes (v4.2)
 - **No drag full-stop**: drag never removes more than 90% of speed per frame — the old `velocity = 0` overshoot (especially at high time warp) halted rockets mid-air and made ground impacts impossible.
