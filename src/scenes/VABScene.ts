@@ -83,7 +83,7 @@ export class VABScene {
     presetHeader.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
-    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Saturn V (2-stage)</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">175000kN</span>`;
+    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Saturn V (2-stage)</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">165000kN</span>`;
     presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
     presetBtn.addEventListener('mouseenter', () => { presetBtn.style.background='rgba(255,255,255,0.05)'; });
     presetBtn.addEventListener('mouseleave', () => { presetBtn.style.background='transparent'; });
@@ -120,16 +120,17 @@ export class VABScene {
     this.st+=h; this.nm.push(p.name); this.rf(); this.up();
   }
 
-  /** One-click Saturn V: booster stage (Mammoth + XL tank) + decoupler + Saturn V upper stage. */
+  /** One-click Saturn V: slim L-profile booster (TwinBoar + 2 L tanks) + decoupler + Saturn V upper stage. */
   private buildSaturnVPreset(): void {
     this.assembly = new Assembly(); this.st = 0; this.nm = [];
-    const mammoth = PART_CATALOG.find(p => p.id === 'engine_mammoth')!;
-    const tankXl = PART_CATALOG.find(p => p.id === 'tank_xl_lfo')!;
+    const twinBoar = PART_CATALOG.find(p => p.id === 'engine_twinboar')!;
+    const tankL = PART_CATALOG.find(p => p.id === 'tank_l_lfo')!;
     const decouplerL = PART_CATALOG.find(p => p.id === 'decoupler_l')!;
     const saturn = PART_CATALOG.find(p => p.id === 'saturn_v')!;
     // Stack bottom→top (same order as clicking parts manually)
-    this.add(mammoth);
-    this.add(tankXl);
+    this.add(twinBoar);
+    this.add(tankL);
+    this.add(tankL);
     this.add(decouplerL);
     this.add(saturn);
     toast.show('Saturn V preset: 2-stage, press SPACE in flight to separate booster', 4000);
