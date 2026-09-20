@@ -15,7 +15,7 @@ import {
   type TextureSet,
 } from '../effects/ProceduralTextures';
 
-const SIZE_DIMS = {
+export const SIZE_DIMS = {
   // Chunky rocket proportions (h/r ≈ 2.4). History: h/r 1.6 = fat barrels,
   // h/r 3.6 = thin sticks ("parts too small"), h/r 2.9 = "still too small"
   // — user wants BIG parts, these are the fattest that still look like a rocket.
@@ -23,7 +23,7 @@ const SIZE_DIMS = {
   M: { radius: 0.85 * PART_SCALE, height: 2.0 * PART_SCALE },
   L: { radius: 1.15 * PART_SCALE, height: 2.8 * PART_SCALE },
   XL: { radius: 1.50 * PART_SCALE, height: 3.6 * PART_SCALE }
-};
+} as const;
 
 const PI = Math.PI;
 const SEG = 128;
@@ -413,9 +413,14 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
   const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.97, h*0.45, Q), bodyMat);
   body.position.y = -h * 0.01; group.add(body);
 
-// Heat shield — extended to reach slot bottom so no gap below capsule
-   const hs = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.82, h*0.305, Q), darkMat);
-   hs.position.y = -h * 0.3475; group.add(hs);
+  // Heat shield — short lip (was a 0.37h black bucket — ugly)
+  const hs = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.90, h*0.10, Q), darkMat);
+  hs.position.y = -h * 0.30; group.add(hs);
+
+  // Aero taper skirt — flows smoothly down to near the S-tank radius, so the
+  // capsule connects to whatever is below without a hard step
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(r*0.90, r*0.68, h*0.15, Q), bodyMat);
+  skirt.position.y = -h * 0.425; group.add(skirt);
 
   // Docking port on top
   const dock = new THREE.Mesh(new THREE.CylinderGeometry(r*0.22, r*0.22, h*0.06, 16), darkMat);
@@ -472,23 +477,24 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
   const hotMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.5, depthWrite: false });
 
-  // Top mount/adapter — NARROW (≈ half tank width), reaches slot top so there
-  // is no gap to the part above, but reads as an engine mount, not a barrel.
-  const mount = new THREE.Mesh(new THREE.CylinderGeometry(r*0.55, r*0.45, h*0.28, Q), engineMat);
-  mount.position.y = h * 0.36; group.add(mount);
+  // Boat-tail mount — top edge is TANK-WIDE (0.97r, matches the tank bottom
+  // above) tapering smoothly down to the pump. This is how real rockets join
+  // a tank to an engine: no step, no gap — the tank flows into the tail cone.
+  const mount = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.50, h*0.30, Q), engineMat);
+  mount.position.y = h * 0.35; group.add(mount);
 
-  // Turbopump housing — short block below the mount
-  const pump = new THREE.Mesh(new THREE.CylinderGeometry(r*0.45, r*0.58, h*0.12, Q), engineMat);
+  // Turbopump housing — short block below the boat-tail
+  const pump = new THREE.Mesh(new THREE.CylinderGeometry(r*0.50, r*0.58, h*0.12, Q), engineMat);
   pump.position.y = h * 0.15; group.add(pump);
 
   // Turbopump exhaust pipes (both sides)
   for (const s of [-1, 1]) {
     const pipe = new THREE.Mesh(new THREE.CylinderGeometry(r*0.06, r*0.06, h*0.1, 8), goldMat);
-    pipe.position.set(s * r * 0.55, h * 0.15, 0); pipe.rotation.z = Math.PI / 2; group.add(pipe);
+    pipe.position.set(s * r * 0.5, h * 0.13, 0); pipe.rotation.z = Math.PI / 2; group.add(pipe);
   }
 
   // Flange ring where the bell meets the pump
-  const flange = new THREE.Mesh(new THREE.TorusGeometry(r*0.5, r*0.045, 8, Q), goldMat);
+  const flange = new THREE.Mesh(new THREE.TorusGeometry(r*0.52, r*0.045, 8, Q), goldMat);
   flange.position.y = h*0.09; flange.rotation.x = Math.PI/2; group.add(flange);
 
   // Nozzle bell — the DOMINANT feature: wide flare nearly tank-width,
