@@ -250,8 +250,16 @@ if (!rocket) {
     this.flight?.dispose(); this.flight = undefined;
   }
 
+  private lastFrameTime = performance.now();
+
   private loop(): void {
-    const dt = 1 / 60;
+    // MEASURED frame time, not a hardcoded 1/60 — the old fixed dt made the
+    // whole game run slow-motion below 60fps (weak GPU, background tab,
+    // software rendering): throttle crawled, countdowns stretched, rockets
+    // "wouldn't lift off". Clamped to avoid huge jumps after tab switches.
+    const now = performance.now();
+    const dt = Math.min(Math.max((now - this.lastFrameTime) / 1000, 0.0005), 0.05);
+    this.lastFrameTime = now;
     this.sceneMgr.update(dt);
     this.flight?.update(dt);
     if (this.vab) this.renderer.three.render(this.vab.scene, this.vab.camera);
