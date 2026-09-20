@@ -5,6 +5,8 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
   if (state.throttle <= 0) return;
   const engines = findAllEngines(state.rocket.assembly.roots);
   if (engines.length === 0) return;
+  const available = state.rocket.totalFuelMass();
+  if (available <= 0) return; // tanks dry — NO thrust
   let totalForceN = 0;
   let totalMassFlow = 0;
   for (const eng of engines) {
@@ -12,14 +14,18 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
     totalForceN += forceN;
     totalMassFlow += forceN / (eng.isp * G0);
   }
-  // Game-balance burn rate (see FUEL_FLOW_MULT) — full thrust at g≈176
-  // would otherwise empty a 50t tank in ~3 seconds.
+  // Game-balance burn rate (see FUEL_FLOW_MULT)
   totalMassFlow *= FUEL_FLOW_MULT;
+  // Thrust proportional to fuel actually burnable this frame — engines cut off
+  // exactly when tanks run dry instead of accelerating forever on fumes.
+  const requested = totalMassFlow * dt;
+  const actualBurn = Math.min(requested, available);
+  const burnFrac = requested > 0 ? actualBurn / requested : 1;
   const dir = direction ?? [0, 1, 0];
   const mass = state.rocket.totalMass();
-  const ax = totalForceN * dir[0] / mass;
-  const ay = totalForceN * dir[1] / mass;
-  const az = totalForceN * dir[2] / mass;
+  const ax = totalForceN * dir[0] / mass * burnFrac;
+  const ay = totalForceN * dir[1] / mass * burnFrac;
+  const az = totalForceN * dir[2] / mass * burnFrac;
   state.velocity[0] += ax * dt;
   state.velocity[1] += ay * dt;
   state.velocity[2] += az * dt;

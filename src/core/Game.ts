@@ -25,7 +25,7 @@ import { toast } from '../ui/Toast';
 import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
-import { loadLastAssembly, hasLastAssembly } from '../storage/SaveLoad';
+import { loadLastAssembly, hasLastAssembly, loadFlightState, hasFlightSave, clearFlightSave, deserializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import * as THREE from 'three';
 
 export class Game {
@@ -122,11 +122,52 @@ export class Game {
     this.loop();
   }
 
+  /** Part ids referenced by a serialized assembly that no longer exist in the catalog. */
+  private collectUnknownPartIds(assembly: any[]): string[] {
+    const unknown: string[] = [];
+    const walk = (nodes: any[]) => {
+      for (const n of nodes) {
+        if (!findPart(n.partId)) unknown.push(String(n.partId));
+        if (Array.isArray(n.children)) walk(n.children);
+      }
+    };
+    walk(assembly ?? []);
+    return [...new Set(unknown)];
+  }
+
   private showMainMenu(): void {
     this.transitionTo(() => {
       this.unmountCurrent();
       this.sceneMgr.scene.background = new THREE.Color(0x000000);
-      const onContinue = hasLastAssembly() ? () => {
+      // CONTINUE: resume the saved flight where it was left off (position,
+      // velocity, fuel, planets) — falls back to last build on the pad.
+      const onContinue = (hasFlightSave() || hasLastAssembly()) ? () => {
+        const save = loadFlightState();
+        if (save) {
+          // Old saves may reference parts that no longer exist (catalog
+          // changes) — deserializeAssembly SILENTLY drops them, which once
+          // removed every decoupler from a resumed rocket ("weight doesn't
+          // change when staging"). Detect and warn loudly instead.
+          const unknown = this.collectUnknownPartIds(save.assembly);
+          if (unknown.length > 0) {
+            toast.show(`Saved flight has unknown parts (${unknown.join(', ')}) — old save, starting fresh`, 5000);
+            clearFlightSave();
+            this.showFlight();
+            return;
+          }
+          // Restore planetary state — planets reset to epoch each session,
+          // which would otherwise strand the rocket in empty space.
+          for (const b of save.bodies) {
+            const body = this.system.bodies.find(x => x.name === b.name);
+            if (body) {
+              body.position = [...b.position] as [number, number, number];
+              body.velocity = [...b.velocity] as [number, number, number];
+              (body as any).syncMesh?.();
+            }
+          }
+          const a = deserializeAssembly(save.assembly);
+          if (a) { const r = new Rocket(a); this.showFlight(r, save); return; }
+        }
         const a = loadLastAssembly();
         if (a) { const r = new Rocket(a); this.showFlight(r); }
         else this.showFlight();
@@ -147,36 +188,45 @@ export class Game {
     });
   }
 
-  private async showFlight(rocket?: Rocket): Promise<void> {
+  private async showFlight(rocket?: Rocket, save?: FlightSave): Promise<void> {
     this.transitionTo(() => {
       this.unmountCurrent();
+      // A fresh launch invalidates the previous resume point
+      if (!save) clearFlightSave();
       const a = rocket?.assembly ?? new Assembly();
-      if (!rocket) {
-        // 2-stage rocket balanced for g≈176: total wet ~106t, TWR≈1.13 with both engines
+if (!rocket) {
+        // 3-stage rocket for g≈176: XL booster → L sustainer → S upper stage + M capsule.
+        // Tapered stages (r 1.0→0.75→0.4) give a classic rocket silhouette.
+        // Heights match PartBuilder SIZE_DIMS exactly — meshes stack with zero overlap.
         const p = PART_SCALE;
-        const s2capH = 1.1*p, s2tankH = 1.1*p, s2engH = 0.7*p;
-        const s1tankH = 1.1*p, s1engH = 2.2*p;
-        const gap = 0.005;
+        const H = { S: 1.4 * p, M: 2.0 * p, L: 2.8 * p, XL: 3.6 * p };
+        const gap = 0;
 
-        // Stage 1: M tank (50t fuel) + Mammoth (18000kN)
-        const s1engY = 0;
-        const s1tankY = s1engY + s1engH/2 + gap + s1tankH/2;
-        // Decoupler
-        const decY = s1tankY + s1tankH/2 + gap + 0.6*p/2;
-        // Stage 2: M tank (50t fuel) + Vector (3000kN)
-        const s2engY = decY + 0.6*p/2 + gap + s2engH/2;
-        const s2tankY = s2engY + s2engH/2 + gap + s2tankH/2;
-        const capY = s2tankY + s2tankH/2 + gap + s2capH/2;
+        let y = -H.XL / 2; // bottom face of the Mammoth engine
+        const stack = (h: number) => { const c = y + h / 2; y += h + gap; return c; };
 
-        a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, s2tankY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('engine_vector')!, position: [0, s2engY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('decoupler_1')!, position: [0, decY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, s1tankY, 0], rotation: 0, children: [] });
+        const s1engY = stack(H.XL);   // engine_mammoth (XL)
+        const s1tankY = stack(H.XL);  // tank_xl_lfo (XL)
+        const dec1Y = stack(H.L);     // decoupler_l (L)
+        const s2engY = stack(H.L);    // engine_twinboar (L)
+        const s2tankY = stack(H.L);   // tank_l_lfo (L)
+        const dec2Y = stack(H.S);     // decoupler_s (S)
+        const s3engY = stack(H.S);    // engine_sparkler (S)
+        const s3tankY = stack(H.S);   // tank_s_lfo (S)
+        const capY = stack(H.M);      // capsule_mk1 (M)
+
         a.addRoot({ part: findPart('engine_mammoth')!, position: [0, s1engY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, s1tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('decoupler_l')!, position: [0, dec1Y, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_twinboar')!, position: [0, s2engY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_l_lfo')!, position: [0, s2tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('decoupler_s')!, position: [0, dec2Y, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_sparkler')!, position: [0, s3engY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, s3tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
       }
       const r = new Rocket(a);
-      this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions);
+      this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions, save);
       this.flight.onCrashAction = (action) => { if (action === 'menu') this.showMainMenu(); else this.showFlight(rocket); };
     });
   }

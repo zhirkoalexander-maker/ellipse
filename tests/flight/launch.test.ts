@@ -52,6 +52,7 @@ describe('TWR and launch', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0.05, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
+    a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, 0.1, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
     const sys = new System();
     const fs = new FlightState(r, sys, [0, 0, 0], [0, 0, 0]);
@@ -59,5 +60,16 @@ describe('TWR and launch', () => {
     applyThrust(fs, 1);
     expect(fs.velocity[1]).toBeGreaterThan(0);
     expect(fs.velocity[1]).toBeGreaterThan(100);
+  });
+
+  it('NO fuel — NO thrust (engines cut off when tanks are dry)', () => {
+    const a = new Assembly();
+    a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
+    const r = new Rocket(a);
+    const sys = new System();
+    const fs = new FlightState(r, sys, [0, 0, 0], [0, 0, 0]);
+    fs.throttle = 1;
+    applyThrust(fs, 1);
+    expect(fs.velocity[1]).toBe(0);
   });
 });

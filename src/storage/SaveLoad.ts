@@ -20,9 +20,22 @@ function deserializeNode(data: any): AssemblyNode | null {
   };
 }
 
+export function serializeAssembly(assembly: Assembly): any[] {
+  return assembly.roots.map(serializeNode);
+}
+
+export function deserializeAssembly(data: any[]): Assembly | null {
+  const a = new Assembly();
+  let any = false;
+  for (const n of data) {
+    const node = deserializeNode(n);
+    if (node) { a.addRoot(node); any = true; }
+  }
+  return any ? a : null;
+}
+
 export function saveAssembly(name: string, assembly: Assembly): void {
-  const data = assembly.roots.map(serializeNode);
-  localStorage.setItem(KEY_PREFIX + name, JSON.stringify(data));
+  localStorage.setItem(KEY_PREFIX + name, JSON.stringify(serializeAssembly(assembly)));
   const idx = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
   if (!idx.includes(name)) {
     idx.push(name);
@@ -33,13 +46,7 @@ export function saveAssembly(name: string, assembly: Assembly): void {
 export function loadAssembly(name: string): Assembly | null {
   const raw = localStorage.getItem(KEY_PREFIX + name);
   if (!raw) return null;
-  const data = JSON.parse(raw) as any[];
-  const a = new Assembly();
-  for (const n of data) {
-    const node = deserializeNode(n);
-    if (node) a.addRoot(node);
-  }
-  return a;
+  return deserializeAssembly(JSON.parse(raw) as any[]);
 }
 
 export function listAssemblies(): string[] {
@@ -64,5 +71,57 @@ export function loadLastAssembly(): Assembly | null {
 
 export function hasLastAssembly(): boolean {
   return localStorage.getItem(KEY_PREFIX + LAST_KEY) !== null;
+}
+
+// ─── Full flight-state save: CONTINUE resumes WHERE YOU LEFT OFF ───
+
+const FLIGHT_KEY = 'ellipse_flight_save';
+
+export interface FlightSave {
+  assembly: any[];
+  /** Remaining fuel per assembly root index (parallel to assembly array). */
+  fuel: number[];
+  position: [number, number, number];
+  velocity: [number, number, number];
+  throttle: number;
+  missionTime: number;
+  /** Rocket orientation quaternion [x, y, z, w]. */
+  quat: [number, number, number, number];
+  launched: boolean;
+  grounded: boolean;
+  groundedDir: [number, number, number] | null;
+  /** Full planetary state — positions drift with sim time, so without this
+   *  the rocket would resume relative to planets that reset to epoch. */
+  bodies: Array<{
+    name: string;
+    position: [number, number, number];
+    velocity: [number, number, number];
+  }>;
+}
+
+export function saveFlightState(s: FlightSave): void {
+  try {
+    localStorage.setItem(FLIGHT_KEY, JSON.stringify(s));
+  } catch { /* storage full — non-fatal */ }
+}
+
+export function loadFlightState(): FlightSave | null {
+  const raw = localStorage.getItem(FLIGHT_KEY);
+  if (!raw) return null;
+  try {
+    const s = JSON.parse(raw) as FlightSave;
+    if (!Array.isArray(s.assembly) || !Array.isArray(s.position) || !Array.isArray(s.velocity)) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+export function hasFlightSave(): boolean {
+  return loadFlightState() !== null;
+}
+
+export function clearFlightSave(): void {
+  localStorage.removeItem(FLIGHT_KEY);
 }
 
