@@ -4,11 +4,12 @@ import { buildPartMesh } from '../parts/PartBuilder';
 import { PART_SCALE } from '../config/constants';
 import type { Vec3 } from '../physics/Body';
 
+// Radii MUST match PartBuilder SIZE_DIMS radii (×PART_SCALE)
 const SIZE_DIMS: Record<string, { radius: number }> = {
-  S: { radius: 0.5 * PART_SCALE },
-  M: { radius: 0.7 * PART_SCALE },
-  L: { radius: 1.0 * PART_SCALE },
-  XL: { radius: 1.4 * PART_SCALE }
+  S: { radius: 0.60 * PART_SCALE },
+  M: { radius: 0.85 * PART_SCALE },
+  L: { radius: 1.15 * PART_SCALE },
+  XL: { radius: 1.50 * PART_SCALE }
 };
 
 export interface AssemblyNode {

@@ -1,4 +1,4 @@
-# Ellipse — Space Flight Simulator (v4.4)
+# Ellipse — Space Flight Simulator (v4.5)
 
 ## Platform
 - Web (Three.js + TypeScript + Vite)
@@ -21,14 +21,14 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 ## Physics (v3.5)
 - **Patched-conics SOI** — single-body gravity per frame
 - **3D quaternion-based thrust** — direction from rocket attitude
-- **Realistic rocket equation**: mass flow = thrust / (Isp * G0) **× FUEL_FLOW_MULT (0.1)** — game-balance slowdown; raw flow at g≈176 thrust levels would empty a 50t tank in ~3s. Burn times now ~1-2 min. Δv readout uses effective exhaust velocity (Isp·g0/FUEL_FLOW_MULT).
+- **Realistic rocket equation**: mass flow = thrust / (Isp * G0) **× FUEL_FLOW_MULT (1/15 ≈ 0.067)** — game-balance slowdown; raw flow at g≈176 thrust levels would empty a 50t tank in ~3s. Burn times now ~2-3 min. Δv readout uses effective exhaust velocity (Isp·g0/FUEL_FLOW_MULT).
 - **Multiple engines** — all engines fire simultaneously, thrust summed
-- **Drag** CdA ∝ mass, exponential atmosphere density
-- **Landing**: soft <5m/s (8 with chute), rough <20m/s (15 with chute), crash above
-- **TWR gate**: must have TWR ≥ 1.0 at CURRENT throttle to lift off — sums ALL engines' thrust (v3.6 fix)
+- **Drag** CdA ∝ mass, exponential atmosphere density *per-body scale (Earth 1.0, Venus 1.5, Mars 0.05, others 0)*
+- **Landing**: soft <5m/s (8 with chute), rough <20m/s (15 with chute), crash above — *chute now scales with mass (×6) for universal soft landing*
+- **TWR gate**: must have TWR ≥ 1.0 at CURRENT throttle and fuel > 0.01 to lift off — sums ALL engines' thrust, with fuel check ("No fuel — cannot launch!")
 - **Countdown**: 3-2-1-LIFTOFF, 5s cooldown after TWR failure
 - **Spawn protection**: 2 seconds (120 frames) after launch
-- **Aerodynamic stability**: rocket aligns with velocity in atmosphere (<70km)
+- **Aerodynamic stability**: rocket aligns with velocity in atmosphere (<70km) *gated by per-body atmosphere scale*
 - **Rotation**: yaw around surface normal, pitch around horizon tangent — realistic
 - **Gravity/drag**: use warped dt — consistent at all time warp levels
 - **SAS (v2.9)**: 4 modes cycled by `T` — OFF / HOLD (locks current attitude) / PROGRADE (tracks velocity) / RETROGRADE (tracks -velocity). Drives angular velocity toward target quaternion. Works only at x1 warp.
@@ -68,6 +68,21 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **Heavy engines boosted** for g≈176 heavy lifting: Mammoth 55000 kN, Kickback 70000 kN, TwinBoar 45000 kN.
 - **VAB preset "Saturn V (2-stage)"** (v4.4): slim L-profile booster — TwinBoar + 2× L tank + TD-2 decoupler + Saturn V GLTF. Total TWR 1.28; after booster separation Saturn V alone TWR 1.29.
 - **Engine bells slimmed** (v4.4): nozzle exit flare 0.84r → 0.60r, elongated 0.38h → 0.44h — sleeker, less "fat" look on all engines.
+- **Engine redesign (v4.5)**: engines read as ENGINES, not barrels — narrow
+  top mount (0.55r, fills the slot so no gap) + short turbopump block with
+  twin exhaust pipes + DOMINANT wide bell flaring to 0.88r over half the slot
+  height. Applies to all engines.
+- **Stage debris fixed (v4.5)**: separated stages now render at
+  ROCKET_VISUAL_SCALE (×60) with tumbling rotation — before, the detached
+  booster was an invisible speck (mesh at PART_SCALE with no group scale),
+  so staging looked like "nothing separated" / a lump under the rocket.
+- **Auto-staging (v4.5)**: drops the booster when ITS OWN tanks run dry (not
+  only when every tank is empty); also runs during warped autopilot ascent.
+- **VAB camera (v4.5)**: auto-frames the REAL mesh bounding box (toMesh()
+  com-centres the stack, so raw stack coordinates point the camera at empty
+  space); wheel + pinch zoom, double-click re-frames; scrolling the parts
+  LIST no longer silently zooms the camera out; LOAD restores the stack
+  height counter so new parts stack on top correctly.
 
 ## Crash & Atmosphere Fixes (v4.2)
 - **No drag full-stop**: drag never removes more than 90% of speed per frame — the old `velocity = 0` overshoot (especially at high time warp) halted rockets mid-air and made ground impacts impossible.
@@ -78,18 +93,42 @@ EARTH_MASS = 8.92e24 * 48  →  g ≈ 176 m/s² at R = 12.74e6 (2× real radius)
 - **Root cause**: `positionFlameAtNozzle` reads `Box3.setFromObject` which returns WORLD-space coordinates once the scene has rendered (at construction, before first render, matrixWorld is identity and it happens to return local coords). On staging the function re-runs mid-flight → `rocketBottomY` becomes a huge world coordinate (~+1400 near Earth) → `visualOffset = -rocketBottomY` explodes to ~-1400 → rocket visual + chase camera teleport deep INSIDE the planet → "planets disappear".
 - **Fix**: convert the world-space box to the rocket group's LOCAL space via `Box3.applyMatrix4(inverse(matrixWorld))` (handles rocket rotation mid-flight); also exclude the `reentry-outer` glow effect mesh from bounds so the flame stays at the true nozzle.
 
-## Default Rocket (Quick Flight)
+## Default Rocket (Quick Flight) — v4.5
 ```
-capsule_mk1   — 1200 kg, crew 1, parachute
-tank_m_lfo    — 600 kg dry, 50000 kg fuel (LFO)   ×2 (stage 1 + 2)
-engine_mammoth — 3000 kg, 18000 kN, Isp 310s      (stage 1)
-engine_vector  — 400 kg, 3000 kN, Isp 340s        (stage 2)
-decoupler_1   — 100 kg
+Stage 1: engine_mammoth (XL, 55000kN) + tank_xl_lfo (250t fuel)
+         ↓ decoupler_l
+Stage 2: engine_twinboar (L, 45000kN) + tank_l_lfo (100t fuel)
+         ↓ decoupler_s
+Stage 3: engine_sparkler (S, 600kN) + tank_s_lfo (5t fuel) + capsule_mk1
 
-Total wet: ~106 t, total thrust: 58000 kN
-TWR ≈ 3.1 at g≈176 (both engines fire)
-Staging required for orbit
+Total wet: ~365 t, launch thrust: 100600 kN (all engines fire)
+TWR ≈ 1.57 at g≈176 — lifts off at full throttle
+Tapered silhouette: r 1.0 → 0.75 → 0.4 (classic rocket profile)
 ```
+
+## Part Proportions (v4.5)
+Chunky rocket proportions (h/r ≈ 2.4) — user-tuned through three iterations
+(1.6 "fat barrels" → 3.6 "thin sticks" → 2.9 "still small" → 2.4 final).
+Heights/radii live in `PartBuilder SIZE_DIMS` and MUST stay in sync with
+`VABScene PH` (stacking) and `Assembly SIZE_DIMS` (adapter radii):
+```
+S:  r 0.60·p, h 1.4·p     M:  r 0.85·p, h 2.0·p
+L:  r 1.15·p, h 2.8·p     XL: r 1.50·p, h 3.6·p
+```
+VAB has on-screen ＋/－/FIT zoom buttons (bottom-right) in addition to
+wheel/pinch; FIT re-frames the whole rocket. Scrolling the parts list never
+zooms the camera.
+
+## Flight Controls gotchas fixed (v4.5)
+- **Throttle locks only above 10x warp** (with a toast) — it used to be
+  silently zeroed at ANY warp, so rockets "wouldn't lift off".
+- **Free camera no longer kills throttle/steering** — it's just a camera.
+- **Rotation**: world-space premultiply (was post-multiply — yaw twisted
+  around a wrong axis); SAS angular velocity actually integrated (SAS was
+  dead code); ANGULAR_ACCEL 2.5; aerodynamic alignment suspended while the
+  player steers and softened ×2.5 (it used to fight manual turns).
+- **Stale saves**: CONTINUE detects unknown part ids (old catalogs) and
+  warns + starts fresh instead of silently dropping decouplers.
 
 ## Part Catalog (32 parts)
 - **Capsule**: MK-1 (M, 1200 kg) — textured body, dark heat shield, blue window, gold ring
@@ -123,21 +162,34 @@ Staging required for orbit
 - Live evaluation during flight; toast on completion
 - Mission list panel in main menu (★ MISSIONS button) with progress + rewards
 
-## Save System (v3.2)
+## Save System (v3.2, flight-resume in v4.5)
 - VAB **SAVE** dialog: name and persist assembly to localStorage
 - VAB **LOAD** dialog: list saved rockets, load or delete
 - **Autosave last build**: persists on LAUNCH; **CONTINUE** button in main menu resumes it
+- **Flight resume (v4.5)**: leaving flight for the menu (Esc → MENU, not a crash)
+  saves the full flight state — position, velocity, attitude, throttle, fuel per
+  tank, landed/launched flags AND all planetary positions/velocities (planets
+  reset to epoch each session, so without this the rocket would resume in the
+  wrong place). **CONTINUE** restores everything where you left off. A fresh
+  launch (FLIGHT / VAB LAUNCH) clears the resume point; crashes are not saved.
 
-## Transfer Planner & Autopilot (v3.7)
+## Transfer Planner & Autopilot (v3.7, auto-launch in v4.5)
 - In map view: **TRANSFER PLANNER** panel (top-right)
 - Select target planet → COMPUTE Hohmann transfer (Δv, direction, travel time)
-- **AUTOPILOT GO** button: rocket automatically flies to selected planet
+- **AUTOPILOT GO** button: rocket automatically flies to selected planet.
+  GO **auto-computes the plan** if COMPUTE was not pressed — previously it
+  silently did nothing without a plan ("press GO, nothing happens").
+  - **ASCENT phase (v4.5)**: GO works even on the pad — full-throttle auto-launch
+    (straight up); works at ANY time warp (atmosphere clamp still limits to 10x
+    below 70 km); dry boosters are auto-staged mid-ascent; at 120 km the
+    transfer is RE-COMPUTED from the current state (a pad-side plan has
+    velocity ≈ 0 and is meaningless)
   - **BURN phase**: sets throttle=100%, SAS=prograde/retrograde, burns until Δv achieved
   - **COAST phase**: time-warp to 100000x, monitors distance to target
   - **ARRIVAL**: shows "YOU HAVE ARRIVED" overlay with travel time, fuel consumed, mass lost
   - Live status badge (top-center) shows phase + progress — click to cancel
-  - Validates: not grounded, has fuel, has engines before starting
-  - Abort: out of fuel, cancelled by user, target not found
+  - Validates: has fuel, has engines before starting; COMPUTE failures show a toast
+  - Abort: out of fuel, cancelled by user, target not found, no valid transfer from orbit
 
 ### Animations (v3.0)
 - **Starfield**: per-star twinkle (shader uTime) + drifting nebula bands
@@ -179,7 +231,7 @@ Staging required for orbit
 - **VAB**: dark sidebar, part list grouped by type, color-coded indicators, rocket breadcrumbs, UNDO/CLEAR/LAUNCH/BACK
 - **Flight**: physics, rendering, HUD, map, effects, staging, SAS — 2300+ lines
 
-## Known Issues (v3.5)
+## Known Issues (v4.5)
 - FlightScene.ts needs decomposition into modules (~2500 lines)
 - Flat assembly model limits radial/staged complexity
 - No symmetry mode for boosters

@@ -7,7 +7,8 @@ import { gltfCache } from '../parts/PartBuilder';
 import { saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
 import { toast } from '../ui/Toast';
 
-const PH: Record<string,number> = { S:0.7, M:1.1, L:1.6, XL:2.2 };
+// Part stacking heights — MUST match PartBuilder SIZE_DIMS heights (×PART_SCALE)
+const PH: Record<string,number> = { S:1.4, M:2.0, L:2.8, XL:3.6 };
 
 export class VABScene {
   scene = new THREE.Scene();
@@ -18,9 +19,19 @@ export class VABScene {
   private info!: HTMLElement;
   private st = 0;
   private nm: string[] = [];
-  private az = 0; private po = Math.PI/2; private readonly dt = 5;
+  private az = 0; private po = Math.PI/2; private dt = 1.5;
   private dr = false; private pr = { x:0, y:0 };
   private tg = new THREE.Vector3(0, PART_SCALE, 0);
+  private _onDown!: (e: MouseEvent) => void;
+  private _onMove!: (e: MouseEvent) => void;
+  private _onUp!: (e: MouseEvent) => void;
+  private _onWheel!: (e: WheelEvent) => void;
+  private _onDbl!: (e: MouseEvent) => void;
+  private _onTStart!: (e: TouchEvent) => void;
+  private _onTMove!: (e: TouchEvent) => void;
+  private _onTEnd!: (e: TouchEvent) => void;
+  private _onResize!: () => void;
+  private _pinchDist = 0;
 
   constructor(private ol: (a:Assembly)=>void, private ob: ()=>void) {
     this.scene.background = new THREE.Color(0x080c16);
@@ -29,10 +40,63 @@ export class VABScene {
     this.scene.add(new THREE.HemisphereLight(0x8899bb, 0x334455, 0.5));
     this.scene.add(this.rg); this.cam();
 
-    const m = (e:MouseEvent) => { if(e.button===0){this.dr=true;this.pr={x:e.clientX,y:e.clientY};} };
-    document.addEventListener('mousedown', m);
-    document.addEventListener('mousemove', e => { if(!this.dr)return; this.az-=(e.clientX-this.pr.x)*0.005; this.po=Math.max(0.05,Math.min(Math.PI-0.05,this.po+(e.clientY-this.pr.y)*0.005)); this.pr={x:e.clientX,y:e.clientY}; this.cam(); });
-    document.addEventListener('mouseup', () => this.dr=false);
+    this._onDown = (e:MouseEvent) => {
+      // Don't start orbit-drag from UI element presses (zoom buttons, sidebar)
+      const t = e.target as Element | null;
+      if (t && t.closest && t.closest('button, input, select, #vl, #vi')) return;
+      if(e.button===0){this.dr=true;this.pr={x:e.clientX,y:e.clientY};}
+    };
+    this._onMove = (e:MouseEvent) => { if(!this.dr)return; this.az-=(e.clientX-this.pr.x)*0.005; this.po=Math.max(0.05,Math.min(Math.PI-0.05,this.po+(e.clientY-this.pr.y)*0.005)); this.pr={x:e.clientX,y:e.clientY}; this.cam(); };
+    this._onUp = () => this.dr=false;
+    // Wheel zoom — v3.9 accidentally froze the camera at a fixed distance
+    // while rockets kept getting taller, making everything tiny on screen.
+    this._onWheel = (e:WheelEvent) => {
+      if (this.root && !this.root.isConnected) return;
+      // Only zoom when the wheel is over the 3D view — scrolling the PARTS
+      // LIST must not silently zoom the camera out (that kept making the
+      // rocket look tiny for no visible reason).
+      const t = e.target as Element | null;
+      if (t && t.closest && t.closest('#vl, #vi, button, input, select, .guide-overlay')) return;
+      this.dt = Math.max(0.12, Math.min(40, this.dt * (e.deltaY > 0 ? 1.15 : 0.87)));
+      this.cam();
+    };
+    // Double-click on empty canvas → re-frame the rocket
+    this._onDbl = (e:MouseEvent) => { if (e.target === document.body) this.frame(); };
+    // Pinch zoom for touch devices (no wheel there)
+    const tDist = (e:TouchEvent) => Math.hypot(
+      e.touches[0]!.clientX - e.touches[1]!.clientX,
+      e.touches[0]!.clientY - e.touches[1]!.clientY
+    );
+    this._onTStart = (e:TouchEvent) => {
+      const t = e.target as Element | null;
+      if (t && t.closest && t.closest('#vl, #vi, button, input, select, .guide-overlay')) return;
+      if (e.touches.length === 2) this._pinchDist = tDist(e);
+    };
+    this._onTMove = (e:TouchEvent) => {
+      if (e.touches.length === 2 && this._pinchDist > 0) {
+        const d = tDist(e);
+        if (d > 0) {
+          this.dt = Math.max(0.12, Math.min(40, this.dt * (this._pinchDist / d)));
+          this._pinchDist = d;
+          this.cam();
+        }
+      }
+    };
+    this._onTEnd = () => { this._pinchDist = 0; };
+    // Keep aspect correct on window resize
+    this._onResize = () => {
+      this.camera.aspect = innerWidth / innerHeight;
+      this.camera.updateProjectionMatrix();
+    };
+    document.addEventListener('mousedown', this._onDown);
+    document.addEventListener('mousemove', this._onMove);
+    document.addEventListener('mouseup', this._onUp);
+    document.addEventListener('wheel', this._onWheel, { passive: true });
+    document.addEventListener('dblclick', this._onDbl);
+    document.addEventListener('touchstart', this._onTStart, { passive: true });
+    document.addEventListener('touchmove', this._onTMove, { passive: true });
+    document.addEventListener('touchend', this._onTEnd, { passive: true });
+    window.addEventListener('resize', this._onResize);
 
     this.root = document.createElement('div');
     this.root.style.cssText = 'position:fixed;inset:0;z-index:150;pointer-events:none;display:flex;';
@@ -56,7 +120,12 @@ export class VABScene {
           <button id="vb" style="width:100%;padding:8px;background:transparent;color:#fff;border:none;font:400 10px system-ui;cursor:pointer;">BACK</button>
         </div>
       </div>
-      <div style="flex:1;"></div>`;
+      <div style="flex:1;"></div>
+      <div style="position:absolute;right:18px;bottom:18px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;">
+        <button id="vz-in" title="Zoom in" style="width:40px;height:40px;border-radius:8px;background:rgba(8,12,22,0.85);color:#fff;border:1px solid rgba(255,255,255,0.25);font:400 18px system-ui;cursor:pointer;">＋</button>
+        <button id="vz-out" title="Zoom out" style="width:40px;height:40px;border-radius:8px;background:rgba(8,12,22,0.85);color:#fff;border:1px solid rgba(255,255,255,0.25);font:400 18px system-ui;cursor:pointer;">－</button>
+        <button id="vz-fit" title="Fit whole rocket" style="width:40px;height:40px;border-radius:8px;background:rgba(200,152,56,0.25);color:#EACD9E;border:1px solid rgba(200,152,56,0.45);font:600 10px system-ui;cursor:pointer;">FIT</button>
+      </div>`;
     this.info = this.root.querySelector('#vi')!;
     this.build();
     this.root.querySelector('#vg')!.addEventListener('click', () => {
@@ -72,6 +141,14 @@ export class VABScene {
     this.root.querySelector('#vs')!.addEventListener('click', () => this.showSaveDialog());
     this.root.querySelector('#vlb')!.addEventListener('click', () => this.showLoadDialog());
     this.root.querySelector('#vb')!.addEventListener('click', () => this.ob());
+    // On-screen zoom controls — bulletproof against wheel/touch/event-target quirks
+    this.root.querySelector('#vz-in')!.addEventListener('click', () => {
+      this.dt = Math.max(0.12, this.dt * 0.8); this.cam();
+    });
+    this.root.querySelector('#vz-out')!.addEventListener('click', () => {
+      this.dt = Math.min(40, this.dt * 1.25); this.cam();
+    });
+    this.root.querySelector('#vz-fit')!.addEventListener('click', () => this.frame());
   }
 
   private build() {
@@ -140,6 +217,23 @@ export class VABScene {
     const r = this.assembly.roots.pop()!; this.st-=PH[r.part.size]||0.6; this.nm.pop();
     this.rf(); this.up();
   }
+
+  /** Auto-frame the camera on the ACTUAL rendered mesh. Assembly.toMesh()
+   *  re-centres parts around the centre of mass, so the visual rocket is NOT
+   *  at the raw stack coordinates — framing by stack height pointed the
+   *  camera at empty space while the rocket sat tiny off-centre. */
+  private frame(): void {
+    const box = new THREE.Box3().setFromObject(this.rg);
+    if (box.isEmpty()) { this.tg.set(0, PART_SCALE, 0); this.dt = 1.5; this.cam(); return; }
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    // Tight framing: visible height at distance d (fov 50°) ≈ 0.93·d,
+    // so d ≈ span·0.92 makes the rocket fill ~the whole view height.
+    const span = Math.max(size.y, size.x * 2.5, 0.03);
+    this.tg.copy(center);
+    this.dt = Math.max(0.16, Math.min(40, span * 0.92 + 0.04));
+    this.cam();
+  }
   private up() {
     if(!this.nm.length){this.info.innerHTML='<span style="color:rgba(255,255,255,0.5);">select parts</span>';return;}
     const dm=this.assembly.roots.reduce((s,n)=>s+n.part.mass,0), fl=this.assembly.roots.reduce((s,n)=>s+(n.part.fuelCapacity||0),0);
@@ -147,14 +241,29 @@ export class VABScene {
   }
   private async rf() {
     while(this.rg.children.length) this.rg.remove(this.rg.children[0]!);
-    if(!this.assembly.roots.length) return;
-    const ng=this.assembly.roots.some(n=>n.part.kind==='gltf'&&n.part.gltfUrl&&!gltfCache.has(n.part.gltfUrl));
-    if(ng){const{loadGLTF}=await import('../parts/PartBuilder');for(const r of this.assembly.roots)if(r.part.kind==='gltf'&&r.part.gltfUrl&&!gltfCache.has(r.part.gltfUrl))await loadGLTF(r.part.gltfUrl,r.part.gltfScale??1);}
-    this.rg.add(this.assembly.toMesh());
+    if (this.assembly.roots.length) {
+      const ng=this.assembly.roots.some(n=>n.part.kind==='gltf'&&n.part.gltfUrl&&!gltfCache.has(n.part.gltfUrl));
+      if(ng){const{loadGLTF}=await import('../parts/PartBuilder');for(const r of this.assembly.roots)if(r.part.kind==='gltf'&&r.part.gltfUrl&&!gltfCache.has(r.part.gltfUrl))await loadGLTF(r.part.gltfUrl,r.part.gltfScale??1);}
+      this.rg.add(this.assembly.toMesh());
+    }
+    // Re-frame after every rebuild — covers add/undo/clear/load and the
+    // async GLTF path (mesh lands only after await).
+    this.frame();
   }
   private cam(){const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
   mount(){document.body.appendChild(this.root);}
-  unmount(){this.root.remove();}
+  unmount(){
+    this.root.remove();
+    document.removeEventListener('mousedown', this._onDown);
+    document.removeEventListener('mousemove', this._onMove);
+    document.removeEventListener('mouseup', this._onUp);
+    document.removeEventListener('wheel', this._onWheel);
+    document.removeEventListener('dblclick', this._onDbl);
+    document.removeEventListener('touchstart', this._onTStart);
+    document.removeEventListener('touchmove', this._onTMove);
+    document.removeEventListener('touchend', this._onTEnd);
+    window.removeEventListener('resize', this._onResize);
+  }
 
   private showSaveDialog(): void {
     if (!this.assembly.roots.length) { toast.show('Nothing to save — build first!'); return; }
@@ -212,7 +321,9 @@ export class VABScene {
           const a = loadAssembly(name);
           if (a) {
             this.assembly = a;
-            this.st = 0; this.nm = a.roots.map(r => r.part.name);
+            // Restore stack height so further adds/undo stack correctly on top
+            this.st = a.roots.reduce((s, r) => s + (PH[r.part.size] || 0.6), 0);
+            this.nm = a.roots.map(r => r.part.name);
             this.rf(); this.up();
             toast.show(`Loaded: "${name}"`);
             overlay.remove();

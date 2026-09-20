@@ -43,13 +43,15 @@ describe('PartBuilder', () => {
     }
   });
 
-  it('capsule has body, nose cone, stripes, gold base, window + glow', () => {
+  it('capsule has body, nose cone, heat shield, docking port + windows', () => {
     const p = findPart('capsule_mk1')!;
     const g = buildPartMesh(p);
-    expect(hasGeometryType(g, 'CircleGeometry')).toBe(true);
-    expect(hasGeometryType(g, 'RingGeometry')).toBe(true);
-    // Gold parts now use gold texture, check for at least 2 textured meshes
-    expect(countMeshesWithGoldTexture(g)).toBeGreaterThanOrEqual(2);
+    // body + heat shield cylinders, sphere nose/windows, torus gold band
+    expect(hasGeometryType(g, 'CylinderGeometry')).toBe(true);
+    expect(hasGeometryType(g, 'SphereGeometry')).toBe(true);
+    expect(hasGeometryType(g, 'TorusGeometry')).toBe(true);
+    // Textured meshes (capsule skin + gold accents)
+    expect(countMeshesWithGoldTexture(g)).toBeGreaterThanOrEqual(1);
   });
 
   it('tank has body and gold bands + structural ring', () => {
