@@ -54,10 +54,11 @@ describe('Comprehensive Integration Tests', () => {
     a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, 0.8*PART_SCALE, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const mesh = a.toMesh();
+    // Joint collars are light-gray 0xd8d8d2 (capsule M over tank S = one collar)
     const adapters = mesh.children.filter(c => {
       const m = c as THREE.Mesh;
-      return m.isMesh && m.geometry.type === 'CylinderGeometry' && 
-             (m.material as THREE.MeshStandardMaterial).color.getHex() === 0xffffff;
+      return m.isMesh && m.geometry.type === 'CylinderGeometry' &&
+             (m.material as THREE.MeshStandardMaterial).color.getHex() === 0xd8d8d2;
     });
     expect(adapters.length).toBeGreaterThanOrEqual(1);
   });

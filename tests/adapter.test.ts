@@ -18,13 +18,14 @@ describe('Adapter Tests', () => {
         a.addRoot({ part: cap, position: [0, 1.2*PART_SCALE, 0], rotation: 0, children: [] });
         a.addRoot({ part: tank, position: [0, 0.6*PART_SCALE, 0], rotation: 0, children: [] });
         const m = a.toMesh();
-        const goldCones = m.children.filter(c => {
+        // Joint collars are light-gray 0xd8d8d2 cylinders
+        const collars = m.children.filter(c => {
           const mesh = c as THREE.Mesh;
-return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xffffff;
+          return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xd8d8d2;
         });
-        // S tank size differs from capsule — adapter should exist
+        // S tank size differs from capsule — collar should exist
         if (tank.size !== cap.size) {
-          expect(goldCones.length).toBeGreaterThanOrEqual(1);
+          expect(collars.length).toBeGreaterThanOrEqual(1);
         }
       }
     }
@@ -35,11 +36,11 @@ return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterCol
     a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, 0.6*PART_SCALE, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const m = a.toMesh();
-    const goldCones = m.children.filter(c => {
+    const collars = m.children.filter(c => {
       const mesh = c as THREE.Mesh;
-      return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xdd9944;
+      return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xd8d8d2;
     });
-    // Both S size — no adapter needed
-    expect(goldCones.length).toBe(0);
+    // Both S size — no collar needed
+    expect(collars.length).toBe(0);
   });
 });

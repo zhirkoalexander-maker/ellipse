@@ -1,16 +1,7 @@
 import * as THREE from 'three';
 import type { Part } from '../parts/Part';
-import { buildPartMesh } from '../parts/PartBuilder';
-import { PART_SCALE } from '../config/constants';
+import { buildPartMesh, SIZE_DIMS } from '../parts/PartBuilder';
 import type { Vec3 } from '../physics/Body';
-
-// Radii MUST match PartBuilder SIZE_DIMS radii (×PART_SCALE)
-const SIZE_DIMS: Record<string, { radius: number }> = {
-  S: { radius: 0.60 * PART_SCALE },
-  M: { radius: 0.85 * PART_SCALE },
-  L: { radius: 1.15 * PART_SCALE },
-  XL: { radius: 1.50 * PART_SCALE }
-};
 
 export interface AssemblyNode {
   part: Part;
@@ -93,23 +84,29 @@ export class Assembly {
       n.children.forEach((c) => walk(c, mesh));
     };
     this.roots.forEach((r) => walk(r, group));
-    // Add smooth adapters between adjacent parts of different sizes
+    // Joint collars between adjacent parts of different sizes — a SHORT cone
+    // centered exactly on the joint plane, tapering from the wider part to
+    // the narrower one. (The old version was a cone 1.5x the center distance
+    // tall, stabbing deep into BOTH parts — ugly.)
     const sorted = [...this.roots].sort((a, b) => b.position[1] - a.position[1]);
     let adapterCount = 0;
     for (let i = 0; i < sorted.length - 1; i++) {
       const top = sorted[i]!, bot = sorted[i + 1]!;
-      const r1 = SIZE_DIMS[top.part.size]?.radius ?? 0;
-      const r2 = SIZE_DIMS[bot.part.size]?.radius ?? 0;
-if (Math.abs(r1 - r2) > 0.001 && !top.part.id.includes('decoupler') && !bot.part.id.includes('decoupler')) {
-        const midY = (top.position[1] + bot.position[1]) / 2;
-        const coneH = Math.abs(top.position[1] - bot.position[1]) * 1.5;
-        const coneGeom = new THREE.CylinderGeometry(r2, r1, coneH, 32);
-        const coneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.2, emissive: 0x000000, emissiveIntensity: 0 });
-        const cone = new THREE.Mesh(coneGeom, coneMat);
-cone.position.y = midY;
-        group.add(cone);
-        adapterCount++;
-      }
+      const dt = SIZE_DIMS[top.part.size], db = SIZE_DIMS[bot.part.size];
+      if (!dt || !db) continue;
+      if (Math.abs(dt.radius - db.radius) < 0.001) continue;
+      if (top.part.id.includes('decoupler') || bot.part.id.includes('decoupler')) continue;
+      // Joint plane = bottom face of the upper part (parts stack flush)
+      const jointY = top.position[1] - dt.height / 2;
+      const collarH = Math.min(dt.height, db.height) * 0.22;
+      const rTop = Math.max(dt.radius, db.radius) * 1.02;
+      const rBot = Math.min(dt.radius, db.radius) * 0.98;
+      const coneGeom = new THREE.CylinderGeometry(rTop, rBot, collarH, 32);
+      const coneMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d2, roughness: 0.45, metalness: 0.3 });
+      const cone = new THREE.Mesh(coneGeom, coneMat);
+      cone.position.y = jointY;
+      group.add(cone);
+      adapterCount++;
     }
     // Center group at center of mass
     if (adapterCount > 0) console.log('Smooth adapters created:', adapterCount);
