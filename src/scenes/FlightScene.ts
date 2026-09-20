@@ -97,11 +97,13 @@ export class FlightScene {
   private cameraMode: 'chase' | 'free' = 'chase';
   private freeCamAzimuth = 0;
   private freeCamPolar = Math.PI / 2;
-  private freeCamDist = 4;
-  private freeCamKeys = { left: false, right: false, up: false, down: false };
-  private freeCamDragging = false;
-  private freeCamPrevMouse = { x: 0, y: 0 };
-  private hudVisible = true;
+private freeCamDist = 4;
+private freeCamKeys = { left: false, right: false, up: false, down: false };
+private freeCamDragging = false;
+private freeCamPrevMouse = { x: 0, y: 0 };
+private throttleUpKey = false;
+private throttleDownKey = false;
+private hudVisible = true;
   private lastAltMilestone = 0;
   private sonicBoomRing: THREE.Mesh | null = null;
   private sonicBoomLife = 0;
@@ -111,6 +113,7 @@ export class FlightScene {
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
   private _camSnapped = false;
+private rocketTopY = 0; // highest point of rocket mesh in local space
 
   // Autopilot state
   private autopilotActive = false;
@@ -198,7 +201,7 @@ export class FlightScene {
     const dirMag = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
-    const SPAWN_OFFSET_M = 60;
+    const SPAWN_OFFSET_M = 120;
     // Compute nominal surface position (for terrain lookup)
     const nominalSurface: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
@@ -380,6 +383,8 @@ export class FlightScene {
     this.sound = new SoundManager();
 
     this.hud = new HUD();
+    // Debug/diagnostics hook (headless e2e tests read live state from here)
+    (window as any).__ellipse = { flight: this };
     this.hud.onAction = (action) => {
       if (action === 'stage') this.performStage();
       else if (action === 'parachute') this.toggleParachute();
@@ -1007,6 +1012,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.hud.setVisible(this.hudVisible);
         toast.show(this.hudVisible ? 'HUD shown' : 'HUD hidden');
       }
+      // Keyboard throttle
+      if (e.key === 'ArrowUp') { this.throttleUpKey = true; e.preventDefault(); }
+      if (e.key === 'ArrowDown') { this.throttleDownKey = true; e.preventDefault(); }
       // Free cam orbit on arrow keys + Shift+C active
       if (this.cameraMode === 'free') {
         if (e.key === 'ArrowUp') { this.freeCamKeys.up = true; e.preventDefault(); }
@@ -1017,10 +1025,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     });
 
     window.addEventListener('keyup', (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp') this.freeCamKeys.up = false;
-      if (e.key === 'ArrowDown') this.freeCamKeys.down = false;
-      if (e.key === 'ArrowLeft') this.freeCamKeys.left = false;
-      if (e.key === 'ArrowRight') this.freeCamKeys.right = false;
+      if (e.key === 'ArrowUp') { this.throttleUpKey = false; this.freeCamKeys.up = false; }
+      if (e.key === 'ArrowDown') { this.throttleDownKey = false; this.freeCamKeys.down = false; }
+      if (e.key === 'ArrowLeft') { this.freeCamKeys.left = false; }
+      if (e.key === 'ArrowRight') { this.freeCamKeys.right = false; }
     });
 
     // Free cam mouse + touch drag (touchpad)
@@ -1101,6 +1109,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       case 'mars': return 0.05;
       default: return 0;
     }
+  }
+
+  /** Velocity RELATIVE to the reference body. Planets race along their orbits
+   *  (Earth: 17 km/s!) — drag, plasma, SAS prograde, orbits and HUD speed must
+   *  all use local-relative velocity, or the pad would burn like a reentry. */
+  private relVelocity(): [number, number, number] {
+    const ref = getReferenceBody(this.state.position, this.system);
+    const rv = ref.velocity ?? [0, 0, 0];
+    return [
+      this.state.velocity[0] - rv[0],
+      this.state.velocity[1] - rv[1],
+      this.state.velocity[2] - rv[2],
+    ];
+  }
+
+  private relSpeed(): number {
+    const v = this.relVelocity();
+    return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1264,6 +1290,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Screen buttons throttle
     if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
     if (this.hud.throttleDownBtn) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
+    // Keyboard throttle
+    if (this.throttleUpKey) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
+    if (this.throttleDownKey) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
 
     // Camera zoom
     if (this.controls.getZoomIn()) this.chase.zoom(0.92);
@@ -1350,12 +1379,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // SAS: hold attitude or track prograde/retrograde
     if (this.sasMode !== 'off' && !warpActive) {
       if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
-        const velMagSas = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+        const rvSas = this.relVelocity();
+        const velMagSas = Math.sqrt(rvSas[0]**2 + rvSas[1]**2 + rvSas[2]**2);
         if (velMagSas > 0.1) {
           let targetDir = new THREE.Vector3(
-            this.state.velocity[0] / velMagSas,
-            this.state.velocity[1] / velMagSas,
-            this.state.velocity[2] / velMagSas
+            rvSas[0] / velMagSas,
+            rvSas[1] / velMagSas,
+            rvSas[2] / velMagSas
           );
           if (this.sasMode === 'retrograde') targetDir.negate();
           this.sasTargetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
@@ -1451,6 +1481,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.liftoffFrames = 5;
       this.launched = true;
       this._camSnapped = false; // reset camera snap on liftoff
+      // Inherit the planet's ORBITAL velocity (Earth: 17 km/s). Without it
+      // the planet races away from the rocket and everything downstream
+      // (debris, altitude, orbit prediction) collapses into garbage.
+      const liftoffRef = getReferenceBody(this.state.position, this.system);
+      const liftoffVel = liftoffRef.velocity ?? [0, 0, 0];
+      this.state.velocity[0] += liftoffVel[0];
+      this.state.velocity[1] += liftoffVel[1];
+      this.state.velocity[2] += liftoffVel[2];
       this.achievements.unlock('reach_space');
       this.sound.startEngine();
       // Brief camera shake on liftoff
@@ -1511,10 +1549,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     nearestDist = Math.sqrt(ndx*ndx + ndy*ndy + ndz*ndz);
     nearestBody = nearRef;
 
-    // Reentry glow
-    const speed = Math.sqrt(
-      this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-    );
+    // Reentry glow — RELATIVE speed (planet's 17 km/s orbital motion removed;
+    // absolute speed would light the pad up like a reentry)
+    const speed = this.relSpeed();
 // Aerodynamic stability: rocket naturally aligns with velocity in atmosphere.
      // Never fights the player: suspended while steering input is held, and
      // softened (the old 0.1 factor yanked ~12%/s at sea level against turns
@@ -1525,7 +1562,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
        const atmoScale = this.atmosphereScale((nearestBody as any).name);
        if (atmoScale > 0 && aeroAlt > 0 && aeroAlt < 70000) {
          const rho = Math.exp(-aeroAlt / 8500) * atmoScale;
-         const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
+          const rvAero = this.relVelocity();
+          const velDir = new THREE.Vector3(rvAero[0], rvAero[1], rvAero[2]).normalize();
          const currFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
          const dot = Math.abs(currFwd.dot(velDir));
          if (dot < 0.99) {
@@ -1578,10 +1616,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       this.sanitize(this.state.velocity);
 
-// Aerodynamic drag
-       const speed = Math.sqrt(
-         this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-       );
+// Aerodynamic drag — RELATIVE speed (atmosphere co-moves with the planet)
+       const speed = this.relSpeed();
        const mass = this.state.rocket.totalMass();
        let CdA = mass * 0.001 + 0.2;
        if (this.parachuteDeployed) CdA = Math.max(50, mass * 6);
@@ -1596,14 +1632,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
            const dragForce = q * CdA;
            const dragAccel = dragForce / mass;
            const dragDelta = dragAccel * _dt;
-           // Never kill more than 90% of speed in one frame — the old full-stop
-           // (velocity = 0) at high time warp halted rockets mid-air and made
-           // impacts impossible.
-           const f = Math.max(0.1, 1 - dragDelta / speed);
-           this.state.velocity[0] *= f;
-           this.state.velocity[1] *= f;
-           this.state.velocity[2] *= f;
-           this.sanitize(this.state.velocity);
+            // Never kill more than 90% of RELATIVE speed in one frame — the
+            // old full-stop (velocity = 0) at high time warp halted rockets
+            // mid-air. Applied to the RELATIVE velocity (planet's orbital
+            // component must pass through untouched).
+            const f = Math.max(0.1, 1 - dragDelta / speed);
+            const rv = this.relVelocity();
+            this.state.velocity[0] = rv[0] * f + (this.state.velocity[0] - rv[0]);
+            this.state.velocity[1] = rv[1] * f + (this.state.velocity[1] - rv[1]);
+            this.state.velocity[2] = rv[2] * f + (this.state.velocity[2] - rv[2]);
+            this.sanitize(this.state.velocity);
 
         // Reentry glow effect (plasma)
         const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
@@ -2159,8 +2197,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
-    // Mach number + sonic boom (visual only, no HUD display)
-    const speedMs = Math.sqrt(this.state.velocity[0]**2 + this.state.velocity[1]**2 + this.state.velocity[2]**2);
+    // Mach number + sonic boom (visual only, no HUD display) — relative speed
+    const speedMs = this.relSpeed();
     const mach = speedMs / 340;
     this.hud.setMass(this.state.rocket.totalMass());
     this.prevMach = mach;
@@ -2563,12 +2601,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
         scene.add(debrisGroup);
 
-        // Velocity: rocket velocity + push toward planet (down, away from rocket) + random
+        // Velocity: rocket velocity + the PLANET's orbital velocity (debris
+        // must co-move with the planet, or it races away at 17 km/s and they
+        // look like they "fly off into space" while still on the ground) +
+        // push toward planet + random
         const pushForce = 5 + Math.random() * 5;
+        const refVel = refBody.velocity ?? [0, 0, 0];
         const sepVel: Vec3 = [
-          this.state.velocity[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[0] + refVel[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[1] + refVel[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[2] + refVel[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
         ];
 
         const debrisBody = new Body('debris', 100, pos, sepVel);
@@ -2875,35 +2917,45 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     return walk(this.rocket.assembly.roots);
   }
 
-  private positionFlameAtNozzle(): void {
-    // Find the lowest point of rocket meshes (engine nozzle) in the GROUP's LOCAL space.
-    // Box3.setFromObject returns WORLD-space coordinates once the scene has rendered;
-    // at construction time (before first render) matrixWorld is identity and the box
-    // happens to be local. A mid-flight re-call (staging) would otherwise store a huge
-    // world coordinate (~+1400 near Earth) in rocketBottomY, exploding visualOffset
-    // and teleporting the rocket + camera inside the planet ("planets disappear" bug).
-    let minY = Infinity;
-    const inv = this.rocketGroup.matrixWorld.clone().invert();
-    this.rocketGroup.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        if (this.gearMeshes.includes(obj)) return;
-        if (obj === this.rocketShadow) return;
-        if (obj === this.reentryGlow) return;
-        if (obj === this.reentryGlowMesh) return;
-        if (obj.name === 'reentry-outer') return; // reentry glow effect — not rocket structure
-        const worldBox = new THREE.Box3().setFromObject(obj);
-        // Convert to rocket-group local space (applyMatrix4 covers all 8 corners,
-        // so rotation of the rocket mid-flight is handled correctly)
-        const localBox = worldBox.applyMatrix4(inv);
-        if (localBox.min.y < minY) minY = localBox.min.y;
-      }
-    });
-    this.rocketBottomY = minY === Infinity ? -0.1 : minY;
-    // Position flame at the bottom center, in local space
-    const flameY = minY === Infinity ? -0.1 : minY - 0.01;
-    this.engineFlame.getMesh().position.set(0, flameY, 0);
-    this.engineFlame.getMesh().rotation.set(0, 0, 0);
-  }
+private positionFlameAtNozzle(): void {
+      // Find the lowest and highest point of rocket meshes in the GROUP's LOCAL space.
+      // Box3.setFromObject returns WORLD-space coordinates once the scene has rendered;
+      // at construction time (before first render) matrixWorld is identity and the box
+      // happens to be local. A mid-flight re-call (staging) would otherwise store a huge
+      // world coordinate (~+1400 near Earth) in rocketBottomY, exploding visualOffset
+      // and teleporting the rocket + camera inside the planet ("planets disappear" bug).
+      let minY = Infinity;
+      let maxY = -Infinity;
+      const inv = this.rocketGroup.matrixWorld.clone().invert();
+      this.rocketGroup.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          if (this.gearMeshes.includes(obj)) return;
+          if (obj === this.rocketShadow) return;
+          if (obj === this.reentryGlow) return;
+          if (obj === this.reentryGlowMesh) return;
+          if (obj.name === 'reentry-outer') return; // reentry glow effect — not rocket structure
+          const worldBox = new THREE.Box3().setFromObject(obj);
+          // Convert to rocket-group local space (applyMatrix4 covers all 8 corners,
+          // so rotation of the rocket mid-flight is handled correctly)
+          const localBox = worldBox.applyMatrix4(inv);
+          if (localBox.min.y < minY) minY = localBox.min.y;
+          if (localBox.max.y > maxY) maxY = localBox.max.y;
+        }
+      });
+      this.rocketBottomY = minY === Infinity ? -0.1 : minY;
+      this.rocketTopY = maxY === -Infinity ? 0.1 : maxY;
+      // Position flame at the bottom center, in local space
+      const flameY = minY === Infinity ? -0.1 : minY - 0.01;
+      this.engineFlame.getMesh().position.set(0, flameY, 0);
+      this.engineFlame.getMesh().rotation.set(0, 0, 0);
+// Adjust visual position so that the rocket's bottom sits at the spawn point.
+       // The rocket's local origin is at (0,0,0); its bottom is at rocketBottomY.
+       // We want the bottom to be at the physics reference point (state.position).
+       // Therefore shift the model up by -rocketBottomY in local Y.
+       const offsetLocal = new THREE.Vector3(0, -this.rocketBottomY, 0);
+       const offsetWorld = offsetLocal.applyQuaternion(this.rocketQuat);
+       this.rocketGroup.position.add(offsetWorld.multiplyScalar(VISUAL_SCALE));
+    }
 
   dispose(): void {
     // Persist the flight so main-menu CONTINUE resumes here — not on the pad.
