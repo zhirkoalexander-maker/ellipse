@@ -16,10 +16,13 @@ import {
 } from '../effects/ProceduralTextures';
 
 const SIZE_DIMS = {
-  S: { radius: 0.5 * PART_SCALE, height: 0.7 * PART_SCALE },
-  M: { radius: 0.7 * PART_SCALE, height: 1.1 * PART_SCALE },
-  L: { radius: 1.0 * PART_SCALE, height: 1.6 * PART_SCALE },
-  XL: { radius: 1.4 * PART_SCALE, height: 2.2 * PART_SCALE }
+  // Chunky rocket proportions (h/r ≈ 2.4). History: h/r 1.6 = fat barrels,
+  // h/r 3.6 = thin sticks ("parts too small"), h/r 2.9 = "still too small"
+  // — user wants BIG parts, these are the fattest that still look like a rocket.
+  S: { radius: 0.60 * PART_SCALE, height: 1.4 * PART_SCALE },
+  M: { radius: 0.85 * PART_SCALE, height: 2.0 * PART_SCALE },
+  L: { radius: 1.15 * PART_SCALE, height: 2.8 * PART_SCALE },
+  XL: { radius: 1.50 * PART_SCALE, height: 3.6 * PART_SCALE }
 };
 
 const PI = Math.PI;
@@ -410,9 +413,9 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
   const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.97, h*0.45, Q), bodyMat);
   body.position.y = -h * 0.01; group.add(body);
 
-  // Heat shield
-  const hs = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.82, h*0.13, Q), darkMat);
-  hs.position.y = -h * 0.26; group.add(hs);
+// Heat shield — extended to reach slot bottom so no gap below capsule
+   const hs = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.82, h*0.305, Q), darkMat);
+   hs.position.y = -h * 0.3475; group.add(hs);
 
   // Docking port on top
   const dock = new THREE.Mesh(new THREE.CylinderGeometry(r*0.22, r*0.22, h*0.06, 16), darkMat);
@@ -469,33 +472,41 @@ function buildEngine(group: THREE.Group, d: { radius: number; height: number }, 
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xc89838, roughness: 0.3, metalness: 0.7 });
   const hotMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.5, depthWrite: false });
 
-  // Turbopump housing (upper body)
-  const upper = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.72, h*0.22, Q), engineMat);
-  upper.position.y = h * 0.24; group.add(upper);
+  // Top mount/adapter — NARROW (≈ half tank width), reaches slot top so there
+  // is no gap to the part above, but reads as an engine mount, not a barrel.
+  const mount = new THREE.Mesh(new THREE.CylinderGeometry(r*0.55, r*0.45, h*0.28, Q), engineMat);
+  mount.position.y = h * 0.36; group.add(mount);
 
-  // Turbopump exhaust pipe (small cylinder on side)
-  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(r*0.06, r*0.06, h*0.12, 8), goldMat);
-  pipe.position.set(r*0.75, h*0.24, 0); pipe.rotation.z = Math.PI/2; group.add(pipe);
+  // Turbopump housing — short block below the mount
+  const pump = new THREE.Mesh(new THREE.CylinderGeometry(r*0.45, r*0.58, h*0.12, Q), engineMat);
+  pump.position.y = h * 0.15; group.add(pump);
 
-  // Flange ring
-  const flange = new THREE.Mesh(new THREE.TorusGeometry(r*0.7, r*0.04, 8, Q), goldMat);
-  flange.position.y = h*0.13; flange.rotation.x = Math.PI/2; group.add(flange);
+  // Turbopump exhaust pipes (both sides)
+  for (const s of [-1, 1]) {
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(r*0.06, r*0.06, h*0.1, 8), goldMat);
+    pipe.position.set(s * r * 0.55, h * 0.15, 0); pipe.rotation.z = Math.PI / 2; group.add(pipe);
+  }
 
-  // Nozzle bell — slim profile (narrow + slightly elongated; was fat 0.84r flare)
-  const bell = new THREE.Mesh(new THREE.CylinderGeometry(r*0.42, r*0.60, h*0.44, Q), bellMat);
-  bell.position.y = -h*0.07; group.add(bell);
+  // Flange ring where the bell meets the pump
+  const flange = new THREE.Mesh(new THREE.TorusGeometry(r*0.5, r*0.045, 8, Q), goldMat);
+  flange.position.y = h*0.09; flange.rotation.x = Math.PI/2; group.add(flange);
+
+  // Nozzle bell — the DOMINANT feature: wide flare nearly tank-width,
+  // over half the slot height. This is what makes it look like an engine.
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(r*0.30, r*0.88, h*0.52, Q), bellMat);
+  bell.position.y = -h*0.12; group.add(bell);
 
   // Inner dark cavity
-  const inner = new THREE.Mesh(new THREE.CylinderGeometry(r*0.25, r*0.40, h*0.36, Q), darkMat);
-  inner.position.y = -h*0.05; group.add(inner);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(r*0.18, r*0.66, h*0.44, Q), darkMat);
+  inner.position.y = -h*0.1; group.add(inner);
 
-  // Exit rim
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(r*0.58, r*0.028, 6, Q), goldMat);
-  rim.position.y = -h*0.07 - h*0.22; rim.rotation.x = Math.PI/2; group.add(rim);
+  // Wide exit rim
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(r*0.86, r*0.035, 6, Q), goldMat);
+  rim.position.y = -h*0.12 - h*0.26; rim.rotation.x = Math.PI/2; group.add(rim);
 
-  // Glow
-  const glow = new THREE.Mesh(new THREE.RingGeometry(r*0.20, r*0.36, Q), hotMat);
-  glow.position.y = -h*0.07 - h*0.15; glow.rotation.x = -Math.PI/2; group.add(glow);
+  // Throat glow
+  const glow = new THREE.Mesh(new THREE.RingGeometry(r*0.12, r*0.28, Q), hotMat);
+  glow.position.y = -h*0.12 - h*0.18; glow.rotation.x = -Math.PI/2; group.add(glow);
 }
 
 function buildParachute(group: THREE.Group, d: { radius: number; height: number }) {
@@ -629,29 +640,43 @@ function buildDecoupler(group: THREE.Group, d: { radius: number; height: number 
   const r = d.radius, h = d.height;
 
   const tex = getTextureSet('decoupler', generateDecouplerTexture);
-  const bodyMat = createMaterialFromTextureSet(tex);
+  // Dark interstage — must contrast with the white tanks, otherwise the
+  // full-height decoupler is invisible between them ("where are my decouplers?")
+  const bodyMat = createMaterialFromTextureSet(tex, {
+    color: 0x23252e, roughness: 0.6, metalness: 0.55,
+  });
 
   const goldTex = getTextureSet('gold', generateGoldTexture);
   const goldMat = createMaterialFromTextureSet(goldTex);
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d2, roughness: 0.5, metalness: 0.15 });
 
-  const ringGeom = new THREE.CylinderGeometry(r * 1.05, r * 0.92, h * 0.12, SEG);
+  // Full-height interstage truss (fills the slot — no gaps to neighbours)
+  const ringGeom = new THREE.CylinderGeometry(r * 1.03, r * 0.95, h * 0.96, SEG);
   applyCylindricalUV(ringGeom);
   perturbVertices(ringGeom, PART_SCALE * 0.008);
   const ring = new THREE.Mesh(ringGeom, bodyMat);
   group.add(ring);
 
-  const bandGeom = new THREE.CylinderGeometry(r * 1.08, r * 1.08, h * 0.04, SEG);
+  // Bold gold separation band at the top edge
+  const bandGeom = new THREE.CylinderGeometry(r * 1.09, r * 1.09, h * 0.09, SEG);
   applyCylindricalUV(bandGeom);
   perturbVertices(bandGeom, PART_SCALE * 0.005);
   const band = new THREE.Mesh(bandGeom, goldMat);
-  band.position.y = h * 0.06;
+  band.position.y = h * 0.42;
   group.add(band);
 
-  const bottomGeom = new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.04, SEG);
+  // White roll-pattern stripe near the bottom (Saturn-style interstage marking)
+  const stripeGeom = new THREE.CylinderGeometry(r * 1.07, r * 1.07, h * 0.1, SEG);
+  applyCylindricalUV(stripeGeom);
+  const stripe = new THREE.Mesh(stripeGeom, whiteMat);
+  stripe.position.y = -h * 0.38;
+  group.add(stripe);
+
+  const bottomGeom = new THREE.CylinderGeometry(r * 0.95, r * 0.95, h * 0.05, SEG);
   applyCylindricalUV(bottomGeom);
   perturbVertices(bottomGeom, PART_SCALE * 0.008);
   const bottom = new THREE.Mesh(bottomGeom, bodyMat);
-  bottom.position.y = -h * 0.06;
+  bottom.position.y = -h * 0.455;
   group.add(bottom);
 }
 

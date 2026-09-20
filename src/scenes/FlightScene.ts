@@ -20,6 +20,7 @@ import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
 import { buildDeployedParachute } from '../parts/PartBuilder';
+import { saveFlightState, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import { totalGravityOn } from '../physics/Gravity';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -55,7 +56,7 @@ export class FlightScene {
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
-  private readonly ANGULAR_ACCEL = 1.5;
+  private readonly ANGULAR_ACCEL = 2.5;
   private readonly ANGULAR_DAMPING = 3.5;
   private timeWarp = 1;
   private parachuteDeployed = false;
@@ -113,7 +114,7 @@ export class FlightScene {
 
   // Autopilot state
   private autopilotActive = false;
-  private autopilotPhase: 'idle' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
+  private autopilotPhase: 'idle' | 'ascent' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
   private autopilotTarget = '';
   private autopilotDeltaV = 0;
   private autopilotDirection: 'prograde' | 'retrograde' = 'prograde';
@@ -175,7 +176,7 @@ export class FlightScene {
   onCrashAction: ((action: 'menu' | 'restart') => void) | null = null;
 
 
-  constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements, missions: Missions) {
+  constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements, missions: Missions, save?: FlightSave) {
     this.renderer = renderer;
     this.sceneMgr = sceneMgr;
     this.system = system;
@@ -463,15 +464,36 @@ export class FlightScene {
         goBtn.style.display = 'block';
       } else {
         resultEl.textContent = 'Unable to compute';
+        toast.show('Unable to compute transfer — get to orbit or open space first', 3500);
         goBtn.style.display = 'none';
       }
     });
 
     goBtn.addEventListener('click', () => {
-      if (!lastPlan) return;
-      if (this.grounded) {
-        toast.show('Launch first — autopilot works in space!', 3500);
-        return;
+      // No plan yet? Compute it right now — a SILENT return here made GO
+      // look completely dead ("press it and nothing happens").
+      if (!lastPlan) {
+        const targetName = targetSelect.value;
+        const sun0 = this.system.bodyByName('sun');
+        if (!sun0) { toast.show('Sun not found', 3500); return; }
+        const sunVel0 = (sun0 as Body).velocity ?? [0, 0, 0];
+        const plan0 = planTransfer(
+          [
+            this.state.position[0] - sun0.position[0],
+            this.state.position[1] - sun0.position[1],
+            this.state.position[2] - sun0.position[2],
+          ],
+          [
+            this.state.velocity[0] - sunVel0[0],
+            this.state.velocity[1] - sunVel0[1],
+            this.state.velocity[2] - sunVel0[2],
+          ],
+          this.system,
+          targetName
+        );
+        if (!plan0) { toast.show('Unable to compute transfer — try another target', 3500); return; }
+        lastPlan = plan0;
+        resultEl.innerHTML = `<div style="color:${plan0.direction === 'prograde' ? '#44ff88' : '#ff8844'};">→ ${plan0.direction.toUpperCase()} burn</div><div style="color:#ddd;margin-top:3px;">Δv: <b>${plan0.deltaV.toFixed(0)}</b> m/s</div><div style="color:#889;margin-top:2px;">~${(plan0.transferTime/86400).toFixed(0)} days</div>`;
       }
       const fuel = this.state.rocket.totalFuelMass();
       if (fuel < 1) {
@@ -481,6 +503,20 @@ export class FlightScene {
       const sumThrust = totalThrust(this.state.rocket.assembly.roots);
       if (sumThrust <= 0) {
         toast.show('No engines — cannot burn!', 3500);
+        return;
+      }
+      // On the pad: auto-launch instead of refusing ("nothing happens").
+      // The transfer is RE-COMPUTED once in space — a plan from a grounded
+      // position (velocity ≈ 0) is meaningless for a Hohmann burn.
+      if (this.grounded) {
+        this.autopilotActive = true;
+        this.autopilotPhase = 'ascent';
+        this.autopilotTarget = lastPlan.targetName;
+        mapActive = false;
+        mapEl.style.opacity = '0';
+        setTimeout(() => { mapEl.style.display = 'none'; }, 240);
+        toast.show(`AUTOPILOT: launching to space, then burning to ${lastPlan.targetName.toUpperCase()}`, 4000);
+        this.showAutopilotStatus();
         return;
       }
       // Start autopilot
@@ -505,8 +541,9 @@ export class FlightScene {
       this.showAutopilotStatus();
     });
 
-    mapEl.appendChild(mapCanvas);
-    document.body.appendChild(mapEl);
+    // NOTE: mapCanvas + mapEl were already appended earlier (lines above).
+    // Re-appending here MOVED the canvas after the transfer panel in the DOM
+    // — removed: canvas must stay under the UI panels.
 
     mapCanvas.addEventListener('wheel', (e) => {
       mapZoom *= e.deltaY > 0 ? 0.9 : 1.1;
@@ -1023,7 +1060,47 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }, { passive: false });
 
     this.achievements.unlock('first_launch');
-    toast.show('You are at the launchpad. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage, Esc pause.');
+    if (save) {
+      this.applyFlightSave(save);
+      toast.show('Flight resumed where you left off. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage.');
+    } else {
+      toast.show('You are at the launchpad. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage, Esc pause.');
+    }
+  }
+
+  /** Resume a saved flight: position, velocity, attitude, fuel, landing state. */
+  private applyFlightSave(save: FlightSave): void {
+    this.state.position = [...save.position] as [number, number, number];
+    this.state.velocity = [...save.velocity] as [number, number, number];
+    this.state.throttle = save.throttle;
+    this.missionTime = save.missionTime;
+    this.rocketQuat.set(save.quat[0], save.quat[1], save.quat[2], save.quat[3]);
+    this.rocketGroup.quaternion.copy(this.rocketQuat);
+    this.launched = save.launched;
+    this.grounded = save.grounded;
+    this.groundedDir = save.groundedDir ? ([...save.groundedDir] as [number, number, number]) : null;
+    this._spawnProtectionTimer = 0; // resumed mid-flight: no pad grace needed
+    // Fuel per root index — uid counters reset between sessions, so match by order
+    const roots = this.rocket.assembly.roots;
+    for (let i = 0; i < roots.length && i < save.fuel.length; i++) {
+      const tank = this.rocket.fuelTanks.find(t => t.node === roots[i]);
+      if (tank) tank.remaining = save.fuel[i]!;
+    }
+    // Snap visuals to the restored position immediately
+    this.rocketGroup.position.set(
+      this.state.position[0] * VISUAL_SCALE,
+      this.state.position[1] * VISUAL_SCALE,
+      this.state.position[2] * VISUAL_SCALE
+    );
+  }
+
+  private atmosphereScale(bodyName: string): number {
+    switch (bodyName) {
+      case 'earth': return 1.0;
+      case 'venus': return 1.5;
+      case 'mars': return 0.05;
+      default: return 0;
+    }
   }
 
   private sanitize(v: [number, number, number]): void {
@@ -1195,34 +1272,45 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
     this.updateAutopilot(baseDt);
 
-    // Disable controls in warp (only allow on x1) — but not during autopilot burn
+    // Throttle is locked only above 10x warp (silently zeroing it at ANY
+    // warp made rockets "not lift off" for no visible reason). Physics warp
+    // up to 10x is safe: thrust and drag both use the warped dt.
     const warpActive = this.timeWarp > 1;
-    if (warpActive && !(this.autopilotActive && this.autopilotPhase === 'burn')) {
+    if (warpActive && this.warpIndex > 3 && !(this.autopilotActive && (this.autopilotPhase === 'burn' || this.autopilotPhase === 'ascent'))) {
+      if (this.state.throttle > 0) toast.show('Throttle locked above 10x warp — press [ to reduce warp', 2500);
       this.state.throttle = 0;
     }
-    // In freecam mode, disable rocket throttle and rotation — but not during autopilot
-    if (this.cameraMode === 'free' && !this.autopilotActive) {
-      this.state.throttle = 0;
-    }
+    // Free camera is just a CAMERA — it must not silently kill the throttle
+    // (another "why doesn't it lift off" trap).
 
     if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
-    // Auto-stage when engine has no fuel and there's a decoupler
-    if (!warpActive && !this.grounded && this.state.throttle > 0) {
-      const activeEngine = findFirstEngine(this.state.rocket.assembly.roots);
-      if (!activeEngine || this.state.rocket.totalFuelMass() < 0.1) {
-        const hasDecoupler = this.state.rocket.assembly.roots.some(n =>
-          n.part.kind === 'decoupler' || n.children.some(c => c.part.kind === 'decoupler')
-        );
-        if (hasDecoupler) this.performStage();
+    // Auto-stage when the CURRENT (lowest) stage's tanks run dry — also
+    // during warped autopilot ascent, otherwise a dry booster at 10x warp
+    // leaves the rocket dead in the water. Allowed at warp during ascent.
+    if ((!warpActive || (this.autopilotActive && this.autopilotPhase === 'ascent')) && !this.grounded && this.state.throttle > 0) {
+      const dec = this.findLowestDecoupler(this.rocket.assembly.roots);
+      if (dec) {
+        const decY = dec.position[1];
+        const below = this.rocket.fuelTanks.filter(t => t.node.position[1] < decY);
+        const belowFuel = below.reduce((s, t) => s + t.remaining, 0);
+        const totalFuel = this.state.rocket.totalFuelMass();
+        // Booster tanks dry but fuel remains above → drop the booster.
+        // Everything dry → drop dead weight anyway.
+        if ((below.length > 0 && belowFuel <= 0.01 && totalFuel > 0.1) || totalFuel <= 0.1) {
+          this.performStage();
+        }
       }
     }
 
     // Quaternion-based rotation in local space — natural feel
+    // engineActive: throttle is up (countdown/spool can run)
+    // engineFiring: throttle up AND fuel remains — thrust, flame and sound
+    // require fuel, otherwise rockets accelerated forever on empty tanks.
     const engineActive = this.state.throttle > 0;
-    const inFreeCam = this.cameraMode === 'free';
-    const pitchInput = (warpActive || inFreeCam) ? 0 : this.controls.getPitch();
-    const yawInput = (warpActive || inFreeCam) ? 0 : this.controls.getYaw();
+    const engineFiring = engineActive && this.state.rocket.totalFuelMass() > 0.01;
+    const pitchInput = warpActive ? 0 : this.controls.getPitch();
+    const yawInput = warpActive ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
 
     // Realistic rotation: yaw around surface normal, pitch around horizon tangent
@@ -1254,8 +1342,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Pitch around horizon tangent — tilts up/down relative to horizon
     const qPitch = new THREE.Quaternion().setFromAxisAngle(horizon, pitchInput * turn * 1.2);
 
-    this.rocketQuat.multiply(qYaw).multiply(qPitch);
-    this.rocketQuat.normalize();
+    // surfaceNormal/horizon are WORLD-space axes → PRE-multiply.
+    // Post-multiply rotated around the rocket's LOCAL axes: yaw acted around
+    // a tilted axis at launch, and controls twisted after every attitude change.
+    this.rocketQuat.premultiply(qYaw).premultiply(qPitch);
 
     // SAS: hold attitude or track prograde/retrograde
     if (this.sasMode !== 'off' && !warpActive) {
@@ -1281,6 +1371,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       this.angularVel.multiplyScalar(Math.exp(-5 * baseDt));
     }
+
+    // Integrate angular velocity (SAS torque) in world space — it was
+    // computed above but never applied, so SAS HOLD/PROGRADE did nothing.
+    const avLen = this.angularVel.length();
+    if (avLen > 1e-6) {
+      const qAv = new THREE.Quaternion().setFromAxisAngle(
+        this.angularVel.clone().divideScalar(avLen), avLen * baseDt
+      );
+      this.rocketQuat.premultiply(qAv);
+    }
+    this.rocketQuat.normalize();
 
     // Apply rotation to mesh
     this.rocketGroup.quaternion.copy(this.rocketQuat);
@@ -1315,14 +1416,22 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (sumThrust > 0 && localGrav > 0) {
-             const twr = (sumThrust * 1000 * this.state.throttle) / (this.state.rocket.totalMass() * localGrav);
-            if (twr >= 1.0) {
-              canLiftOff = true;
-            } else {
-              toast.show(`TWR ${twr.toFixed(2)} — need more throttle!`);
+            const fuelNow = this.state.rocket.totalFuelMass();
+            if (fuelNow <= 0.01) {
+              toast.show('No fuel — cannot launch!');
               this.launched = false;
               this.countdownTimer = 0;
-              this.countdownCooldown = 5; // 5s cooldown before retry
+              this.countdownCooldown = 5;
+            } else {
+              const twr = (sumThrust * 1000 * this.state.throttle) / (this.state.rocket.totalMass() * localGrav);
+              if (twr >= 1.0) {
+                canLiftOff = true;
+              } else {
+                toast.show(`TWR ${twr.toFixed(2)} — need more throttle!`);
+                this.launched = false;
+                this.countdownTimer = 0;
+                this.countdownCooldown = 5; // 5s cooldown before retry
+              }
             }
           }
           if (canLiftOff) {
@@ -1332,11 +1441,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
       }
     }
-    if (engineActive && (!this.grounded || canLiftOff)) {
+    if (engineFiring && (!this.grounded || canLiftOff)) {
       applyThrust(this.state, _dt, [tx, ty, tz]);
       this.sanitize(this.state.velocity);
     }
-    if (engineActive && canLiftOff && this.grounded) {
+    if (engineFiring && canLiftOff && this.grounded) {
       this.grounded = false;
       this.groundedDir = null;
       this.liftoffFrames = 5;
@@ -1348,8 +1457,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.screenShake = 0.8;
     }
 
-    // Flame and sound always show when engine is active (even if thrust < weight)
-    if (engineActive) {
+    // Flame and sound show only while fuel remains (engineFiring)
+    if (engineFiring) {
       this.sound.setThrottle(this.state.throttle);
       this.engineFlame.setThrottle(this.state.throttle);
       this.engineFlame.start();
@@ -1374,7 +1483,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     // Ground smoke when engine runs on pad
-    if (engineActive && this.grounded) this.groundSmoke.start();
+    if (engineFiring && this.grounded) this.groundSmoke.start();
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
@@ -1406,21 +1515,26 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const speed = Math.sqrt(
       this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
     );
-    // Aerodynamic stability: rocket naturally aligns with velocity in atmosphere
-    if (!this.grounded && !warpActive && speed > 5 && nearestBody && (nearestBody as any).radius) {
-      const aeroAlt = nearestDist - (nearestBody as any).radius;
-      if (aeroAlt > 0 && aeroAlt < 70000) {
-        const rho = Math.exp(-aeroAlt / 8500);
-        const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
-        const currFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-        const dot = Math.abs(currFwd.dot(velDir));
-        if (dot < 0.99) {
-          const alignQ = new THREE.Quaternion().setFromUnitVectors(currFwd, velDir);
-          this.rocketQuat.slerp(alignQ, rho * 0.1 * baseDt);
-          this.rocketQuat.normalize();
-        }
-      }
-    }
+// Aerodynamic stability: rocket naturally aligns with velocity in atmosphere.
+     // Never fights the player: suspended while steering input is held, and
+     // softened (the old 0.1 factor yanked ~12%/s at sea level against turns
+     // — steering felt "barely working").
+     const steering = pitchInput !== 0 || yawInput !== 0;
+     if (!this.grounded && !warpActive && !steering && speed > 5 && nearestBody && (nearestBody as any).radius) {
+       const aeroAlt = nearestDist - (nearestBody as any).radius;
+       const atmoScale = this.atmosphereScale((nearestBody as any).name);
+       if (atmoScale > 0 && aeroAlt > 0 && aeroAlt < 70000) {
+         const rho = Math.exp(-aeroAlt / 8500) * atmoScale;
+         const velDir = new THREE.Vector3(this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]).normalize();
+         const currFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+         const dot = Math.abs(currFwd.dot(velDir));
+         if (dot < 0.99) {
+           const alignQ = new THREE.Quaternion().setFromUnitVectors(currFwd, velDir);
+           this.rocketQuat.slerp(alignQ, rho * 0.04 * baseDt);
+           this.rocketQuat.normalize();
+         }
+       }
+     }
     if (!this.grounded && nearestBody && (nearestBody as any).radius) {
       const alt = nearestDist - (nearestBody as any).radius;
       if (alt > 0 && alt < 120000 && speed > 2000) {
@@ -1464,30 +1578,32 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       this.sanitize(this.state.velocity);
 
-      // Aerodynamic drag
-      const speed = Math.sqrt(
-        this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-      );
-      const mass = this.state.rocket.totalMass();
-      let CdA = mass * 0.001 + 0.2;
-      if (this.parachuteDeployed) CdA = 50;
-      else if (this.gearDeployed) CdA *= 2.5;
-      if (nearestBody && (nearestBody as any).radius && speed > 0.05 && speed < 1e6) {
-        const alt = nearestDist - (nearestBody as any).radius;
-        if (alt > 0 && alt < 300000) {
-          const rho = 1.225 * Math.exp(-alt / 8500);
-          const q = 0.5 * rho * speed * speed;
-          const dragForce = q * CdA;
-          const dragAccel = dragForce / mass;
-          const dragDelta = dragAccel * _dt;
-          // Never kill more than 90% of speed in one frame — the old full-stop
-          // (velocity = 0) at high time warp halted rockets mid-air and made
-          // impacts impossible.
-          const f = Math.max(0.1, 1 - dragDelta / speed);
-          this.state.velocity[0] *= f;
-          this.state.velocity[1] *= f;
-          this.state.velocity[2] *= f;
-          this.sanitize(this.state.velocity);
+// Aerodynamic drag
+       const speed = Math.sqrt(
+         this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+       );
+       const mass = this.state.rocket.totalMass();
+       let CdA = mass * 0.001 + 0.2;
+       if (this.parachuteDeployed) CdA = Math.max(50, mass * 6);
+       else if (this.gearDeployed) CdA *= 2.5;
+       if (nearestBody && (nearestBody as any).radius && speed > 0.05 && speed < 1e6) {
+         const alt = nearestDist - (nearestBody as any).radius;
+         // Only apply drag if the body has an atmosphere
+         const atmoScale = this.atmosphereScale((nearestBody as any).name);
+         if (atmoScale > 0 && alt > 0 && alt < 300000) {
+           const rho = 1.225 * Math.exp(-alt / 8500) * atmoScale;
+           const q = 0.5 * rho * speed * speed;
+           const dragForce = q * CdA;
+           const dragAccel = dragForce / mass;
+           const dragDelta = dragAccel * _dt;
+           // Never kill more than 90% of speed in one frame — the old full-stop
+           // (velocity = 0) at high time warp halted rockets mid-air and made
+           // impacts impossible.
+           const f = Math.max(0.1, 1 - dragDelta / speed);
+           this.state.velocity[0] *= f;
+           this.state.velocity[1] *= f;
+           this.state.velocity[2] *= f;
+           this.sanitize(this.state.velocity);
 
         // Reentry glow effect (plasma)
         const reentryIntensity = Math.max(0, (speed / 2000) * (rho / 1.225) - 0.1);
@@ -1732,6 +1848,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           d.body.position[1] * VISUAL_SCALE,
           d.body.position[2] * VISUAL_SCALE
         );
+        // Tumble away — visible separation
+        d.mesh.rotation.x += 0.6 * baseDt;
+        d.mesh.rotation.z += 0.4 * baseDt;
         // Check ground collision
         const bdx = d.body.position[0] - refBody.position[0];
         const bdy = d.body.position[1] - refBody.position[1];
@@ -1781,7 +1900,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dbg = document.createElement('div');
         dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v4.4';
+        dbg.textContent = 'ELLIPSE  v4.5';
         document.body.appendChild(dbg);
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
@@ -2173,6 +2292,58 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     );
     const fuel = this.state.rocket.totalFuelMass();
 
+    // --- ASCENT PHASE (auto-launch from the pad) ---
+    if (this.autopilotPhase === 'ascent') {
+      // Full throttle straight up; the countdown/TWR gate in updateInner
+      // handles the actual lift-off sequence. Works at ANY warp level —
+      // the atmosphere clamp below 70 km already limits warp to 10x there,
+      // and above that drag is negligible so tunneling is not a concern.
+      this.state.throttle = 1.0;
+      if (fuel < 0.1) {
+        this.abortAutopilot('out of fuel during ascent');
+        return;
+      }
+      const ascRef = getReferenceBody(this.state.position, this.system);
+      const adx = this.state.position[0] - ascRef.position[0];
+      const ady = this.state.position[1] - ascRef.position[1];
+      const adz = this.state.position[2] - ascRef.position[2];
+      const alt = Math.sqrt(adx*adx + ady*ady + adz*adz) - ((ascRef as any).radius ?? 6.371e6);
+      this.updateAutopilotStatus('ASCENT', `alt ${(alt/1000).toFixed(0)} km · warp OK — then burn to ${this.autopilotTarget.toUpperCase()}`);
+      // Reached space → recompute the transfer from the CURRENT state
+      // (a plan computed on the pad has velocity ≈ 0 and is meaningless)
+      if (alt > 120000) {
+        const sun = this.system.bodyByName('sun');
+        if (!sun) { this.abortAutopilot('Sun not found'); return; }
+        const sunVel = (sun as Body).velocity ?? [0, 0, 0];
+        const plan = planTransfer(
+          [
+            this.state.position[0] - sun.position[0],
+            this.state.position[1] - sun.position[1],
+            this.state.position[2] - sun.position[2],
+          ],
+          [
+            this.state.velocity[0] - sunVel[0],
+            this.state.velocity[1] - sunVel[1],
+            this.state.velocity[2] - sunVel[2],
+          ],
+          this.system,
+          this.autopilotTarget
+        );
+        if (!plan) { this.abortAutopilot('could not compute transfer from the current orbit'); return; }
+        this.autopilotPhase = 'burn';
+        this.autopilotDirection = plan.direction;
+        this.autopilotDeltaV = plan.deltaV;
+        this.autopilotBurnStartSpeed = speed;
+        this.autopilotStartMissionTime = this.missionTime;
+        this.autopilotStartFuel = fuel;
+        this.autopilotStartMass = this.state.rocket.totalMass();
+        this.sasMode = plan.direction;
+        this.hud.setSasMode(this.sasMode);
+        toast.show(`Space reached — burning ${plan.direction} toward ${this.autopilotTarget.toUpperCase()}`, 4000);
+      }
+      return;
+    }
+
     // --- BURN PHASE ---
     if (this.autopilotPhase === 'burn') {
       // Force max throttle and SAS direction
@@ -2374,6 +2545,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const debrisGroup = new THREE.Group();
         debrisGroup.add(dm);
         dm.position.set(0, 0, 0);
+        // CRITICAL: part meshes are built at PART_SCALE (~0.1 units) but the
+        // rocket renders at ROCKET_VISUAL_SCALE (×60). Without this the
+        // "separated booster" is an invisible speck — staging looked like
+        // nothing happened (or a tiny lump stuck under the rocket).
+        debrisGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
 
         const scene = this.sceneMgr.scene;
         debrisGroup.position.copy(worldPositions[i]!);
@@ -2388,11 +2564,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         scene.add(debrisGroup);
 
         // Velocity: rocket velocity + push toward planet (down, away from rocket) + random
-        const pushForce = 1 + Math.random() * 2;
+        const pushForce = 5 + Math.random() * 5;
         const sepVel: Vec3 = [
-          this.state.velocity[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
-          this.state.velocity[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
-          this.state.velocity[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 0.5,
+          this.state.velocity[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
         ];
 
         const debrisBody = new Body('debris', 100, pos, sepVel);
@@ -2730,6 +2906,31 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
   dispose(): void {
+    // Persist the flight so main-menu CONTINUE resumes here — not on the pad.
+    // Crashed flights are not saved (nothing left to resume).
+    if (!this.crashed) {
+      const roots = this.rocket.assembly.roots;
+      saveFlightState({
+        assembly: serializeAssembly(this.rocket.assembly),
+        fuel: roots.map(n => {
+          const t = this.rocket.fuelTanks.find(tk => tk.node === n);
+          return t ? t.remaining : 0;
+        }),
+        position: [...this.state.position] as [number, number, number],
+        velocity: [...this.state.velocity] as [number, number, number],
+        throttle: this.state.throttle,
+        missionTime: this.missionTime,
+        quat: [this.rocketQuat.x, this.rocketQuat.y, this.rocketQuat.z, this.rocketQuat.w],
+        launched: this.launched,
+        grounded: this.grounded,
+        groundedDir: this.groundedDir ? ([...this.groundedDir] as [number, number, number]) : null,
+        bodies: this.system.bodies.map(b => ({
+          name: b.name,
+          position: [...b.position] as [number, number, number],
+          velocity: [...(b.velocity ?? [0, 0, 0])] as [number, number, number],
+        })),
+      });
+    }
     if (this.crashOverlay) {
       this.crashOverlay.remove();
       this.crashOverlay = null;

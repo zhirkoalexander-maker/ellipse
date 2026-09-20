@@ -23,37 +23,37 @@ describe('Controls', () => {
     controls = new Controls(makeState());
   });
 
-  describe('pitch', () => {
+  describe('pitch (W/S — documented mapping: ↑/↓ throttle, W/S pitch, A/D yaw)', () => {
     it('returns 0 when no keys', () => {
       expect(controls.getPitch()).toBe(0);
     });
 
-    it('returns 1 for arrow up', () => {
-      emitKey('ArrowUp', 'keydown');
+    it('returns 1 for W', () => {
+      emitKey('w', 'keydown');
       expect(controls.getPitch()).toBe(1);
     });
 
-    it('returns -1 for arrow down', () => {
-      emitKey('ArrowDown', 'keydown');
+    it('returns -1 for S', () => {
+      emitKey('s', 'keydown');
       expect(controls.getPitch()).toBe(-1);
     });
   });
 
   describe('yaw', () => {
-    it('returns 1 for arrow left', () => {
-      emitKey('ArrowLeft', 'keydown');
+    it('returns 1 for A', () => {
+      emitKey('a', 'keydown');
       expect(controls.getYaw()).toBe(1);
     });
 
-    it('returns -1 for arrow right', () => {
-      emitKey('ArrowRight', 'keydown');
+    it('returns -1 for D', () => {
+      emitKey('d', 'keydown');
       expect(controls.getYaw()).toBe(-1);
     });
   });
 
   describe('throttle', () => {
-    it('increases with W', () => {
-      emitKey('w', 'keydown');
+    it('increases with ArrowUp', () => {
+      emitKey('ArrowUp', 'keydown');
       controls.update(0.1);
       expect(controls.state.throttle).toBeGreaterThan(0);
     });
