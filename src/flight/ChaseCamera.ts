@@ -4,13 +4,13 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
-const MIN_DIST = 0.5;
-const MAX_DIST = 500;
+const MIN_DIST = 0.2;
+const MAX_DIST = 200;
 const LERP_SPEED = 25;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
-const DEFAULT_DIST = 7;
+const DEFAULT_DIST = 2;
 const DEFAULT_AZIMUTH = 0;
 const DEFAULT_POLAR = Math.PI / 2.5;
 
