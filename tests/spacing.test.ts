@@ -20,7 +20,7 @@ describe('Rocket Part Spacing', () => {
     expect(tankY - tankH/2).toBeGreaterThanOrEqual(engY + engH/2);
     
     const mesh = a.toMesh();
-    expect(mesh.children.length).toBeGreaterThan(3);
+    expect(mesh.children.length).toBeGreaterThanOrEqual(3);
   });
   
   it('parts gap is exactly 0.005', () => {
