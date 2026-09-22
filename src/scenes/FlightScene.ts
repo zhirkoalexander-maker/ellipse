@@ -355,8 +355,10 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.chase = new ChaseCamera(sceneMgr.camera);
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
-    // Compute visual offset for initial camera placement (rocketBottomY already scaled)
-    const initVisualOff = -this.rocketBottomY - 50 * VISUAL_SCALE + 2;
+    // Compute visual offset for initial camera placement. rocketBottomY is in
+    // MODEL units but the group renders at ROCKET_VISUAL_SCALE — multiply, or
+    // the rocket sits ~1 scene-unit (≈4 km) underground.
+    const initVisualOff = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
     const initOffX = upDir.x * initVisualOff;
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
@@ -1989,10 +1991,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     if (!this.crashed) {
-      // Visual offset: rocketBottomY is already in group's scaled coords.
+      // Visual offset: rocketBottomY is in MODEL units but the group renders at
+      // ROCKET_VISUAL_SCALE, so lift by rocketBottomY * ROCKET_VISUAL_SCALE to
+      // put the rocket's very bottom on the reference point (the old formula
+      // forgot the ×ROCKET_VISUAL_SCALE and left the rocket ~1 unit buried).
       // Physics pos already accounts for terrain (getSurfaceRadiusAt at spawn).
-      // Terrain disp cancels out — only need to lift rocket's own height.
-      const visualOffset = -this.rocketBottomY - 50 * VISUAL_SCALE + 2;
+      const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
       // Direction from reference body center to rocket (up vector = surface normal)
       const refBodyVis = getReferenceBody(this.state.position, this.system);
