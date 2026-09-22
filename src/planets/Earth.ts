@@ -77,24 +77,31 @@ export class Earth extends Planet {
   atmosphereGlow: AtmosphereGlow;
   private cloudMesh: THREE.Mesh;
 
+  // Kennedy Space Center: 28.5°N, 80.5°W (normalized direction from planet center)
+  private static readonly KSC_X = 0.144379;
+  private static readonly KSC_Y = 0.477159;
+  private static readonly KSC_Z = -0.866989;
+  // Full-flat radius (radians) around KSC and the smooth transition zone to real terrain
+  private static readonly PAD_R = 0.02;
+  private static readonly PAD_BLEND = 0.06;
+
   constructor(position: Vec3, velocity: Vec3) {
     super('earth', EARTH_MASS, position, velocity, 6.371e6 * 2);
 
     const visualR = this.visualRadius;
-    const SEG = 320;
+    const SEG = 512;
 
     const geom = new THREE.SphereGeometry(visualR, SEG, SEG);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
     const colors: number[] = [];
     const maxDisp = visualR * 0.035;
-    const oceanD = visualR * 0.007;
 
     // Single pass: compute height → displace → color
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
       const nx = vert.x / visualR, ny = vert.y / visualR, nz = vert.z / visualR;
-      const h = this.terrainAt(nx, ny, nz, maxDisp, oceanD);
+      const h = this.getTerrainHeightVisual(nx, ny, nz);
       vert.setLength(visualR + h);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);
 
@@ -141,16 +148,37 @@ export class Earth extends Planet {
     this.mesh.add(this.cloudMesh);
   }
 
-  private terrainAt(nx: number, ny: number, nz: number, maxDisp: number, oceanD: number): number {
+  /** Terrain displacement at world direction, in VISUAL units. Flattens the
+   *  KSC launch pad so the rocket spawns on flat ground (sea level) instead
+   *  of buried inside a mountain. Physics (getSurfaceRadiusAt) calls this
+   *  exact same function, keeping the visual mesh and collision surface in sync. */
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    const maxDisp = this.visualRadius * 0.035;
+    const oceanD = this.visualRadius * 0.007;
+    const elev = this.elevationAt(nx, ny, nz);
+
+    let h: number;
+    if (elev > 0.48) { const t = (elev - 0.48) / 0.52; h = t * t * maxDisp; }
+    else if (elev > 0.38) { h = (elev - 0.38) / 0.1 * maxDisp * 0.2; }
+    else { h = -(0.38 - elev) / 0.38 * oceanD; }
+
+    const dot = nx * Earth.KSC_X + ny * Earth.KSC_Y + nz * Earth.KSC_Z;
+    const ang = Math.acos(Math.max(-1, Math.min(1, dot)));
+    if (ang < Earth.PAD_R) return 0;
+    if (ang < Earth.PAD_BLEND) {
+      const t = (ang - Earth.PAD_R) / (Earth.PAD_BLEND - Earth.PAD_R);
+      const s = t * t * (3 - 2 * t);
+      return h * s;
+    }
+    return h;
+  }
+
+  private elevationAt(nx: number, ny: number, nz: number): number {
     const f1 = Math.sin(nx * 5 + ny * 3.5) * 0.5 + Math.cos(ny * 4.5 - nz * 3) * 0.3;
     const f2 = Math.sin(nz * 7 + nx * 3 + ny * 5) * 0.2 + Math.sin(nx * 13 + ny * 9 + nz * 11) * 0.12;
     const f3 = Math.sin(nx * 20 + nz * 16) * 0.06 + Math.cos(ny * 18 + nx * 13) * 0.04;
     const f4 = Math.sin(nx * 38 + ny * 33 + nz * 42) * 0.02;
-    const elev = ((f1 + f2 + f3 + f4) * 0.35 + 0.5) * 1.05;
-
-    if (elev > 0.48) { const h = (elev - 0.48) / 0.52; return h * h * maxDisp; }
-    if (elev > 0.38) { return (elev - 0.38) / 0.1 * maxDisp * 0.2; }
-    return -(0.38 - elev) / 0.38 * oceanD;
+    return ((f1 + f2 + f3 + f4) * 0.35 + 0.5) * 1.05;
   }
 
   private async loadTexture(): Promise<void> {

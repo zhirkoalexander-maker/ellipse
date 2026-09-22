@@ -1078,15 +1078,40 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   /** Resume a saved flight: position, velocity, attitude, fuel, landing state. */
   private applyFlightSave(save: FlightSave): void {
-    this.state.position = [...save.position] as [number, number, number];
-    this.state.velocity = [...save.velocity] as [number, number, number];
-    this.state.throttle = save.throttle;
-    this.missionTime = save.missionTime;
-    this.rocketQuat.set(save.quat[0], save.quat[1], save.quat[2], save.quat[3]);
-    this.rocketGroup.quaternion.copy(this.rocketQuat);
-    this.launched = save.launched;
-    this.grounded = save.grounded;
-    this.groundedDir = save.groundedDir ? ([...save.groundedDir] as [number, number, number]) : null;
+    // Defensive: a stale/corrupted save must never resurrect the rocket
+    // inside a planet (instant 'Impact on Earth' crash on resume). Fall back
+    // to a fresh spawn on the launchpad.
+    const refBody = getReferenceBody(save.position as [number, number, number], this.system);
+    const sdx = save.position[0] - refBody.position[0];
+    const sdy = save.position[1] - refBody.position[1];
+    const sdz = save.position[2] - refBody.position[2];
+    const sd = Math.sqrt(sdx * sdx + sdy * sdy + sdz * sdz);
+    const refR = (refBody as any).radius ?? 0;
+    if (!isFinite(sd) || sd === 0 || sd < refR * 1.005) {
+      this.resetToLaunchPad();
+      this.rocketGroup.quaternion.copy(this.rocketQuat);
+      this.rocketGroup.position.set(
+        this.state.position[0] * VISUAL_SCALE,
+        this.state.position[1] * VISUAL_SCALE,
+        this.state.position[2] * VISUAL_SCALE
+      );
+    } else {
+      this.state.position = [...save.position] as [number, number, number];
+      this.state.velocity = [...save.velocity] as [number, number, number];
+      this.state.throttle = save.throttle;
+      this.missionTime = save.missionTime;
+      this.rocketQuat.set(save.quat[0], save.quat[1], save.quat[2], save.quat[3]);
+      this.rocketGroup.quaternion.copy(this.rocketQuat);
+      this.launched = save.launched;
+      this.grounded = save.grounded;
+      this.groundedDir = save.groundedDir ? ([...save.groundedDir] as [number, number, number]) : null;
+      // Snap visuals to the restored position immediately
+      this.rocketGroup.position.set(
+        this.state.position[0] * VISUAL_SCALE,
+        this.state.position[1] * VISUAL_SCALE,
+        this.state.position[2] * VISUAL_SCALE
+      );
+    }
     this._spawnProtectionTimer = 0; // resumed mid-flight: no pad grace needed
     // Fuel per root index — uid counters reset between sessions, so match by order
     const roots = this.rocket.assembly.roots;
@@ -1094,12 +1119,45 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const tank = this.rocket.fuelTanks.find(t => t.node === roots[i]);
       if (tank) tank.remaining = save.fuel[i]!;
     }
-    // Snap visuals to the restored position immediately
-    this.rocketGroup.position.set(
-      this.state.position[0] * VISUAL_SCALE,
-      this.state.position[1] * VISUAL_SCALE,
-      this.state.position[2] * VISUAL_SCALE
-    );
+  }
+
+  /** Re-spawn on the flat KSC launchpad (also used when a saved flight is invalid). */
+  private resetToLaunchPad(): void {
+    const earth = this.system.bodyByName('earth')!;
+    const earthR = (earth as any).radius ?? 6.371e6;
+    this.launched = false;
+    this.groundedDir = null;
+    this.state.velocity = [0, 0, 0];
+    // Kennedy Space Center: 28.5°N, 80.5°W
+    const lat = 28.5 * Math.PI / 180;
+    const lon = -80.5 * Math.PI / 180;
+    const dir: [number, number, number] = [
+      Math.cos(lat) * Math.cos(lon),
+      Math.sin(lat),
+      Math.cos(lat) * Math.sin(lon),
+    ];
+    const dirMag = Math.sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+    const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
+    const nominal: [number, number, number] = [
+      earth.position[0] + dirNorm[0] * earthR,
+      earth.position[1] + dirNorm[1] * earthR,
+      earth.position[2] + dirNorm[2] * earthR,
+    ];
+    const surfaceR = (earth as any).getSurfaceRadiusAt?.(nominal) ?? earthR;
+    this.state.position = [
+      earth.position[0] + dirNorm[0] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
+      earth.position[1] + dirNorm[1] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
+      earth.position[2] + dirNorm[2] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
+    ];
+    this.groundedDir = dirNorm;
+    this.grounded = true;
+    this.missionTime = 0;
+    const upDir = new THREE.Vector3(
+      this.state.position[0] - earth.position[0],
+      this.state.position[1] - earth.position[1],
+      this.state.position[2] - earth.position[2]
+    ).normalize();
+    this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), upDir);
   }
 
   private atmosphereScale(bodyName: string): number {
@@ -1730,7 +1788,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
         const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
         // Inside planet or on surface: always crash at orbital speeds
-        if (d < surfaceR) {
+        if (d < surfaceR && !this.grounded) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0 && !this.grounded && isFinite(vertSpeed) && vertSpeed <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
