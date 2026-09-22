@@ -34,6 +34,7 @@ interface Debris {
 }
 
 export class FlightScene {
+  static readonly SPAWN_OFFSET_M = 150;
   private renderer: Renderer;
   private sceneMgr: SceneManager;
   private system: System;
@@ -201,7 +202,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const dirMag = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
     const dirNorm: [number, number, number] = [dir[0] / dirMag, dir[1] / dirMag, dir[2] / dirMag];
 
-    const SPAWN_OFFSET_M = 120;
     // Compute nominal surface position (for terrain lookup)
     const nominalSurface: [number, number, number] = [
       earth.position[0] + dirNorm[0] * earthR,
@@ -211,9 +211,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Get actual surface radius including terrain displacement
     const surfaceR = (earth as any).getSurfaceRadiusAt?.(nominalSurface) ?? earthR;
     const spawnPos: [number, number, number] = [
-      earth.position[0] + dirNorm[0] * (surfaceR + SPAWN_OFFSET_M),
-      earth.position[1] + dirNorm[1] * (surfaceR + SPAWN_OFFSET_M),
-      earth.position[2] + dirNorm[2] * (surfaceR + SPAWN_OFFSET_M),
+      earth.position[0] + dirNorm[0] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
+      earth.position[1] + dirNorm[1] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
+      earth.position[2] + dirNorm[2] * (surfaceR + FlightScene.SPAWN_OFFSET_M),
     ];
     this.state = new FlightState(rocket, system, spawnPos, [0, 0, 0]);
     this.groundedDir = dirNorm;
@@ -1803,7 +1803,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         refBody.position[2] + this.groundedDir[2],
       ];
       const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
-      const targetDist = surfaceR + 50; // match SPAWN_OFFSET_M
+      const targetDist = surfaceR + FlightScene.SPAWN_OFFSET_M;
       this.state.position[0] = refBody.position[0] + this.groundedDir[0] * targetDist;
       this.state.position[1] = refBody.position[1] + this.groundedDir[1] * targetDist;
       this.state.position[2] = refBody.position[2] + this.groundedDir[2] * targetDist;
@@ -1818,9 +1818,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const bodyR = (refBody as any).radius ?? 6.371e6;
       if (d > bodyR * 1.1) {
         this.state.velocity = [0, 0, 0];
-        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + 50);
-        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + 50);
-        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + 50);
+        this.state.position[0] = refBody.position[0] + (dx / d) * (bodyR + FlightScene.SPAWN_OFFSET_M);
+        this.state.position[1] = refBody.position[1] + (dy / d) * (bodyR + FlightScene.SPAWN_OFFSET_M);
+        this.state.position[2] = refBody.position[2] + (dz / d) * (bodyR + FlightScene.SPAWN_OFFSET_M);
       }
     }
 
@@ -2720,9 +2720,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.screenShake = 3.0;
 
     this.state.position = [
-      body.position[0] + dx / d * (bodyR + 50),
-      body.position[1] + dy / d * (bodyR + 50),
-      body.position[2] + dz / d * (bodyR + 50),
+      body.position[0] + dx / d * (bodyR + FlightScene.SPAWN_OFFSET_M),
+      body.position[1] + dy / d * (bodyR + FlightScene.SPAWN_OFFSET_M),
+      body.position[2] + dz / d * (bodyR + FlightScene.SPAWN_OFFSET_M),
     ];
     this.state.velocity = [0, 0, 0];
     this.state.throttle = 0;
