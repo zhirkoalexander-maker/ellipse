@@ -195,9 +195,7 @@ export class Game {
       if (!save) clearFlightSave();
       const a = rocket?.assembly ?? new Assembly();
 if (!rocket) {
-        // 3-stage rocket for g≈176: XL booster → L sustainer → S upper stage + M capsule.
-        // Tapered stages (r 1.0→0.75→0.4) give a classic rocket silhouette.
-        // Heights match PartBuilder SIZE_DIMS exactly — meshes stack with zero overlap.
+        // Simple single-stage rocket: XL engine + XL tank + capsule + fairing (classic look)
         const p = PART_SCALE;
         const H = { S: 1.4 * p, M: 2.0 * p, L: 2.8 * p, XL: 3.6 * p };
         const gap = 0;
@@ -205,25 +203,15 @@ if (!rocket) {
         let y = -H.XL / 2; // bottom face of the Mammoth engine
         const stack = (h: number) => { const c = y + h / 2; y += h + gap; return c; };
 
-        const s1engY = stack(H.XL);   // engine_mammoth (XL)
-        const s1tankY = stack(H.XL);  // tank_xl_lfo (XL)
-        const dec1Y = stack(H.L);     // decoupler_l (L)
-        const s2engY = stack(H.L);    // engine_twinboar (L)
-        const s2tankY = stack(H.L);   // tank_l_lfo (L)
-        const dec2Y = stack(H.S);     // decoupler_s (S)
-        const s3engY = stack(H.S);    // engine_sparkler (S)
-        const s3tankY = stack(H.S);   // tank_s_lfo (S)
-        const capY = stack(H.M);      // capsule_mk1 (M)
+        const engY = stack(H.XL);      // engine_mammoth (XL)
+        const tankY = stack(H.XL);     // tank_xl_lfo (XL)
+        const capY = stack(H.M);       // capsule_mk1 (M)
+        const fairY = stack(H.S);      // fairing_m (S) as nose cone
 
-        a.addRoot({ part: findPart('engine_mammoth')!, position: [0, s1engY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, s1tankY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('decoupler_l')!, position: [0, dec1Y, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('engine_twinboar')!, position: [0, s2engY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_l_lfo')!, position: [0, s2tankY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('decoupler_s')!, position: [0, dec2Y, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('engine_sparkler')!, position: [0, s3engY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, s3tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_mammoth')!, position: [0, engY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('fairing_m')!, position: [0, fairY, 0], rotation: 0, children: [] });
       }
       const r = new Rocket(a);
       this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions, save);
