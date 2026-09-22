@@ -96,6 +96,9 @@ export class Assembly {
       if (!dt || !db) continue;
       if (Math.abs(dt.radius - db.radius) < 0.001) continue;
       if (top.part.id.includes('decoupler') || bot.part.id.includes('decoupler')) continue;
+      // Capsules already taper down to the tank radius with their built-in
+      // skirt — an extra collar cone on top just looks bulky/weird.
+      if (top.part.kind === 'capsule') continue;
       // Joint plane = bottom face of the upper part (parts stack flush)
       const jointY = top.position[1] - dt.height / 2;
       const collarH = Math.min(dt.height, db.height) * 0.22;

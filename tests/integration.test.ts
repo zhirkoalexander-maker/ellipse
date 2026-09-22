@@ -50,11 +50,11 @@ describe('Comprehensive Integration Tests', () => {
 
   it('adapter count matches diff-sized parts', () => {
     const a = new Assembly();
-    a.addRoot({ part: findPart('capsule_mk1')!, position: [0, 1.6*PART_SCALE, 0], rotation: 0, children: [] });
+    a.addRoot({ part: findPart('tank_m_lfo')!, position: [0, 1.6*PART_SCALE, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, 0.8*PART_SCALE, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const mesh = a.toMesh();
-    // Joint collars are light-gray 0xd8d8d2 (capsule M over tank S = one collar)
+    // Joint collars are light-gray 0xd8d8d2 (M tank over S tank = one collar)
     const adapters = mesh.children.filter(c => {
       const m = c as THREE.Mesh;
       return m.isMesh && m.geometry.type === 'CylinderGeometry' &&
@@ -80,7 +80,7 @@ describe('Comprehensive Integration Tests', () => {
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
     const r = new Rocket(a);
     const mesh = r.assembly.toMesh();
-    expect(mesh.children.length).toBeGreaterThan(3); // 3 parts + adapters
+    expect(mesh.children.length).toBeGreaterThanOrEqual(3); // 3 parts (capsule has its own skirt, no extra collar)
     expect(mesh instanceof THREE.Group).toBe(true);
   });
 });

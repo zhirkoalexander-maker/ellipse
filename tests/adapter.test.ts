@@ -9,7 +9,7 @@ describe('Adapter Tests', () => {
   const getAdapterColor = (mesh: THREE.Mesh) => 
     (mesh.material as THREE.MeshStandardMaterial).color.getHex();
 
-  it('every S-size tank to every capsule creates adapter', () => {
+  it('capsules never get joint collars (built-in skirt tapers instead)', () => {
     const caps = PART_CATALOG.filter(p => p.kind === 'capsule');
     const tanks = PART_CATALOG.filter(p => p.kind === 'tank' && p.size === 'S');
     for (const cap of caps) {
@@ -23,10 +23,8 @@ describe('Adapter Tests', () => {
           const mesh = c as THREE.Mesh;
           return mesh.isMesh && mesh.geometry.type === 'CylinderGeometry' && getAdapterColor(mesh) === 0xd8d8d2;
         });
-        // S tank size differs from capsule — collar should exist
-        if (tank.size !== cap.size) {
-          expect(collars.length).toBeGreaterThanOrEqual(1);
-        }
+        // Capsule already tapers down to the tank — no collar over it
+        expect(collars.length).toBe(0);
       }
     }
   });
