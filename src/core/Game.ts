@@ -195,23 +195,23 @@ export class Game {
       if (!save) clearFlightSave();
       const a = rocket?.assembly ?? new Assembly();
 if (!rocket) {
-        // Simple single-stage rocket: XL engine + XL tank + capsule + fairing (classic look)
+        // Ant engine + 2x S tank + MK1 capsule (classic small rocket)
         const p = PART_SCALE;
         const H = { S: 1.4 * p, M: 2.0 * p, L: 2.8 * p, XL: 3.6 * p };
         const gap = 0;
 
-        let y = -H.XL / 2; // bottom face of the Mammoth engine
+        let y = -H.S / 2; // bottom face of the Ant engine (S size)
         const stack = (h: number) => { const c = y + h / 2; y += h + gap; return c; };
 
-        const engY = stack(H.XL);      // engine_mammoth (XL)
-        const tankY = stack(H.XL);     // tank_xl_lfo (XL)
+        const engY = stack(H.S);       // engine_ant (S)
+        const tank1Y = stack(H.S);     // tank_s_lfo (S)
+        const tank2Y = stack(H.S);     // tank_s_lfo (S)
         const capY = stack(H.M);       // capsule_mk1 (M)
-        const fairY = stack(H.S);      // fairing_m (S) as nose cone
 
-        a.addRoot({ part: findPart('engine_mammoth')!, position: [0, engY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, tankY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank1Y, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank2Y, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('fairing_m')!, position: [0, fairY, 0], rotation: 0, children: [] });
       }
       const r = new Rocket(a);
       this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions, save);
