@@ -1478,7 +1478,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (engineFiring && canLiftOff && this.grounded) {
       this.grounded = false;
       this.groundedDir = null;
-      this.liftoffFrames = 5;
+      this.liftoffFrames = 60;
       this.launched = true;
       this._camSnapped = false; // reset camera snap on liftoff
       // Inherit the planet's ORBITAL velocity (Earth: 17 km/s). Without it
@@ -1732,7 +1732,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // Inside planet or on surface: always crash at orbital speeds
         if (d < surfaceR) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0) {
+        } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0 && !this.grounded && isFinite(vertSpeed) && vertSpeed <= 0) {
           const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
           const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
           const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
@@ -1751,10 +1751,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
             this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + 50) ||
-                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + 50) ||
-                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + 50)) {
-              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 50), nearestBody.position[1] + dy / d * (surfaceR + 50), nearestBody.position[2] + dz / d * (surfaceR + 50)];
+            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M) ||
+                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M) ||
+                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)) {
+              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)];
               this.sound.playLand();
               this.sound.stopEngine();
               const bodyName = nearestBody.name;
@@ -1768,7 +1768,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             }
           } else if (isFinite(vertSpeed)) {
             this.state.velocity = [0, 0, 0];
-            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + 50), nearestBody.position[1] + dy / d * (surfaceR + 50), nearestBody.position[2] + dz / d * (surfaceR + 50)];
+            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)];
             this.grounded = true;
             this.groundedDir = [dx / d, dy / d, dz / d];
             const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
@@ -1781,7 +1781,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
             if (bodyName === 'earth') this.achievements.unlock('land_earth');
             else if (bodyName === 'moon') this.achievements.unlock('land_moon');
           }
-        } else if (d < surfaceR + 250 && isFinite(vertSpeed) && Math.abs(vertSpeed) > 50000) {
+        } else if (d < surfaceR + 250 && !this.grounded && isFinite(vertSpeed) && vertSpeed < -50000) {
           // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
           this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
         }
