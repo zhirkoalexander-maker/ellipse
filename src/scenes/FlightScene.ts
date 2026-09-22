@@ -1583,13 +1583,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     else this.groundSmoke.stop();
     this.groundSmoke.update(baseDt);
 
-    // Integrate position (skip when grounded to prevent bounce-through)
-    if (!this.grounded) {
-      this.state.position[0] += this.state.velocity[0] * _dt;
-      this.state.position[1] += this.state.velocity[1] * _dt;
-      this.state.position[2] += this.state.velocity[2] * _dt;
-    }
-
     let nearestBody: any = null;
     let nearestDist = Infinity;
     
@@ -1786,7 +1779,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const dy = this.state.position[1] - nearestBody.position[1];
         const dz = this.state.position[2] - nearestBody.position[2];
         const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        const vertSpeed = (this.state.velocity[0] * dx + this.state.velocity[1] * dy + this.state.velocity[2] * dz) / d;
+        // Vertical speed must use the body-RELATIVE velocity. On liftoff the
+        // rocket inherits the planet's orbital velocity (Earth: 17 km/s), but
+        // that velocity's radial projection at the pad is NOT zero (KSC sits
+        // off the orbital plane) — using absolute velocity reads ~-14.7 km/s
+        // "falling" and instantly crashes every rocket after the countdown.
+        const refVel = (nearestBody as any).velocity ?? [0, 0, 0];
+        const vertSpeed = ((this.state.velocity[0] - refVel[0]) * dx + (this.state.velocity[1] - refVel[1]) * dy + (this.state.velocity[2] - refVel[2]) * dz) / d;
         // Inside planet or on surface: always crash at orbital speeds
         if (d < surfaceR && !this.grounded) {
           this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
@@ -1849,6 +1848,18 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     this.system.propagate(_dt, FIXED_DT);
+
+    // Integrate position AFTER propagate and AFTER the collision check: the
+    // check reads positions as of the START of this frame. If we integrated the
+    // absolute velocity (which on liftoff includes the planet's 17 km/s orbital
+    // motion) first, the rocket would jump ~283 m/tick before the reference body
+    // has moved, dipping 250 m INSIDE the planet at KSC and insta-crashing.
+    // (Skip when grounded to prevent bounce-through.)
+    if (!this.grounded) {
+      this.state.position[0] += this.state.velocity[0] * _dt;
+      this.state.position[1] += this.state.velocity[1] * _dt;
+      this.state.position[2] += this.state.velocity[2] * _dt;
+    }
 
     // Track body surface while grounded (body moves during propagate)
     if (this.grounded && this.groundedDir) {
