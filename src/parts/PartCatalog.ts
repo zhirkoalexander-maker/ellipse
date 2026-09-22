@@ -290,7 +290,7 @@ export const PART_CATALOG: Part[] = [
     size: 'XL',
     mass: 30000,
     fuelCapacity: 500000,
-    thrust: 120000,
+    thrust: 55000,
     isp: 310,
     dragCoeff: 0.3,
     gltfUrl: '/models/saturn_v.glb',
