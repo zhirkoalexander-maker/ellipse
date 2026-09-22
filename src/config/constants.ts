@@ -26,7 +26,7 @@ export const EARTH_MASS = 8.92e24 * 48;
 export const PART_SCALE = 0.05;
 
 /** Rocket visual scale multiplier */
-export const ROCKET_VISUAL_SCALE = 0.2;
+export const ROCKET_VISUAL_SCALE = 60;
 
 /** Terrain displacement fraction of visual radius */
 export const TERRAIN_DISP_FRAC = 0.001;
