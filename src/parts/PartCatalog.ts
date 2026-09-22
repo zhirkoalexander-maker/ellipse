@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 1800,
+    thrust: 2200,
     isp: 350,
     fuelType: 'LFO'
   },
@@ -80,7 +80,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 400,
-    thrust: 3000,
+    thrust: 2200,
     isp: 340,
     fuelType: 'LFO'
   },
