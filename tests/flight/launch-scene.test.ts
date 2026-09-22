@@ -8,10 +8,12 @@ import { Moon } from '../../src/planets/Moon';
 import { Rocket } from '../../src/rocket/Rocket';
 import { Assembly } from '../../src/rocket/Assembly';
 import { findPart, PART_CATALOG } from '../../src/parts/PartCatalog';
-import { PART_SCALE } from '../../src/config/constants';
+import { PART_SCALE, ORBIT_SCALE, VISUAL_PLANET_MULT, ROCKET_VISUAL_SCALE } from '../../src/config/constants';
 import { FlightScene } from '../../src/scenes/FlightScene';
 import { Achievements } from '../../src/core/Achievements';
 import { Missions } from '../../src/core/Missions';
+
+const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
 function buildDefaultRocket(): Rocket {
   const a = new Assembly();
@@ -77,6 +79,19 @@ describe('FlightScene launch from KSC pad', () => {
     const fd = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
     const fsurfaceR = earth.getSurfaceRadiusAt([px, py, pz]) ?? earth.radius;
     expect(fd - fsurfaceR).toBeGreaterThan(150);
+
+    // Visual regression: the rocket must NOT be buried in the ground. Its group
+    // is placed at state.position*VISUAL_SCALE + upDir*visualOffset, and the
+    // model hangs up to rocketBottomY*ROCKET_VISUAL_SCALE below the origin.
+    // The earth MESH sphere has radius = earth.visualRadius (the doubled radius).
+    const group = (anyFlight.rocketGroup as { position: { x: number; y: number; z: number } }).position;
+    const ecdx = group.x - earth.position[0] * VISUAL_SCALE;
+    const ecdy = group.y - earth.position[1] * VISUAL_SCALE;
+    const ecdz = group.z - earth.position[2] * VISUAL_SCALE;
+    const groupDist = Math.sqrt(ecdx * ecdx + ecdy * ecdy + ecdz * ecdz);
+    const bottomY = groupDist - (anyFlight.rocketBottomY as number) * ROCKET_VISUAL_SCALE;
+    expect(bottomY).toBeGreaterThanOrEqual(earth.visualRadius - 0.1);
+    expect(anyFlight.rocketBottomY).toBeLessThan(0);
   });
 
   it('engine_ant TWR uses default thrust that clears the 1.0 gate (regression guard)', () => {
