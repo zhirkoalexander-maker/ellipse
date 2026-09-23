@@ -10,7 +10,11 @@ const LERP_SPEED = 25;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
-const DEFAULT_DIST = 2;
+// Rockets render at ROCKET_VISUAL_SCALE (×60), so a default stack is ~18 scene
+// units tall. A DEFAULT_DIST of 2 put the camera INSIDE the fuselage — the user
+// stared at rocket texture and liftoff looked like "nothing happens" while the
+// HUD altitude climbed. Pull far enough out to frame the whole rocket + pad.
+const DEFAULT_DIST = 14;
 const DEFAULT_AZIMUTH = 0;
 const DEFAULT_POLAR = Math.PI / 2.5;
 
