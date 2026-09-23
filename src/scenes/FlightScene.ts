@@ -87,6 +87,8 @@ export class FlightScene {
   private countdownTimer = 0;
   private countdownActive = false;
   private countdownCooldown = 0;
+  private _debugShown = false;
+  private _dbgEl: HTMLDivElement | null = null;
   private countdownEl: HTMLElement | null = null;
   private lastRefBody: string | null = null;
   private impactMarker: THREE.Mesh | null = null;
@@ -110,10 +112,11 @@ private hudVisible = true;
   private sonicBoomLife = 0;
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
-  private _debugShown = false;
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
   private _camSnapped = false;
+  private _gravityTurnBias = 0;
+  private _gravityTurnAltThreshold = 5000;
 private rocketTopY = 0; // highest point of rocket mesh in local space
 
   // Autopilot state
@@ -1413,6 +1416,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const sz = this.state.position[2] - rotRefBody.position[2];
     const sl = Math.sqrt(sx*sx + sy*sy + sz*sz) || 1;
     const surfaceNormal = new THREE.Vector3(sx/sl, sy/sl, sz/sl);
+    const altM = sl - ((rotRefBody as any).radius ?? 6.371e6);
 
     // Horizon tangent = perpendicular to both forward and surface normal
     const horizon = new THREE.Vector3().crossVectors(rocketFwd, surfaceNormal);
@@ -1460,6 +1464,43 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.angularVel.z -= axis.z * angle * 3 * baseDt;
       }
       this.angularVel.multiplyScalar(Math.exp(-5 * baseDt));
+    }
+
+    // Automatic gravity turn: after clearing the low atmosphere the rocket
+    // gradually pitches toward the east horizon (instead of flying straight
+    // nose-up forever), then follows prograde for the rest of the burn. Only
+    // active while the player is not steering, SAS is off and throttle is up.
+    const canAutoturn = this.launched && !this.grounded && !warpActive && !this.paused &&
+      this.sasMode === 'off' && this.state.throttle > 0 &&
+      pitchInput === 0 && yawInput === 0;
+    if (canAutoturn && altM > this._gravityTurnAltThreshold) {
+      this._gravityTurnBias = Math.min(this._gravityTurnBias + 0.012 * baseDt, 0.65);
+    }
+    if (this._gravityTurnBias > 0.001 && canAutoturn) {
+      const rvT = this.relVelocity();
+      const rvTm = Math.sqrt(rvT[0] ** 2 + rvT[1] ** 2 + rvT[2] ** 2) || 1;
+      const progradeDir = new THREE.Vector3(rvT[0] / rvTm, rvT[1] / rvTm, rvT[2] / rvTm);
+      // Blend the prograde target toward east only while the turn is starting
+      // (prograde is still near-vertical); once the arc curves, track pure
+      // prograde.
+      const horizComp = progradeDir.clone().sub(surfaceNormal.clone().multiplyScalar(progradeDir.dot(surfaceNormal)));
+      const hlen = horizComp.length();
+      const blend = this._gravityTurnBias * Math.max(0, 1 - hlen / 0.35);
+      const qPro = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), progradeDir);
+      let qTarget: THREE.Quaternion = qPro;
+      if (blend > 0.001) {
+        const eastSeed = new THREE.Vector3(-surfaceNormal.y, surfaceNormal.x, 0);
+        const eastLen = eastSeed.length();
+        if (eastLen > 0.001) {
+          const eastDir = eastSeed.divideScalar(eastLen);
+          const qEast = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), eastDir);
+          qTarget = new THREE.Quaternion().slerpQuaternions(qPro, qEast, blend);
+        }
+      }
+      this.rocketQuat.slerp(qTarget, 1 - Math.exp(-3 * baseDt));
+      this.rocketQuat.normalize();
+      // Autopilot drives the attitude directly — kill residual SAS/angular velocity.
+      this.angularVel.set(0, 0, 0);
     }
 
     // Integrate angular velocity (SAS torque) in world space — it was
@@ -1609,7 +1650,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
      // Never fights the player: suspended while steering input is held, and
      // softened (the old 0.1 factor yanked ~12%/s at sea level against turns
      // — steering felt "barely working").
-     const steering = pitchInput !== 0 || yawInput !== 0;
+     const steering = pitchInput !== 0 || yawInput !== 0 || (canAutoturn && this._gravityTurnBias > 0);
      if (!this.grounded && !warpActive && !steering && speed > 5 && nearestBody && (nearestBody as any).radius) {
        const aeroAlt = nearestDist - (nearestBody as any).radius;
        const atmoScale = this.atmosphereScale((nearestBody as any).name);
@@ -2005,14 +2046,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
 
-      // Debug overlay — shows once then fades
+      // Debug overlay — live readout of physics vs. visual altitude.
       if (!this._debugShown) {
         this._debugShown = true;
         const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:10px;color:#c89838;background:rgba(8,10,24,0.6);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.1em;border:1px solid rgba(200,152,56,0.2);';
+        dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:11px;color:#c89838;background:rgba(8,10,24,0.65);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.05em;border:1px solid rgba(200,152,56,0.25);white-space:pre;';
         dbg.id = 'rocket-debug';
-        dbg.textContent = 'ELLIPSE  v4.6';
         document.body.appendChild(dbg);
+        this._dbgEl = dbg;
         console.log('ROCKET DEBUG:', {
           rocketBottomY: this.rocketBottomY,
           visualOffset,
@@ -2022,6 +2063,37 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           rocketGroupPos: this.rocketGroup.position.toArray(),
           statePos: this.state.position,
         });
+      }
+      const dbg = this._dbgEl;
+      if (dbg) {
+        let altH = Infinity;
+        for (const b of this.system.bodies) {
+          if (b.mass <= 0) continue;
+          const bdx = this.state.position[0] - b.position[0];
+          const bdy = this.state.position[1] - b.position[1];
+          const bdz = this.state.position[2] - b.position[2];
+          const bd = Math.sqrt(bdx * bdx + bdy * bdy + bdz * bdz);
+          const br = (b as any).getSurfaceRadiusAt?.(this.state.position) ?? (b as any).radius ?? 0;
+          const alt = bd - br;
+          if (alt < altH) altH = alt;
+        }
+        const velM = Math.sqrt(
+          this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
+        );
+        const gyy2 = Math.sqrt(
+          (this.rocketGroup.position.x - refBodyVis.position[0] * VISUAL_SCALE) ** 2 +
+          (this.rocketGroup.position.y - refBodyVis.position[1] * VISUAL_SCALE) ** 2 +
+          (this.rocketGroup.position.z - refBodyVis.position[2] * VISUAL_SCALE) ** 2
+        );
+        const refVisR2 = (refBodyVis as any).visualRadius ?? (refBodyVis as any).radius * VISUAL_SCALE;
+        const visualAlt2 = gyy2 - refVisR2;
+        dbg.textContent =
+          'v4.7  H' + Math.round(altH) +
+          'm V' + Math.round(velM) +
+          ' vR' + Math.round(visualAlt2 * 1000) / 1000 +
+          ' th' + Math.round(this.state.throttle * 100) +
+          (this._gravityTurnBias > 0.001 ? ' T' + Math.round(this._gravityTurnBias * 57.3) + '°' : '') +
+          (this.launched ? ' FLY' : this.countdownActive ? ' CD' + Math.max(1, Math.ceil(3 - this.countdownTimer)) : this.grounded ? ' PAD' : '');
       }
 
       this.rocketGroup.position.set(
