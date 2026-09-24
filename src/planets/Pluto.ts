@@ -1,3 +1,4 @@
+import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import type { Vec3 } from '../physics/Body';
 import { Planet } from './Planet';
@@ -7,7 +8,7 @@ const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
 export class Pluto extends Planet {
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    return this.visualRadius * 0.0026 * (Math.sin(nx * 9 + ny * 3) * Math.cos(nz * 8) + 0.3 * Math.sin(ny * 17 + nz * 11));
+    return this.visualRadius * rockyTerrain('pluto', nx, ny, nz);
   }
   constructor(position: Vec3, velocity: Vec3) {
     super("pluto", 4.4e21, position, velocity, 1.188e6 * 1.25);
@@ -20,7 +21,8 @@ export class Pluto extends Planet {
       positions.setXYZ(i, direction.x * radius, direction.y * radius, direction.z * radius);
     }
     geom.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ color: 0xddccbb, roughness: 0.9, metalness: 0.0 });
+    paintTerrain(geom, 'pluto', this.visualRadius);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, roughness: 0.9, metalness: 0.0 });
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
   }

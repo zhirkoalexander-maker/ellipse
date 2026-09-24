@@ -8,6 +8,8 @@ The rocket carries an assembly, remaining fuel, position, velocity, throttle, an
 
 Surface contact samples the same terrain function as the planet mesh. Descent speed, lateral speed, attitude, and landing equipment determine the outcome. A crash stops the flight until restart or return to the menu.
 
+Near the ground, a dense terrain mesh and a common visual magnification make planets look larger beside the rocket. This magnification decreases with altitude and does not change physical radii or gravity. Launch restraints are fitted to the hull and open when liftoff begins.
+
 The default starter rocket has a full-fuel thrust-to-weight ratio of about 5.7 on Earth. This is a game balance choice. Constants live in `src/config/constants.ts`, and engine values live in the part catalog.
 
 ## Automatic flight
