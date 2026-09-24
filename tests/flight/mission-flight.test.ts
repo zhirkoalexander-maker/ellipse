@@ -7,6 +7,9 @@ import { Missions } from '../../src/core/Missions';
 import { Mars } from '../../src/planets/Mars';
 import { buildDefaultRocket, buildSystem } from './fixtures';
 import { clearFlightSave, loadFlightState } from '../../src/storage/SaveLoad';
+import * as THREE from 'three';
+import { getReferenceBody } from '../../src/physics/SoiResolver';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, ROCKET_VISUAL_SCALE } from '../../src/config/constants';
 
 let flight: FlightScene | undefined;
 function create() {
@@ -32,7 +35,19 @@ describe('automatic flight and landing', () => {
     const f = create(); const before = f.rocket.totalFuelMass();
     f.hud.onAction('autopilot:' + target);
     expect(f.autopilotActive).toBe(true);
-    for (let i = 0; i < 30000 && !f.crashed && f.autopilotActive; i++) f.update(1 / 30);
+    let fastFrames = 0;
+    for (let i = 0; i < 30000 && !f.crashed && f.autopilotActive; i++) {
+      f.update(1 / 30);
+      if (f.autopilotActive && f.missionRate >= 100) {
+        const body = f.autopilotSurfaceBody() ?? getReferenceBody(f.state.position, f.system);
+        const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
+        const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
+          .addScaledVector(up, (-f.rocketBottomY + (f.rocketTopY + f.rocketBottomY) * 0.5) * ROCKET_VISUAL_SCALE);
+        expect(f.sceneMgr.camera.position.distanceTo(look)).toBeCloseTo(f.chase.dist, 3);
+        fastFrames++;
+      }
+    }
+    expect(fastFrames).toBeGreaterThan(0);
     expect({ crashed: f.crashed, phase: f.autopilotPhase, status: f.landingStatus }).toMatchObject({ crashed: false, phase: 'arrived' });
     expect(f.grounded).toBe(true);
     const body = f.system.bodyByName(target);
