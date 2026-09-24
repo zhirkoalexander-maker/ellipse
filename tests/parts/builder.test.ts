@@ -73,10 +73,13 @@ describe('PartBuilder', () => {
     expect(countMeshes(g)).toBe(3);
   });
 
-  it('legs have 4 leg cylinders and 4 foot pads', () => {
+  it('legs have four substantial foot pads and visible suspension', () => {
     const p = findPart('legs_landini')!;
     const g = buildPartMesh(p);
-    expect(countMeshes(g)).toBe(8);
+    let feet = 0;
+    g.traverse(o => { if (o.name === 'landing-foot') feet++; });
+    expect(feet).toBe(4);
+    expect(countMeshes(g)).toBeGreaterThanOrEqual(12);
   });
 
   it('all materials use MeshStandardMaterial or BasicMaterial', () => {

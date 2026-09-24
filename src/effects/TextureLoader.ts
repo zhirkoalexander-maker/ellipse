@@ -1,3 +1,4 @@
+import { assetUrl } from '../config/constants';
 import * as THREE from 'three';
 
 export interface LoadedTextures {
@@ -47,7 +48,7 @@ async function loadTex(url: string, cs: THREE.ColorSpace = THREE.SRGBColorSpace)
     const i = new Image();
     i.onload = () => resolve(i);
     i.onerror = () => reject(new Error(`Failed: ${url}`));
-    i.src = url;
+    i.src = assetUrl(url);
   });
   const tex = new THREE.Texture(img);
   tex.colorSpace = cs;

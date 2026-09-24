@@ -2,6 +2,8 @@ import { G } from '../config/constants';
 
 export interface OrbitPrediction {
   points: [number, number][];
+  /** Spatial trajectory in the same units and reference frame as the input. */
+  points3d: [number, number, number][];
   eccentricity: number;
   apoapsis: number;
   periapsis: number;
@@ -36,11 +38,12 @@ export function predictOrbit(
 
   const bound = e < 1 && a > 0;
   const apoapsis = bound ? a * (1 + e) : Infinity;
-  const periapsis = bound ? a * (1 - e) : r;
+  const semiLatusRectum = h * h / mu;
+  const periapsis = semiLatusRectum / (1 + e);
 
-  const ex = e > 1e-8 ? evx / e : 1;
-  const ey = e > 1e-8 ? evy / e : 0;
-  const ez = e > 1e-8 ? evz / e : 0;
+  const ex = e > 1e-8 ? evx / e : pos[0] / r;
+  const ey = e > 1e-8 ? evy / e : pos[1] / r;
+  const ez = e > 1e-8 ? evz / e : pos[2] / r;
 
   const p: [number, number, number] = [ex, ey, ez];
   const q: [number, number, number] = [
@@ -50,12 +53,17 @@ export function predictOrbit(
   ];
 
   const pts: [number, number][] = [];
+  const points3d: [number, number, number][] = [];
   const thetaMax = bound ? Math.PI : Math.acos(-1 / Math.max(e, 1.001)) * 0.98;
 
   // Compute time to Ap/Pe for bound orbits
   let timeToAp: number | undefined;
   let timeToPe: number | undefined;
-  if (bound) {
+  if (bound && e < 1e-8) {
+    // Circular orbits have no unique apsides: use current position as phase zero.
+    timeToPe = 2 * Math.PI * Math.sqrt(a ** 3 / mu);
+    timeToAp = timeToPe / 2;
+  } else if (bound) {
     const orbitPeriod = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
     const dot = (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) / (r || 1);
     const cosTheta = (a * (1 - e * e) / r - 1) / e;
@@ -78,14 +86,16 @@ export function predictOrbit(
     const theta = -thetaMax + (2 * thetaMax * i) / steps;
     const denom = 1 + e * Math.cos(theta);
     if (Math.abs(denom) < 1e-10) continue;
-    const rr = (a * (1 - e * e)) / denom;
+    const rr = semiLatusRectum / denom;
     if (isNaN(rr) || !isFinite(rr) || rr < 0) continue;
     const x = rr * (Math.cos(theta) * p[0] + Math.sin(theta) * q[0]);
+    const y = rr * (Math.cos(theta) * p[1] + Math.sin(theta) * q[1]);
     const z = rr * (Math.cos(theta) * p[2] + Math.sin(theta) * q[2]);
-    const dist = Math.sqrt(x * x + z * z);
-    if (dist > soiRadius * 1.5) break;
+    const dist = Math.hypot(x, y, z);
+    if (dist > soiRadius * 1.5) continue;
     pts.push([x, z]);
+    points3d.push([x, y, z]);
   }
 
-  return { points: pts, eccentricity: e, apoapsis, periapsis, bound, timeToAp, timeToPe };
+  return { points: pts, points3d, eccentricity: e, apoapsis, periapsis, bound, timeToAp, timeToPe };
 }

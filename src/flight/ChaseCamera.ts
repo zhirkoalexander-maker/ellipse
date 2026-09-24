@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Lifetime } from '../core/Lifetime';
 import type { FlightState } from './FlightState';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
@@ -19,7 +20,11 @@ const DEFAULT_AZIMUTH = 0;
 const DEFAULT_POLAR = Math.PI / 2.5;
 
 export class ChaseCamera {
+  private lifetime = new Lifetime();
+  private orbitLifetime = new Lifetime();
+  private surfaceFrame = new THREE.Quaternion();
   camera: THREE.PerspectiveCamera;
+  private fittedDist = DEFAULT_DIST;
   private dist = DEFAULT_DIST;
   private targetDist = DEFAULT_DIST;
   private azimuth = DEFAULT_AZIMUTH;
@@ -39,10 +44,11 @@ export class ChaseCamera {
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
     this.setupKeyboard();
+    this.lifetime.listen(window, 'blur', () => this.clearInput());
   }
 
   private setupKeyboard(): void {
-    window.addEventListener('keydown', (e) => {
+    this.lifetime.listen(window, 'keydown', (e) => {
       if (e.shiftKey) {
         switch (e.key) {
           case 'ArrowLeft': this.orbitKeys.left = true; e.preventDefault(); break;
@@ -55,7 +61,7 @@ export class ChaseCamera {
       if (e.key === 'z' || e.key === 'Z') this.zoomKeys.in = true;
       if (e.key === 'x' || e.key === 'X') this.zoomKeys.out = true;
     });
-    window.addEventListener('keyup', (e) => {
+    this.lifetime.listen(window, 'keyup', (e) => {
       switch (e.key) {
         case 'ArrowLeft': this.orbitKeys.left = false; break;
         case 'ArrowRight': this.orbitKeys.right = false; break;
@@ -68,17 +74,32 @@ export class ChaseCamera {
   }
 
   initialiseAt(state: FlightState, _quat: THREE.Quaternion, upDir?: THREE.Vector3, lookOffset?: { x: number; y: number; z: number }): void {
-    const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
-    const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
-    const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
-    const look = new THREE.Vector3(vx, vy, vz);
-    const ox = this.targetDist * Math.sin(this.polar) * Math.cos(this.azimuth);
-    const oy = this.targetDist * Math.cos(this.polar);
-    const oz = this.targetDist * Math.sin(this.polar) * Math.sin(this.azimuth);
+    this.initialized = false;
+    this.follow(state, 0, upDir, true, lookOffset);
+  }
 
-    this.camera.position.set(vx + ox, vy + oy, vz + oz);
-    this.camera.up.set(0, 1, 0);
-    this.camera.lookAt(look);
+  private clearInput(): void {
+    this.orbitKeys = { left: false, right: false, up: false, down: false };
+    this.zoomKeys = { in: false, out: false };
+    this.isDragging = false;
+    this.inertiaAzimuth = 0;
+    this.inertiaPolar = 0;
+  }
+
+  /** Fit the complete structural bounds with margin in either screen orientation.
+   * The caller supplies rendered dimensions and centers lookOffset on the bounds.
+   */
+  frame(height: number, radius: number): void {
+    const halfHeight = Number.isFinite(height) ? Math.max(0, height) / 2 : 0;
+    const radialExtent = Number.isFinite(radius) ? Math.max(0, radius) : 0;
+    const sphereRadius = Math.hypot(halfHeight, radialExtent);
+    const verticalHalfAngle = THREE.MathUtils.degToRad(this.camera.getEffectiveFOV()) / 2;
+    const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * this.camera.aspect);
+    const halfAngle = Math.max(0.001, Math.min(verticalHalfAngle, horizontalHalfAngle));
+    this.fittedDist = Math.max(DEFAULT_DIST, Math.min(MAX_DIST, 1.15 * sphereRadius / Math.sin(halfAngle)));
+    this.targetDist = this.fittedDist;
+    this.dist = this.fittedDist;
+    this.initialized = false;
   }
 
   setAzimuth(az: number): void {
@@ -97,9 +118,11 @@ export class ChaseCamera {
   }
 
   enableOrbit(el: HTMLElement): void {
+    this.orbitLifetime.dispose();
+    this.orbitLifetime = new Lifetime();
     this.canvas = el;
 
-    el.addEventListener('mousedown', (e) => {
+    this.orbitLifetime.listen(el, 'mousedown', (e) => {
       if (e.button !== 0) return;
       this.isDragging = true;
       this.prevMouse = { x: e.clientX, y: e.clientY };
@@ -107,7 +130,7 @@ export class ChaseCamera {
       this.inertiaPolar = 0;
     });
 
-    window.addEventListener('mousemove', (e) => {
+    this.orbitLifetime.listen(window, 'mousemove', (e) => {
       if (!this.isDragging) return;
       const dx = e.clientX - this.prevMouse.x;
       const dy = e.clientY - this.prevMouse.y;
@@ -118,16 +141,16 @@ export class ChaseCamera {
       this.prevMouse = { x: e.clientX, y: e.clientY };
     });
 
-    window.addEventListener('mouseup', () => { this.isDragging = false; });
+    this.orbitLifetime.listen(window, 'mouseup', () => { this.isDragging = false; });
 
-    el.addEventListener('wheel', (e) => {
+    this.orbitLifetime.listen(el, 'wheel', (e) => {
       e.preventDefault();
       this.targetDist *= e.deltaY > 0 ? 1.1 : 0.9;
       this.targetDist = Math.max(MIN_DIST, Math.min(MAX_DIST, this.targetDist));
     }, { passive: false });
   }
 
-  follow(state: FlightState, dt: number, _upDir?: THREE.Vector3, snap = false, lookOffset?: { x: number; y: number; z: number }): void {
+  follow(state: FlightState, dt: number, upDir?: THREE.Vector3, snap = false, lookOffset?: { x: number; y: number; z: number }): void {
     const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
     const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
     const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
@@ -145,6 +168,7 @@ export class ChaseCamera {
     if (!this.isDragging) {
       this.targetAzimuth += this.inertiaAzimuth * dt * 2;
       this.targetPolar += this.inertiaPolar * dt * 2;
+      this.targetPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.targetPolar));
       this.inertiaAzimuth *= Math.exp(-3 * dt);
       this.inertiaPolar *= Math.exp(-3 * dt);
     }
@@ -157,8 +181,12 @@ export class ChaseCamera {
     const ox = this.dist * Math.sin(this.polar) * Math.cos(this.azimuth);
     const oy = this.dist * Math.cos(this.polar);
     const oz = this.dist * Math.sin(this.polar) * Math.sin(this.azimuth);
-    const targetPos = new THREE.Vector3(vx + ox, vy + oy, vz + oz);
-    const targetUp = new THREE.Vector3(0, 1, 0);
+    const targetUp = upDir && upDir.lengthSq() > 0
+      ? upDir.clone().normalize() : new THREE.Vector3(0, 1, 0);
+    // Transport the tangent frame as surface normal changes, avoiding pole flips.
+    const previousUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.surfaceFrame);
+    this.surfaceFrame.premultiply(new THREE.Quaternion().setFromUnitVectors(previousUp, targetUp)).normalize();
+    const targetPos = new THREE.Vector3(ox, oy, oz).applyQuaternion(this.surfaceFrame).add(targetLook);
 
     if (!this.initialized) {
       this.smoothPos.copy(targetPos);
@@ -173,17 +201,13 @@ export class ChaseCamera {
     }
 
     this.camera.position.copy(this.smoothPos);
-    // Dynamic up-vector to prevent gimbal lock at poles
-    const upVec = Math.abs(this.polar) < 0.1 ? new THREE.Vector3(0, 0, 1) :
-                  Math.abs(this.polar - Math.PI) < 0.1 ? new THREE.Vector3(0, 0, -1) :
-                  targetUp;
-    this.camera.up.copy(upVec);
+    this.camera.up.copy(targetUp);
     this.camera.lookAt(targetLook);
   }
 
   reset(): void {
-    this.targetDist = DEFAULT_DIST;
-    this.dist = DEFAULT_DIST;
+    this.targetDist = this.fittedDist;
+    this.dist = this.fittedDist;
     this.targetAzimuth = DEFAULT_AZIMUTH;
     this.azimuth = DEFAULT_AZIMUTH;
     this.targetPolar = DEFAULT_POLAR;
@@ -191,6 +215,9 @@ export class ChaseCamera {
   }
 
   dispose(): void {
+    this.lifetime.dispose();
+    this.orbitLifetime.dispose();
+    this.clearInput();
     this.canvas = null;
   }
 }

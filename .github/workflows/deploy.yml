@@ -18,9 +18,9 @@ jobs:
 
       - run: npm ci
 
-      - run: npx tsc
+      - run: npm test
 
-      - run: npx vite build
+      - run: npm run build
 
       - uses: peaceiris/actions-gh-pages@v3
         with:

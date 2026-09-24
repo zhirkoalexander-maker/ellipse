@@ -14,13 +14,13 @@ export const FIXED_DT = 1 / 60;
 export const G0 = 9.80665;
 
 /** Fuel burn rate multiplier (game balance).
- *  Raw rocket equation at thrust levels needed for g≈176 drains a 50t tank
- *  in ~3 seconds (mass flow = thrust/(Isp·g0) ≈ 18 t/s). 1/15 slows burn 15×
- *  so ascents take ~3-4 minutes. Δv readout divides by this to stay honest. */
+ * Retains the existing extended burn time; Δv uses the same multiplier.
+ * Lower surface gravity now allows controlled low-throttle descents. */
 export const FUEL_FLOW_MULT = 1 / 15;
 
-/** Earth mass (kg) — g≈176 m/s² at 2× radius */
-export const EARTH_MASS = 8.92e24 * 48;
+/** Playable Earth radius and mass: 25% larger, 14 m/s² at sea level. */
+export const EARTH_RADIUS = 6.371e6 * 2.5;
+export const EARTH_MASS = 14 * EARTH_RADIUS ** 2 / G;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;
@@ -39,7 +39,6 @@ export const TERRAIN_SEA_LEVEL = 0.35;
 
 /** Resolve asset URL with correct base path for GitHub Pages. */
 export function assetUrl(path: string): string {
-  if (import.meta.env.DEV) return path;
   const base = (import.meta as any).env?.BASE_URL ?? '/';
   return (base + path.replace(/^\//, '')).replace(/\/\//g, '/');
 }

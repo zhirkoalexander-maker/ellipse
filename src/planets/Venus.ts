@@ -5,7 +5,7 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
-const SEGMENTS = 64;
+const SEGMENTS = 192;
 
 const hash = (x: number, y: number, z: number) => {
   const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.9) * 43758.5453;
@@ -48,7 +48,7 @@ export class Venus extends Planet {
     const volcanoes = fbm3D(nx * 6 + 50, ny * 6 + 100, nz * 6 + 150, 4);
     const plains = fbm3D(nx * 15 + 200, ny * 15 + 300, nz * 15 + 400, 3);
     const elev = volcanoes * 0.6 + plains * 0.4;
-    const maxDisp = this.visualRadius * 0.015;
+    const maxDisp = this.visualRadius * 0.0078;
     if (elev > 0.35) return ((elev - 0.35) / 0.65) ** 2 * maxDisp;
     return -(0.35 - elev) / 0.35 * maxDisp * 0.05;
   }
@@ -56,7 +56,7 @@ export class Venus extends Planet {
   atmosphereGlow: AtmosphereGlow;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("venus", 1.46e25, position, velocity, 6.052e6);
+    super("venus", 1.46e25, position, velocity, 6.052e6 * 1.25);
 
     const visualR = this.visualRadius;
 
@@ -69,21 +69,10 @@ export class Venus extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.015;
-
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR;
-      const ny = vert.y / visualR;
-      const nz = vert.z / visualR;
-
-      const volcanoes = fbm3D(nx * 6 + 50, ny * 6 + 100, nz * 6 + 150, 4);
-      const plains = fbm3D(nx * 15 + 200, ny * 15 + 300, nz * 15 + 400, 3);
-      const elev = volcanoes * 0.6 + plains * 0.4;
-
-      let disp = 0;
-      if (elev > 0.35) disp = ((elev - 0.35) / 0.65) ** 2 * maxDisp;
-      else disp = -(0.35 - elev) / 0.35 * maxDisp * 0.05;
+      const direction = vert.clone().normalize();
+      const disp = this.getTerrainHeightVisual(direction.x, direction.y, direction.z);
 
       vert.setLength(visualR + disp);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);

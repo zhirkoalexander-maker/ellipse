@@ -6,9 +6,20 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
 export class Pluto extends Planet {
+  protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
+    return this.visualRadius * 0.0026 * (Math.sin(nx * 9 + ny * 3) * Math.cos(nz * 8) + 0.3 * Math.sin(ny * 17 + nz * 11));
+  }
   constructor(position: Vec3, velocity: Vec3) {
-    super("pluto", 4.4e21, position, velocity, 1.188e6);
-    const geom = new THREE.SphereGeometry(this.visualRadius, 32, 16);
+    super("pluto", 4.4e21, position, velocity, 1.188e6 * 1.25);
+    const geom = new THREE.SphereGeometry(this.visualRadius, 192, 192);
+    const positions = geom.attributes.position!;
+    const direction = new THREE.Vector3();
+    for (let i = 0; i < positions.count; i++) {
+      direction.fromBufferAttribute(positions, i).normalize();
+      const radius = this.visualRadius + this.getTerrainHeightVisual(direction.x, direction.y, direction.z);
+      positions.setXYZ(i, direction.x * radius, direction.y * radius, direction.z * radius);
+    }
+    geom.computeVertexNormals();
     const mat = new THREE.MeshStandardMaterial({ color: 0xddccbb, roughness: 0.9, metalness: 0.0 });
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
