@@ -1,4 +1,4 @@
-import { rockyTerrain, paintTerrain } from './Terrain';
+import { rockyTerrain, paintTerrain, configureEarthMaterial } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
@@ -29,8 +29,8 @@ function makeCloudTexture(): THREE.CanvasTexture {
       cl *= Math.max(0, 1 - Math.abs(v - 0.5) * 1.2);
       cl = Math.max(0, Math.min(255, (cl - 0.4) * 2.5 * 255));
       const idx = (py * W + px) * 4;
-      img.data[idx] = img.data[idx + 1] = img.data[idx + 2] = cl;
-      img.data[idx + 3] = 255;
+      img.data[idx] = img.data[idx + 1] = img.data[idx + 2] = 255;
+      img.data[idx + 3] = cl;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -131,6 +131,7 @@ export class Earth extends Planet {
       emissiveIntensity: 0.3,
     });
 
+    configureEarthMaterial(mat);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 
