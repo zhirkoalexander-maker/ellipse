@@ -47,3 +47,18 @@ export function mapTrajectory(position: Vec3, velocity: Vec3, mass: number, radi
   }
   return points;
 }
+
+export function simpleCorrection(position: Vec3, velocity: Vec3, destination: Vec3, kind: 'toward' | 'faster' | 'slower', strength: number): Vec3 {
+ const direction=kind==='toward'?new Vector3(...destination).sub(new Vector3(...position)):new Vector3(...velocity);
+ if(kind==='slower'){strength=Math.min(strength,direction.length());direction.negate();}
+ return direction.lengthSq()>1e-12?direction.normalize().multiplyScalar(Math.max(0,strength)).toArray():[0,0,0];
+}
+
+/** Face the destination in the map plane, even when the transfer is inclined. */
+export function destinationBasis(position: Vec3, destination: Vec3): [Vector3,Vector3] {
+ const x=new Vector3(...destination).sub(new Vector3(...position));
+ if(x.lengthSq()<1)x.set(1,0,0);x.normalize();
+ const y=Math.abs(x.y)<.9?new Vector3(0,1,0):new Vector3(0,0,1);
+ y.addScaledVector(x,-y.dot(x)).normalize();
+ return [x,y];
+}
