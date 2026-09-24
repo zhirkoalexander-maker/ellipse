@@ -54,3 +54,13 @@ it.each([16 / 9, 9 / 16])('frames a tall rocket inside the camera frustum at asp
  chase.zoom(0.5); chase.follow(state(), 1, undefined, true); chase.reset(); chase.follow(state(), 1, undefined, true);
  expect(camera.position.length()).toBeCloseTo(fittedDistance, 8);
 });
+it('keeps manual zoom inside a bounded range', () => {
+ const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 1000);
+ const chase = new ChaseCamera(camera); owned.push(chase);
+ chase.frame(40, 5); chase.initialiseAt(state(), new THREE.Quaternion(), new THREE.Vector3(0, 1, 0));
+ const fitted = camera.position.length();
+ chase.zoom(0.0001); chase.follow(state(), 1, undefined, true);
+ expect(camera.position.length()).toBeGreaterThanOrEqual(fitted * 0.38 - 1e-6);
+ chase.zoom(1000); chase.follow(state(), 1, undefined, true);
+ expect(camera.position.length()).toBeLessThanOrEqual(80 + 1e-6);
+});
