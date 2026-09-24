@@ -29,7 +29,9 @@ npm run build
 
 Search the parts library in Vehicle Assembly and click a part to add it on top. The stack list shows the top of the rocket first; use its arrows to move parts or × to remove one. You can save and load designs.
 
-In the map, use Orbit for the current flight path, Target to frame the selected destination, or System for an overview. Scroll or pinch to zoom and drag to pan. Prograde, radial and normal values preview a short burn from the current position; Execute burn turns the rocket and fires its engines until the requested correction is complete. Stop, manual throttle, or a warp change cancels the burn. The preview uses the current reference body, so it is not a full interplanetary encounter prediction.
+The map opens on your selected destination. Choose another planet from Destination, or use All planets for the whole system. Scroll or pinch to zoom and drag to pan. To adjust a flight, choose Toward destination, Speed up or Slow down, pick Gentle, Medium or Strong, then Apply correction. Fine tuning keeps the individual burn axes available. Corrections use the engines and fuel; they do not replace the automatic transfer and landing flight. The yellow preview assumes a short burn around the current reference body.
+
+While descending below 20 km, Above surface shows terrain clearance and descent speed. Look down points the camera toward the ground without changing zoom.
 
 ## Project layout
 
