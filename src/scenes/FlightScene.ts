@@ -49,7 +49,7 @@ export class FlightScene {
   private stageSeparations = 0;
   private landingAssist = false;
   private landingDirection = new THREE.Vector3();
-  private landingStatus = 'LAUNCH or Space to lift off · ↑/↓ throttle · W/S, A/D steer';
+  private landingStatus = 'Click Launch or press Space · ↑/↓ throttle · W/S, A/D steer';
   private renderer: Renderer;
   private sceneMgr: SceneManager;
   private system: System;
@@ -141,6 +141,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
   private autopilotPhase: MissionCommand['phase'] | 'idle' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
   private missionGuidance: MissionGuidance | null = null;
   private missionDirection = new THREE.Vector3(0, 1, 0);
+  private missionThrottle = 0;
   private missionAutoWarp = true;
   private missionRate = 1;
   private autopilotTarget = '';
@@ -444,14 +445,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const transferPanel = document.createElement('div');
     transferPanel.style.cssText = 'position:absolute;top:16px;right:16px;z-index:10;background:rgba(8,10,24,0.85);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#88ccff;min-width:200px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;';
     transferPanel.innerHTML = `
-      <div style="color:#c89838;font-size:10px;letter-spacing:0.1em;">TRANSFER PLANNER</div>
+      <div style="color:#c89838;font-size:10px;letter-spacing:0.1em;">Transfer planner</div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <span style="color:#889;font-size:10px;">TARGET</span>
+        <span style="color:#889;font-size:10px;">Target</span>
         <select id="transfer-target" style="flex:1;background:#06080f;color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;padding:3px 6px;font:400 11px monospace;cursor:pointer;"></select>
       </div>
-      <button id="transfer-compute" style="padding:6px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;letter-spacing:0.05em;">COMPUTE</button>
+      <button id="transfer-compute" style="padding:6px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;letter-spacing:0.05em;">Check vehicle</button>
       <div id="transfer-result" style="font-size:10px;color:#ddd;min-height:40px;line-height:1.5;"></div>
-      <button id="transfer-go" style="padding:8px;background:rgba(124,255,178,0.12);color:#7CFFB2;border:1px solid rgba(124,255,178,0.3);border-radius:3px;font:700 11px system-ui;cursor:pointer;letter-spacing:0.08em;display:none;">▶ AUTOPILOT GO</button>
+      <button id="transfer-go" style="padding:8px;background:rgba(124,255,178,0.12);color:#7CFFB2;border:1px solid rgba(124,255,178,0.3);border-radius:3px;font:700 11px system-ui;cursor:pointer;letter-spacing:0.08em;display:none;">▶ Start flight</button>
     `;
     mapEl.appendChild(transferPanel);
     const targetSelect = transferPanel.querySelector('[id="transfer-target"]') as HTMLSelectElement;
@@ -464,9 +465,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
     targetSelect.value = 'moon';
     goBtn.style.display = 'block';
-    goBtn.textContent = 'FLY & LAND';
+    goBtn.textContent = 'Start flight';
 
-    computeBtn.textContent = 'CHECK VEHICLE';
+    computeBtn.textContent = 'Check vehicle';
     this.lifetime.listen(computeBtn, 'click', () => {
       const fuel = this.rocket.totalFuelMass();
       const thrust = totalThrust(this.rocket.assembly.roots);
@@ -987,9 +988,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     if (save) {
       this.applyFlightSave(save);
-      toast.show('Flight resumed where you left off. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage.');
+      toast.show('Flight resumed. ↑/↓ throttle, W/S pitch, A/D yaw, Space stages.');
     } else {
-      toast.show('Click LAUNCH or press Space to lift off. W/S, A/D steer, ↑/↓ throttle, Esc pauses.');
+      toast.show('Click Launch or press Space. W/S and A/D steer, ↑/↓ throttle, Esc pauses.');
     }
     this.syncVisualTransform();
     const initialRef = getReferenceBody(this.state.position, this.system);
@@ -1064,6 +1065,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.autopilotTarget = target.name;
         this.autopilotPhase = save.mission.phase === 'landing' ? 'landing' : 'cruise';
         this.missionGuidance = new MissionGuidance(this.navigationBody(departure), this.navigationBody(target));
+        this.missionDirection.set(0, 1, 0).applyQuaternion(this.rocketQuat).normalize();
+        this.missionThrottle = this.state.throttle;
         this.missionAutoWarp = save.mission.autoWarp;
         this.missionRate = 1;
         this.timeWarp = 1;
@@ -1417,7 +1420,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
     if (this.autopilotActive && this.missionGuidance && !this.grounded && !this.landingAssist) {
       const alignment = Math.max(0, fwd.dot(this.missionDirection));
-      this.state.throttle *= alignment > 0.9 ? alignment : 0;
+      // Keep thrust continuous while the nose catches up. A hard 0/1 gate
+      // made the controller pulse every frame, which looked like shaking.
+      this.state.throttle *= THREE.MathUtils.clamp((alignment - 0.55) / 0.45, 0, 1) * alignment;
     }
 
     // Apply thrust — TWR gate: must have enough thrust at current throttle
@@ -1486,7 +1491,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.groundedDir = null;
       this.liftoffFrames = 60;
       this.launched = true;
-      this.landingStatus = 'W/S, A/D steer · ↑/↓ throttle · Space stage · L landing assist';
+      this.landingStatus = 'W/S and A/D steer · ↑/↓ throttle · Space stages · L landing assist';
       this._camSnapped = false; // reset camera snap on liftoff
       // Inherit the planet's ORBITAL velocity (Earth: 17 km/s). Without it
       // the planet races away from the rocket and everything downstream
@@ -1758,20 +1763,23 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       (body as any).syncMesh?.();
     }
 
-    // Planet visibility: barely visible from ground, fade in with altitude
+    // Keep the planet under the rocket fully visible. Previously every body
+    // except Earth was faded to 5% opacity while landed, which made the Moon
+    // look like a black void and hid the rest of the system from its surface.
     const refVis = getReferenceBody(this.state.position, this.system);
     const rdx = this.state.position[0] - refVis.position[0];
     const rdy = this.state.position[1] - refVis.position[1];
     const rdz = this.state.position[2] - refVis.position[2];
     const altAboveSurface = Math.sqrt(rdx*rdx + rdy*rdy + rdz*rdz) - ((refVis as any).radius ?? 6371000);
-    const planetAlpha = Math.max(0.05, Math.min(1, altAboveSurface / 50000));
+    const planetAlpha = Math.max(0.72, Math.min(1, 0.72 + altAboveSurface / 200000));
     for (const body of this.system.bodies) {
       const b = body as any;
-      if (!b.mesh || b.name === 'earth' || b.name === 'sun') continue;
+      if (!b.mesh || b.name === 'sun') continue;
+      const opacity = b.name === refVis.name ? 1 : planetAlpha;
       if (b.mesh.material) {
         const mats = Array.isArray(b.mesh.material) ? b.mesh.material : [b.mesh.material];
         for (const m of mats) {
-          if (m.transparent !== undefined) { m.transparent = true; m.opacity = planetAlpha; m.needsUpdate = true; }
+          if (m.transparent !== undefined) { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; }
         }
       }
     }
@@ -2245,6 +2253,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.autopilotActive = true; this.autopilotTarget = targetName;
     this.autopilotPhase = this.grounded ? 'ascent' : 'cruise';
     this.missionGuidance = new MissionGuidance(this.navigationBody(departure), this.navigationBody(target!));
+    this.missionDirection.set(0, 1, 0).applyQuaternion(this.rocketQuat).normalize();
+    this.missionThrottle = 0;
     this.missionAutoWarp = autoWarp;
     this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0;
     this.hud.setWarp(1); this.landingAssist = false; this.sasMode = 'off'; this.hud.setSasMode('off');
@@ -2270,10 +2280,18 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       dt, grounded: this.grounded, fuel: this.rocket.totalFuelMass() });
     if (command.phase === 'blocked') { this.abortAutopilot(command.status); return; }
     this.autopilotPhase = command.phase;
-    this.missionDirection.set(...command.direction);
-    this.state.throttle = command.throttle;
+    // Guidance is evaluated on a moving target and can change by several
+    // degrees between frames. Slew both the desired direction and throttle so
+    // the attitude controller does not chase a noisy vector and visibly shake.
+    const desiredDirection = new THREE.Vector3(...command.direction).normalize();
+    const directionResponse = 1 - Math.exp(-4.5 * Math.max(0, dt));
+    if (this.missionDirection.lengthSq() < 1e-8) this.missionDirection.copy(desiredDirection);
+    else this.missionDirection.lerp(desiredDirection, directionResponse).normalize();
+    this.missionThrottle += (command.throttle - this.missionThrottle) * (1 - Math.exp(-5 * Math.max(0, dt)));
+    this.state.throttle = this.missionThrottle;
     this.timeWarp = 1; this.warpIndex = 0;
     if (command.readyToLand) {
+      if (!this.landingAssist) this.landingDirection.set(0, 0, 0);
       this.landingAssist = true;
       if (this.hasLandingLegs() && !this.gearDeployed) this.toggleGear();
     }
@@ -2284,6 +2302,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.autopilotActive = false;
     this.autopilotPhase = 'aborted';
     this.missionGuidance = null; this.missionRate = 1; this.landingAssist = false;
+    this.missionThrottle = 0;
     this.hud.setAutopilotStatus(null, '', '');
     this.state.throttle = 0;
     this.sasMode = 'off';
@@ -2292,7 +2311,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.timeWarp = 1;
     this.hud.setWarp(1);
     this.hideAutopilotStatus();
-    toast.show(`AUTOPILOT ABORTED: ${reason}`, 5000);
+    toast.show(`Automatic flight cancelled: ${reason}`, 5000);
   }
 
   private showArrivalOverlay(target: string, timeS: number, fuelKg: number, massKg: number): void {
@@ -2569,10 +2588,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     const maxAcceleration = this.rocket.totalFuelMass() > 0 ? totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass() : 0;
     const command = landingCommand({ altitude, verticalSpeed, horizontalSpeed: lateral.length(), gravity: G * ref.mass / (radius * radius), maxAcceleration });
-    this.landingDirection.copy(up).multiplyScalar(command.verticalAcceleration);
-    if (lateral.lengthSq() > 1e-8) this.landingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
-    if (this.landingDirection.lengthSq() === 0) this.landingDirection.copy(up);
-    this.landingDirection.normalize();
+    const desiredLandingDirection = up.clone().multiplyScalar(command.verticalAcceleration);
+    if (lateral.lengthSq() > 1e-8) desiredLandingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
+    if (desiredLandingDirection.lengthSq() === 0) desiredLandingDirection.copy(up);
+    desiredLandingDirection.normalize();
+    const landingResponse = 1 - Math.exp(-6 * Math.max(0, dt));
+    if (this.landingDirection.lengthSq() < 1e-8) this.landingDirection.copy(desiredLandingDirection);
+    else this.landingDirection.lerp(desiredLandingDirection, landingResponse).normalize();
     const nose = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     // Point the engine in the useful direction before applying descent thrust.
     const aligned = Math.max(0, nose.dot(this.landingDirection));
