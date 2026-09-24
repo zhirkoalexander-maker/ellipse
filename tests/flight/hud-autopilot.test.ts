@@ -50,6 +50,11 @@ it('dispatches exactly one action per warp click and per pause button click',()=
    action.mockClear();const icon=document.createElement('span');icon.textContent='icon';button(control).append(icon);icon.click();expect(action.mock.calls).toEqual([[control]]);
  }
 });
+it('exposes explicit bounded camera zoom controls',()=>{
+ hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;
+ button('cameraZoomOut').click();button('cameraZoomIn').click();
+ expect(action.mock.calls).toEqual([['cameraZoomOut'],['cameraZoomIn']]);
+});
 it('Escape closes the picker without reaching window flight shortcuts',()=>{
  hud=new HUD();hud.mount();button('autopilotOpen').click();
  const listener=vi.fn();window.addEventListener('keydown',listener);

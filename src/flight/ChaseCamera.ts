@@ -5,8 +5,8 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
-const MIN_DIST = 0.2;
-const MAX_DIST = 200;
+const MIN_DIST = 4;
+const MAX_DIST = 80;
 const LERP_SPEED = 25;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
@@ -25,6 +25,8 @@ export class ChaseCamera {
   private surfaceFrame = new THREE.Quaternion();
   camera: THREE.PerspectiveCamera;
   private fittedDist = DEFAULT_DIST;
+  private minZoomDist = MIN_DIST;
+  private maxZoomDist = MAX_DIST;
   private dist = DEFAULT_DIST;
   private targetDist = DEFAULT_DIST;
   private azimuth = DEFAULT_AZIMUTH;
@@ -97,6 +99,10 @@ export class ChaseCamera {
     const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * this.camera.aspect);
     const halfAngle = Math.max(0.001, Math.min(verticalHalfAngle, horizontalHalfAngle));
     this.fittedDist = Math.max(DEFAULT_DIST, Math.min(MAX_DIST, 1.15 * sphereRadius / Math.sin(halfAngle)));
+    // Keep a useful, controllable framing range. A wheel event or a held key
+    // must never pull the chase camera hundreds of units away from the craft.
+    this.minZoomDist = Math.max(MIN_DIST, this.fittedDist * 0.38);
+    this.maxZoomDist = Math.min(MAX_DIST, Math.max(this.fittedDist * 2.4, this.fittedDist + 10));
     this.targetDist = this.fittedDist;
     this.dist = this.fittedDist;
     this.initialized = false;
@@ -114,7 +120,7 @@ export class ChaseCamera {
 
   zoom(delta: number): void {
     this.targetDist *= delta;
-    this.targetDist = Math.max(MIN_DIST, Math.min(MAX_DIST, this.targetDist));
+    this.targetDist = Math.max(this.minZoomDist, Math.min(this.maxZoomDist, this.targetDist));
   }
 
   enableOrbit(el: HTMLElement): void {
@@ -145,38 +151,41 @@ export class ChaseCamera {
 
     this.orbitLifetime.listen(el, 'wheel', (e) => {
       e.preventDefault();
-      this.targetDist *= e.deltaY > 0 ? 1.1 : 0.9;
-      this.targetDist = Math.max(MIN_DIST, Math.min(MAX_DIST, this.targetDist));
+      this.zoom(e.deltaY > 0 ? 1.1 : 0.9);
     }, { passive: false });
   }
 
   follow(state: FlightState, dt: number, upDir?: THREE.Vector3, snap = false, lookOffset?: { x: number; y: number; z: number }): void {
+    // Autopilot may split a large simulation step into tiny render slices.
+    // Keep camera easing tied to visible time so it neither lags for seconds
+    // nor appears to jitter while the physics is being accelerated.
+    const cameraDt = Math.max(0, Math.min(0.05, Math.max(dt, 1 / 120)));
     const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
     const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
     const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
     const targetLook = new THREE.Vector3(vx, vy, vz);
 
     // Handle keyboard orbit
-    if (this.orbitKeys.left) this.targetAzimuth += dt * ORBIT_SPEED;
-    if (this.orbitKeys.right) this.targetAzimuth -= dt * ORBIT_SPEED;
-    if (this.orbitKeys.up) this.targetPolar = Math.max(0.05, this.targetPolar - dt * ORBIT_SPEED * 0.5);
-    if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.05, this.targetPolar + dt * ORBIT_SPEED * 0.5);
-    if (this.zoomKeys.in) this.targetDist = Math.max(MIN_DIST, this.targetDist * (1 - dt * ZOOM_SPEED));
-    if (this.zoomKeys.out) this.targetDist = Math.min(MAX_DIST, this.targetDist * (1 + dt * ZOOM_SPEED));
+    if (this.orbitKeys.left) this.targetAzimuth += cameraDt * ORBIT_SPEED;
+    if (this.orbitKeys.right) this.targetAzimuth -= cameraDt * ORBIT_SPEED;
+    if (this.orbitKeys.up) this.targetPolar = Math.max(0.05, this.targetPolar - cameraDt * ORBIT_SPEED * 0.5);
+    if (this.orbitKeys.down) this.targetPolar = Math.min(Math.PI - 0.05, this.targetPolar + cameraDt * ORBIT_SPEED * 0.5);
+    if (this.zoomKeys.in) this.zoom(Math.max(0.01, 1 - cameraDt * ZOOM_SPEED));
+    if (this.zoomKeys.out) this.zoom(1 + cameraDt * ZOOM_SPEED);
 
     // Apply inertia when not dragging
     if (!this.isDragging) {
-      this.targetAzimuth += this.inertiaAzimuth * dt * 2;
-      this.targetPolar += this.inertiaPolar * dt * 2;
+      this.targetAzimuth += this.inertiaAzimuth * cameraDt * 2;
+      this.targetPolar += this.inertiaPolar * cameraDt * 2;
       this.targetPolar = Math.max(0.05, Math.min(Math.PI - 0.05, this.targetPolar));
-      this.inertiaAzimuth *= Math.exp(-3 * dt);
-      this.inertiaPolar *= Math.exp(-3 * dt);
+      this.inertiaAzimuth *= Math.exp(-3 * cameraDt);
+      this.inertiaPolar *= Math.exp(-3 * cameraDt);
     }
 
     // Smooth interpolation
-    this.dist += (this.targetDist - this.dist) * Math.min(1, LERP_SPEED * dt);
-    this.azimuth += (this.targetAzimuth - this.azimuth) * Math.min(1, LERP_SPEED * dt * 0.5);
-    this.polar += (this.targetPolar - this.polar) * Math.min(1, LERP_SPEED * dt * 0.5);
+    this.dist += (this.targetDist - this.dist) * Math.min(1, LERP_SPEED * cameraDt);
+    this.azimuth += (this.targetAzimuth - this.azimuth) * Math.min(1, LERP_SPEED * cameraDt * 0.5);
+    this.polar += (this.targetPolar - this.polar) * Math.min(1, LERP_SPEED * cameraDt * 0.5);
 
     const ox = this.dist * Math.sin(this.polar) * Math.cos(this.azimuth);
     const oy = this.dist * Math.cos(this.polar);
@@ -196,7 +205,7 @@ export class ChaseCamera {
     if (snap) {
       this.smoothPos.copy(targetPos);
     } else {
-      const t = Math.min(1, LERP_SPEED * dt);
+      const t = Math.min(1, LERP_SPEED * cameraDt);
       this.smoothPos.lerp(targetPos, t);
     }
 
