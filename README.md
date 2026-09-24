@@ -25,9 +25,11 @@ npm run build
 - `L` toggles landing assist.
 - `Q/E` changes time warp; `100×` and `1000×` are available above 70 km with the engines off.
 - `C` switches the chase and free cameras; drag or use the camera buttons to orbit and zoom.
-- `M` or `Tab` opens the system map; `Esc` pauses.
+- `M` or `Tab` opens the map. `M` or `Esc` closes it; outside the map, `Esc` pauses.
 
 Search the parts library in Vehicle Assembly and click a part to add it on top. The stack list shows the top of the rocket first; use its arrows to move parts or × to remove one. You can save and load designs.
+
+In the map, use Orbit for the current flight path, Target to frame the selected destination, or System for an overview. Scroll or pinch to zoom and drag to pan. Prograde, radial and normal values preview a short burn from the current position; Execute burn turns the rocket and fires its engines until the requested correction is complete. Stop, manual throttle, or a warp change cancels the burn. The preview uses the current reference body, so it is not a full interplanetary encounter prediction.
 
 ## Project layout
 

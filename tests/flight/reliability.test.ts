@@ -41,7 +41,8 @@ describe('flight reliability', () => {
       f.update(dt);
       const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
       const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
-        .addScaledVector(up, (-f.rocketBottomY + (f.rocketTopY + f.rocketBottomY) * 0.5) * 60);
+        .addScaledVector(up, -f.rocketBottomY * 60)
+        .add(new THREE.Vector3(0, (f.rocketTopY + f.rocketBottomY) * 30, 0).applyQuaternion(f.rocketGroup.quaternion));
       expect(scene.camera.position.distanceTo(look)).toBeCloseTo(f.chase.dist, 3);
       expect(f.timeWarp).toBe(1000);
       expect(f.crashed).toBe(false);
