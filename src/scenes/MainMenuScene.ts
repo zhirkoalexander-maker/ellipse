@@ -64,7 +64,7 @@ export class MainMenuScene {
     this.root.appendChild(btn('Settings', 'ghost', this.onSettings));
     this.root.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
-    version.textContent = 'v2.5.3';
+    version.textContent = 'v2.5.4';
     version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
     this.root.appendChild(version);
 

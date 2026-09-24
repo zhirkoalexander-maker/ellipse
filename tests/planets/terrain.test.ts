@@ -32,21 +32,23 @@ it('uses gentle terrain and identical mesh vertex and physical surface heights',
     }
   }
 });
-it('makes Pluto hills thirty percent taller while keeping smooth shallow slopes', () => {
+it('gives Pluto continuous raised ridges rather than a smooth sphere', () => {
  const planet = new Pluto([0,0,0], [0,0,0]);
  const direction = new THREE.Vector3(1, 2, 3).normalize();
- const originalFraction = 0.002 * (Math.sin(direction.x * 9 + direction.y * 3) * Math.cos(direction.z * 8) + 0.3 * Math.sin(direction.y * 17 + direction.z * 11));
  const point = direction.clone().multiplyScalar(planet.radius);
  const fraction = planet.getSurfaceRadiusAt(point.toArray()) / planet.radius - 1;
- expect(fraction).toBeCloseTo(originalFraction * 1.3, 10);
+ expect(Math.abs(fraction)).toBeGreaterThan(0.0005);
  const adjacent = direction.clone().add(new THREE.Vector3(1e-5,0,0)).normalize().multiplyScalar(planet.radius);
  expect(Math.abs(planet.getSurfaceRadiusAt(adjacent.toArray()) - planet.getSurfaceRadiusAt(point.toArray())) / planet.radius).toBeLessThan(1e-5);
 });
-it('keeps the Kennedy launch site flat after increasing terrain', () => {
+it('keeps only the immediate launch site flat with hills outside it', () => {
  const earth = new Earth([0,0,0], [0,0,0]);
- const pad = new THREE.Vector3(0.144379, 0.477159, -0.866989).normalize();
- for (const offset of [-0.005, 0, 0.005]) {
+ const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
+ const pad = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
+ for (const offset of [-0.0003, 0, 0.0003]) {
   const point = pad.clone().add(new THREE.Vector3(offset,0,0)).normalize().multiplyScalar(earth.radius);
   expect(earth.getSurfaceRadiusAt(point.toArray())).toBeCloseTo(earth.radius, 6);
  }
+ const hillside = pad.clone().add(new THREE.Vector3(0.006, 0, 0)).normalize().multiplyScalar(earth.radius);
+ expect(earth.getSurfaceRadiusAt(hillside.toArray()) - earth.radius).toBeGreaterThan(1000);
 });
