@@ -20,7 +20,7 @@ it('updates mission progress, exposes cancellation and removes its controls and 
  hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;
  hud.setAutopilotStatus('Cruising','moon','Arrival in 2 minutes');
  const card=document.querySelector<HTMLElement>('.autopilot-mission')!;
- expect(card.hidden).toBe(false);expect(card.textContent).toContain('MOON');expect(card.textContent).toContain('Arrival in 2 minutes');
+ expect(card.hidden).toBe(false);expect(card.textContent).toContain('Moon');expect(card.textContent).toContain('Arrival in 2 minutes');
  const cancel=card.querySelector<HTMLButtonElement>('button')!;cancel.click();
  expect(action).toHaveBeenCalledWith('autopilotCancel');
  hud.setAutopilotStatus(null,'','');expect(card.hidden).toBe(true);

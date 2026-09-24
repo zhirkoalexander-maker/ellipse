@@ -53,9 +53,9 @@ export class HUD {
     this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(6,8,20,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;opacity:0;transition:opacity 220ms ease-out;';
     this.pauseOverlay.innerHTML = `
       <div style="width:280px;display:flex;flex-direction:column;gap:8px;align-items:center;">
-        <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:center;">▶ RESUME</button>
-        <button class="btn btn--secondary pause-btn" data-action="menu" style="width:100%;padding:14px;font-size:16px;text-align:center;">MENU</button>
-        <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:center;">🔄 RESTART</button>
+        <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:center;">▶ Resume</button>
+        <button class="btn btn--secondary pause-btn" data-action="menu" style="width:100%;padding:14px;font-size:16px;text-align:center;">Menu</button>
+        <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:center;">🔄 Restart</button>
       </div>
     `;
     document.body.appendChild(this.pauseOverlay);
@@ -84,22 +84,22 @@ export class HUD {
       for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(event, () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
       return b;
     };
-    bar.appendChild(addBtn('THR−', 'throttleDown', '#ff8844'));
-    bar.appendChild(addBtn('THR+', 'throttleUp', '#44ff88'));
-    this.stageButton = addBtn('LAUNCH', 'stage', '#ffcc44');
+    bar.appendChild(addBtn('Throttle −', 'throttleDown', '#ff8844'));
+    bar.appendChild(addBtn('Throttle +', 'throttleUp', '#44ff88'));
+    this.stageButton = addBtn('Launch', 'stage', '#ffcc44');
     bar.appendChild(this.stageButton);
     this.setGrounded(true);
-    bar.appendChild(addBtn('MAP', 'map', '#4488ff'));
-    bar.appendChild(addBtn('SAS', 'sas', '#8888cc'));
-    bar.appendChild(addBtn('CHUTE', 'parachute', '#44cc88'));
-    bar.appendChild(addBtn('LAND [L]', 'landing', '#8fb6cf'));
-    this.autopilotEntry = addBtn('AUTOPILOT', 'autopilotOpen', '#eacd9e');
+    bar.appendChild(addBtn('Map', 'map', '#4488ff'));
+    bar.appendChild(addBtn('Stability', 'sas', '#8888cc'));
+    bar.appendChild(addBtn('Parachute', 'parachute', '#44cc88'));
+    bar.appendChild(addBtn('Landing [L]', 'landing', '#8fb6cf'));
+    this.autopilotEntry = addBtn('Auto flight', 'autopilotOpen', '#eacd9e');
     bar.appendChild(this.autopilotEntry);
     this.createAutopilotControls();
     bar.style.flexWrap = 'wrap'; bar.style.justifyContent = 'center'; bar.style.width = 'min(96vw, 760px)';
     this.landingStatusEl.className = 'flight-landing-status';
     this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none';
-    this.landingStatusEl.textContent = 'LAUNCH or Space to lift off · ↑/↓ throttle · W/S, A/D steer';
+    this.landingStatusEl.textContent = 'Click Launch or press Space · ↑/↓ throttle · W/S, A/D steer';
     this.root.appendChild(this.landingStatusEl);
     this.root.appendChild(bar);
     this._throttleBtn = false;
@@ -141,8 +141,8 @@ export class HUD {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Fly & land</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
         <p style="color:#a6b8c9;margin:0 0 20px">Choose a destination. Autopilot handles the flight and touchdown.</p>
         <label>Destination<select aria-label="Destination"><option value="moon">Moon</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth</option><option value="mars">Mars</option><option value="pluto">Pluto</option></select></label>
-        <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px"><input type="checkbox" checked style="width:18px;height:18px;accent-color:#eacd9e">Auto time warp</label>
-        <button type="button" data-action="autopilotStart" style="width:100%">FLY & LAND</button>
+        <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px"><input type="checkbox" checked style="width:18px;height:18px;accent-color:#eacd9e">Automatic time warp</label>
+        <button type="button" data-action="autopilotStart" style="width:100%">Start flight</button>
       </section>`;
     this.autopilotWarp = this.autopilotPicker.querySelector('input')!;
     const close = this.autopilotPicker.querySelector<HTMLButtonElement>('[data-action="autopilotClose"]')!;
@@ -172,7 +172,7 @@ export class HUD {
     this.autopilotMission.className = 'autopilot-mission'; this.autopilotMission.hidden = true;
     this.autopilotTitle = document.createElement('strong');
     this.autopilotDetail = document.createElement('div'); this.autopilotDetail.style.color = '#b7c8d6';
-    const cancel = document.createElement('button'); cancel.textContent = 'CANCEL MISSION'; cancel.dataset.action = 'autopilotCancel';
+    const cancel = document.createElement('button'); cancel.textContent = 'Cancel mission'; cancel.dataset.action = 'autopilotCancel';
     this.lifetime.listen(cancel, 'click', () => this.onAction?.('autopilotCancel'));
     this.autopilotMission.append(this.autopilotTitle, this.autopilotDetail, cancel);
     this.root.append(this.autopilotPicker, this.autopilotMission);
@@ -180,7 +180,8 @@ export class HUD {
 
   setAutopilotStatus(phase: string | null, target: string, detail: string): void {
     this.autopilotMission.hidden = phase === null;
-    this.autopilotTitle.textContent = phase === null ? '' : `${target.toUpperCase()} · ${phase}`;
+    const human = (value: string) => value.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+    this.autopilotTitle.textContent = phase === null ? '' : `${human(target)} · ${human(phase)}`;
     this.autopilotDetail.textContent = detail;
   }
 
@@ -192,7 +193,7 @@ export class HUD {
   setGrounded(grounded: boolean): void {
     if (this.grounded === grounded) return;
     this.grounded = grounded;
-    this.stageButton.textContent = grounded ? 'LAUNCH' : 'STAGE';
+    this.stageButton.textContent = grounded ? 'Launch' : 'Stage';
     this.stageButton.title = grounded ? 'Start engines at full throttle (Space)' : 'Separate the next stage (Space)';
     this.stageButton.style.background = grounded ? '#b94f20' : 'rgba(0,0,0,0.6)';
     this.stageButton.style.color = grounded ? '#fff' : '#ffcc44';
