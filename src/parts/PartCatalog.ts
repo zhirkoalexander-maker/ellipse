@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 453.6,
+    thrust: 680.4,
     isp: 350,
     fuelType: 'LFO'
   },
@@ -80,7 +80,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 400,
-    thrust: 2016.0,
+    thrust: 3024.0,
     isp: 340,
     fuelType: 'LFO'
   },
@@ -90,7 +90,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 300,
-    thrust: 2016.0,
+    thrust: 3024.0,
     isp: 290,
     fuelType: 'LFO'
   },
@@ -100,7 +100,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 1200,
-    thrust: 4200.0,
+    thrust: 6300.0,
     isp: 330,
     fuelType: 'LFO'
   },
@@ -120,7 +120,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 1800,
-    thrust: 7560.0,
+    thrust: 11340.0,
     isp: 300,
     fuelType: 'LFO'
   },
@@ -130,7 +130,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'XL',
     mass: 3000,
-    thrust: 9240.0,
+    thrust: 13860.0,
     isp: 310,
     fuelType: 'LFO'
   },
@@ -140,7 +140,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'XL',
     mass: 4500,
-    thrust: 11760.0,
+    thrust: 17640.0,
     isp: 280,
     fuelType: 'LFO'
   },
@@ -290,7 +290,7 @@ export const PART_CATALOG: Part[] = [
     size: 'XL',
     mass: 30000,
     fuelCapacity: 500000,
-    thrust: 92400.0,
+    thrust: 138600.0,
     isp: 310,
     dragCoeff: 0.3,
     gltfUrl: '/models/saturn_v.glb',

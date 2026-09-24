@@ -32,6 +32,7 @@ import { aimAttitude, steerAttitude } from '../flight/Attitude';
 import { landingCommand, landingOutcome } from '../flight/LandingGuidance';
 import { flightTelemetry } from '../flight/Telemetry';
 import { propagateCoast } from '../flight/Coast';
+import { MissionGuidance, type NavigationBody, type MissionCommand } from '../flight/MissionGuidance';
 
 interface Debris {
   mesh: THREE.Group;
@@ -137,7 +138,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
   // Autopilot state
   private autopilotActive = false;
-  private autopilotPhase: 'idle' | 'ascent' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
+  private autopilotPhase: MissionCommand['phase'] | 'idle' | 'burn' | 'coast' | 'arrived' | 'aborted' = 'idle';
+  private missionGuidance: MissionGuidance | null = null;
+  private missionDirection = new THREE.Vector3(0, 1, 0);
+  private missionAutoWarp = true;
+  private missionRate = 1;
   private autopilotTarget = '';
   private autopilotDeltaV = 0;
   private autopilotDirection: 'prograde' | 'retrograde' = 'prograde';
@@ -388,7 +393,10 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.hud.onAction = (action) => {
       if (this.lifetime.disposed || this.crashed) return;
       if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100'].includes(action) && this.paused) return;
-      if (action === 'landing') this.toggleLandingAssist();
+      if (action.startsWith('autopilot') && this.paused) return;
+      if (action.startsWith('autopilot:')) this.startMission(action.slice('autopilot:'.length));
+      else if (action === 'autopilotCancel') this.abortAutopilot('Cancelled by user');
+      else if (action === 'landing') this.toggleLandingAssist();
       else if (action === 'warpDown') this.setPlayerWarp(this.warpIndex - 1);
       else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
       else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
@@ -452,105 +460,23 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const goBtn = transferPanel.querySelector('[id="transfer-go"]') as HTMLButtonElement;
     let lastPlan: TransferPlan | null = null;
     // Populate target list with planets (not sun, not current ref body)
-    const planetsForTransfer = this.system.bodies.filter(b => b.name !== 'sun' && b.mass > 0 && b.name !== 'moon');
+    const planetsForTransfer = this.system.bodies.filter(b => ['moon', 'earth', 'mercury', 'venus', 'mars', 'pluto'].includes(b.name));
     targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
+    targetSelect.value = 'moon';
+    goBtn.style.display = 'block';
+    goBtn.textContent = 'FLY & LAND';
 
+    computeBtn.textContent = 'CHECK VEHICLE';
     this.lifetime.listen(computeBtn, 'click', () => {
-      const targetName = targetSelect.value;
-      const sun = this.system.bodyByName('sun');
-      if (!sun) return;
-      const rx = this.state.position[0] - sun.position[0];
-      const ry = this.state.position[1] - sun.position[1];
-      const rz = this.state.position[2] - sun.position[2];
-      const sunBody = sun as Body;
-      const sunVel = sunBody.velocity ?? [0, 0, 0];
-      const rvx = this.state.velocity[0] - sunVel[0];
-      const rvy = this.state.velocity[1] - sunVel[1];
-      const rvz = this.state.velocity[2] - sunVel[2];
-      const plan = planTransfer([rx, ry, rz], [rvx, rvy, rvz], this.system, targetName);
-      if (plan) {
-        lastPlan = plan;
-        resultEl.innerHTML = `<div style="color:${plan.direction === 'prograde' ? '#44ff88' : '#ff8844'};">→ ${plan.direction.toUpperCase()} burn</div><div style="color:#ddd;margin-top:3px;">Δv: <b>${plan.deltaV.toFixed(0)}</b> m/s</div><div style="color:#889;margin-top:2px;">~${(plan.transferTime/86400).toFixed(0)} days</div>`;
-        toast.show(plan.summary, 4000);
-        goBtn.style.display = 'block';
-      } else {
-        resultEl.textContent = 'Unable to compute';
-        toast.show('Unable to compute transfer — get to orbit or open space first', 3500);
-        goBtn.style.display = 'none';
-      }
+      const fuel = this.rocket.totalFuelMass();
+      const thrust = totalThrust(this.rocket.assembly.roots);
+      resultEl.textContent = `${thrust.toFixed(0)} kN thrust · ${(fuel / 1000).toFixed(1)} t fuel. Autopilot launches, transfers, brakes and lands.`;
     });
 
     this.lifetime.listen(goBtn, 'click', () => {
-      // No plan yet? Compute it right now — a SILENT return here made GO
-      // look completely dead ("press it and nothing happens").
-      if (!lastPlan) {
-        const targetName = targetSelect.value;
-        const sun0 = this.system.bodyByName('sun');
-        if (!sun0) { toast.show('Sun not found', 3500); return; }
-        const sunVel0 = (sun0 as Body).velocity ?? [0, 0, 0];
-        const plan0 = planTransfer(
-          [
-            this.state.position[0] - sun0.position[0],
-            this.state.position[1] - sun0.position[1],
-            this.state.position[2] - sun0.position[2],
-          ],
-          [
-            this.state.velocity[0] - sunVel0[0],
-            this.state.velocity[1] - sunVel0[1],
-            this.state.velocity[2] - sunVel0[2],
-          ],
-          this.system,
-          targetName
-        );
-        if (!plan0) { toast.show('Unable to compute transfer — try another target', 3500); return; }
-        lastPlan = plan0;
-        resultEl.innerHTML = `<div style="color:${plan0.direction === 'prograde' ? '#44ff88' : '#ff8844'};">→ ${plan0.direction.toUpperCase()} burn</div><div style="color:#ddd;margin-top:3px;">Δv: <b>${plan0.deltaV.toFixed(0)}</b> m/s</div><div style="color:#889;margin-top:2px;">~${(plan0.transferTime/86400).toFixed(0)} days</div>`;
-      }
-      const fuel = this.state.rocket.totalFuelMass();
-      if (fuel < 1) {
-        toast.show('No fuel left for transfer burn!', 3500);
-        return;
-      }
-      const sumThrust = totalThrust(this.state.rocket.assembly.roots);
-      if (sumThrust <= 0) {
-        toast.show('No engines — cannot burn!', 3500);
-        return;
-      }
-      // On the pad: auto-launch instead of refusing ("nothing happens").
-      // The transfer is RE-COMPUTED once in space — a plan from a grounded
-      // position (velocity ≈ 0) is meaningless for a Hohmann burn.
-      if (this.grounded) {
-        this.autopilotActive = true;
-        this.autopilotPhase = 'ascent';
-        this.autopilotTarget = lastPlan.targetName;
-        mapActive = false;
-        mapEl.style.opacity = '0';
-        this.lifetime.timeout(() => { mapEl.style.display = 'none'; }, 240);
-        toast.show(`AUTOPILOT: launching to space, then burning to ${lastPlan.targetName.toUpperCase()}`, 4000);
-        this.showAutopilotStatus();
-        return;
-      }
-      // Start autopilot
-      this.autopilotActive = true;
-      this.autopilotPhase = 'burn';
-      this.autopilotTarget = lastPlan.targetName;
-      this.autopilotDeltaV = lastPlan.deltaV;
-      this.autopilotDirection = lastPlan.direction;
-      this.autopilotBurnStartSpeed = Math.sqrt(
-        this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-      );
-      this.autopilotStartMissionTime = this.missionTime;
-      this.autopilotStartFuel = fuel;
-      this.autopilotStartMass = this.state.rocket.totalMass();
-      // Close map, set SAS to prograde/retrograde
-      mapActive = false;
-      mapEl.style.opacity = '0';
+      if (!this.startMission(targetSelect.value)) return;
+      mapActive = false; mapEl.style.opacity = '0';
       this.lifetime.timeout(() => { mapEl.style.display = 'none'; }, 240);
-      this.sasMode = this.autopilotDirection;
-      this.hud.setSasMode(this.sasMode);
-    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
-      toast.show(`AUTOPILOT: burning ${this.autopilotDirection} to reach ${lastPlan.targetName.toUpperCase()}`, 4000);
-      this.showAutopilotStatus();
     });
 
     // NOTE: mapCanvas + mapEl were already appended earlier (lines above).
@@ -970,6 +896,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
       if (this.lifetime.disposed || e.repeat || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
       if (this.paused || this.crashed) return;
+      if (this.autopilotActive && ['w', 's', 'a', 'd', 'j', 'k', 'arrowup', 'arrowdown'].includes(e.key.toLowerCase())) this.abortAutopilot('Manual control');
       if (e.key.toLowerCase() === 'l') { this.toggleLandingAssist(); e.preventDefault(); return; }
       if (e.key === 'q' || e.key === '[') {
         if (this.paused) return;
@@ -1125,6 +1052,29 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this._spawnProtectionTimer = 0; // resumed mid-flight: no pad grace needed
     restoreFuel(this.rocket, save);
+    // Recreate an in-progress automatic flight only after position, planets,
+    // orientation and fuel have been restored.  The controller is stateless
+    // between frames, so rebuilding it from the saved departure/target keeps
+    // Continue deterministic without moving the rocket to a waypoint.
+    if (save.mission && !this.grounded && !this.crashed) {
+      const departure = this.system.bodyByName(save.mission.departure);
+      const target = this.system.bodyByName(save.mission.target);
+      if (departure && target && departure.name !== target.name && this.rocket.totalFuelMass() > 0 && totalThrust(this.rocket.assembly.roots) > 0) {
+        this.autopilotActive = true;
+        this.autopilotTarget = target.name;
+        this.autopilotPhase = save.mission.phase === 'landing' ? 'landing' : 'cruise';
+        this.missionGuidance = new MissionGuidance(this.navigationBody(departure), this.navigationBody(target));
+        this.missionAutoWarp = save.mission.autoWarp;
+        this.missionRate = 1;
+        this.timeWarp = 1;
+        this.warpIndex = 0;
+        this.hud.setWarp(1);
+        this.sasMode = 'off';
+        this.hud.setSasMode('off');
+        this.landingAssist = this.autopilotPhase === 'landing';
+        this.hud.setAutopilotStatus(this.autopilotPhase === 'landing' ? 'LAND' : 'CRUISE', target.name, 'Automatic flight resumed');
+      }
+    }
     this.syncVisualTransform();
   }
 
@@ -1295,15 +1245,38 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   update(_dt: number): void {
     if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
     try {
-      this.updateInner(_dt);
+      if (this.autopilotActive && this.missionGuidance && this.missionAutoWarp && !this.grounded && !this.paused && !this.crashed) {
+        const ref = getReferenceBody(this.state.position, this.system);
+        const altitude = flightTelemetry(this.state.position, this.state.velocity, ref, false).altitude;
+        const target = this.missionGuidance.target;
+        const toTarget = Math.hypot(...this.state.position.map((v, i) => v - target.position[i]!)) - target.radius;
+        let rate = altitude < 1000 ? 5 : altitude < 70000 ? 10 : toTarget < 1000000 ? 100 : 1000;
+        if (this.autopilotPhase === 'landing') rate = altitude < 100 ? 1 : altitude < 1000 ? 5 : 10;
+        const maxStep = altitude < 20000 ? 0.1 : Math.min(2, Math.max(0.25, toTarget / 1e6));
+        this.missionRate = Math.min(rate, maxStep * 32 / _dt);
+        const total = _dt * this.missionRate;
+        const count = Math.min(32, Math.max(1, Math.ceil(total / maxStep)));
+        for (let i = 0; i < count; i++) {
+          this.updateInner(total / count, i === count - 1, _dt / count);
+          if (this.crashed || this.paused || !this.autopilotActive || this.grounded) break;
+        }
+        if (this.autopilotActive) this.hud.setWarp(this.missionRate);
+      } else this.updateInner(_dt);
     } catch (e: any) {
       toast.show(`ERROR: ${e.message || e}`);
       console.error('FlightScene.update error:', e);
     }
   }
 
-  private updateInner(_dt: number): void {
-    const baseDt = _dt;
+  private updateInner(_dt: number, render = true, wallDt = _dt): void {
+    const baseDt = wallDt;
+    const simulationDt = _dt;
+    // A crash is terminal: keep planet, contact point and camera in one frozen
+    // frame until restart. Only the short explosion animation continues.
+    if (this.crashed) {
+      this.updateExplosion(baseDt);
+      return;
+    }
     if (this._spawnProtectionTimer > 0) this._spawnProtectionTimer = Math.max(0, this._spawnProtectionTimer - baseDt * 60);
     this.saveTimer += baseDt;
     if (this.saveTimer >= 5) { this.persistFlight(); this.saveTimer = 0; }
@@ -1319,13 +1292,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.controls.getStageRequested();
       this.system.propagate(0, FIXED_DT);
       for (const body of this.system.bodies) (body as any).syncMesh?.();
-      return;
-    }
-
-    if (this.crashed) {
-      this.system.propagate(_dt * this.timeWarp, FIXED_DT);
-      for (const body of this.system.bodies) (body as any).syncMesh?.();
-      this.updateExplosion(baseDt);
       return;
     }
 
@@ -1360,9 +1326,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
     if (this.hud.throttleDownBtn) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
     // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
-    this.updateAutopilot(baseDt);
-    this.updateLandingAssist(baseDt);
-    _dt = baseDt * this.timeWarp;
+    this.updateAutopilot(simulationDt);
+    this.updateLandingAssist(simulationDt);
+    _dt = simulationDt * this.timeWarp;
     this.missionTime += _dt;
 
     // Throttle is locked only above 10x warp (silently zeroing it at ANY
@@ -1415,7 +1381,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         steerAttitude(this.rocketQuat, this.angularVel, pitchInput, yawInput, rollInput, baseDt);
         this.sasTargetQuat.copy(this.rocketQuat);
       } else if (this.landingAssist) {
-        aimAttitude(this.rocketQuat, this.landingDirection, baseDt, 1.4);
+        aimAttitude(this.rocketQuat, this.landingDirection, this.autopilotActive ? simulationDt : baseDt, 1.4);
+        this.angularVel.set(0, 0, 0);
+      } else if (this.autopilotActive && this.missionGuidance) {
+        aimAttitude(this.rocketQuat, this.missionDirection, simulationDt, 1.4);
         this.angularVel.set(0, 0, 0);
       } else if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
         const target = new THREE.Vector3(...this.relVelocity());
@@ -1432,7 +1401,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // A gentle ascent turn is never allowed to follow a descending trajectory nose-down.
     const radialSpeed = new THREE.Vector3(...this.relVelocity()).dot(surfaceNormal);
     const canAutoturn = this.launched && !this.grounded && !warpActive && !this.landingAssist &&
-      !steering && !this.manualAttitude && this.sasMode === 'off' && this.state.throttle > 0 && radialSpeed > 5;
+      !this.autopilotActive && !steering && !this.manualAttitude && this.sasMode === 'off' && this.state.throttle > 0 && radialSpeed > 5;
     if (canAutoturn && altM > this._gravityTurnAltThreshold) {
       this._gravityTurnBias = Math.min(this._gravityTurnBias + 0.012 * baseDt, 0.65);
       const east = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), surfaceNormal);
@@ -1446,6 +1415,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Use the orientation that will actually be rendered this frame.
     const fwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
+    if (this.autopilotActive && this.missionGuidance && !this.grounded && !this.landingAssist) {
+      const alignment = Math.max(0, fwd.dot(this.missionDirection));
+      this.state.throttle *= alignment > 0.9 ? alignment : 0;
+    }
 
     // Apply thrust — TWR gate: must have enough thrust at current throttle
     let canLiftOff = false;
@@ -1722,6 +1695,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         if (this.heatEnergy > this.MAX_HEAT) {
           const delta = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...nearRef.position));
           this.doCrash('Overheated during reentry', nearRef, delta.x, delta.y, delta.z, delta.length(), (nearRef as any).getSurfaceRadiusAt?.(this.state.position) ?? (nearRef as any).radius ?? 0);
+          if (this.crashed) return;
         }
       }
 
@@ -1737,13 +1711,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const coast = !this.grounded && this.timeWarp > 10
       ? propagateCoast(oldRelative, relativeVelocity, motionRef.mass, _dt, surfaceBefore + FlightScene.SPAWN_OFFSET_M)
       : null;
-    this.system.propagate(_dt, FIXED_DT);
+    this.system.propagate(_dt, this.autopilotActive && this.missionGuidance ? 1 : FIXED_DT);
     if (!this.grounded) {
       const relativeEnd = coast?.position ?? oldRelative.map((x, i) => x + relativeVelocity[i]! * _dt) as Vec3;
       this.state.position = relativeEnd.map((x, i) => x + motionRef.position[i]!) as Vec3;
       // Account for acceleration of the reference body's heliocentric frame.
       this.state.velocity = (coast?.velocity ?? relativeVelocity).map((x, i) => x + motionRef.velocity[i]!) as Vec3;
       this.resolveSurfaceContact(motionRef, coast ? relativeEnd : oldRelative, relativeEnd, coast?.impacted ?? false);
+      if (this.crashed) return;
     }
 
     // Track body surface while grounded (body moves during propagate)
@@ -1778,6 +1753,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
+    if (!render) return;
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
     }
@@ -2249,159 +2225,66 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (detailEl) detailEl.textContent = detail;
   }
 
-  private updateAutopilot(baseDt: number): void {
-    if (!this.autopilotActive) return;
+  private navigationBody(body: Body): NavigationBody {
+    return { name: body.name, mass: body.mass, position: body.position, velocity: body.velocity,
+      radius: (body as any).radius ?? 0,
+      getSurfaceRadiusAt: (body as any).getSurfaceRadiusAt?.bind(body) };
+  }
 
-    const speed = Math.sqrt(
-      this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-    );
-    const fuel = this.state.rocket.totalFuelMass();
+  private startMission(targetName: string, autoWarp = this.hud.autopilotAutoWarp): boolean {
+    if (this.paused || this.crashed || this.lifetime.disposed) return false;
+    const target = this.system.bodyByName(targetName);
+    const departure = getReferenceBody(this.state.position, this.system);
+    const error = !target || !['moon','earth','mars','mercury','venus','pluto'].includes(targetName)
+      ? 'Choose a destination with a solid landing surface.'
+      : this.grounded && departure.name === targetName ? `Already landed on ${targetName.toUpperCase()}.`
+      : this.rocket.totalFuelMass() < 1 ? 'No fuel available for an automatic mission.'
+      : totalThrust(this.rocket.assembly.roots) <= 0 ? 'Add an engine before starting a mission.' : '';
+    if (error) { toast.show(error, 4500); return false; }
+    if (this.grounded) { this.stageOrLaunch(); if (this.state.throttle === 0) return false; }
+    this.autopilotActive = true; this.autopilotTarget = targetName;
+    this.autopilotPhase = this.grounded ? 'ascent' : 'cruise';
+    this.missionGuidance = new MissionGuidance(this.navigationBody(departure), this.navigationBody(target!));
+    this.missionAutoWarp = autoWarp;
+    this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0;
+    this.hud.setWarp(1); this.landingAssist = false; this.sasMode = 'off'; this.hud.setSasMode('off');
+    if (this.parachuteDeployed) this.toggleParachute();
+    if (this.gearDeployed) this.toggleGear();
+    this.autopilotStartMissionTime = this.missionTime;
+    this.autopilotStartFuel = this.rocket.totalFuelMass();
+    this.autopilotStartMass = this.rocket.totalMass();
+    this.hud.setAutopilotStatus('LAUNCH', targetName, 'Launching, navigating and landing automatically');
+    return true;
+  }
 
-    // --- ASCENT PHASE (auto-launch from the pad) ---
-    if (this.autopilotPhase === 'ascent') {
-      // Full throttle straight up; the countdown/TWR gate in updateInner
-      // handles the actual lift-off sequence. Works at ANY warp level —
-      // the atmosphere clamp below 70 km already limits warp to 10x there,
-      // and above that drag is negligible so tunneling is not a concern.
-      this.state.throttle = 1.0;
-      if (fuel < 0.1) {
-        this.abortAutopilot('out of fuel during ascent');
-        return;
-      }
-      const ascRef = getReferenceBody(this.state.position, this.system);
-      const adx = this.state.position[0] - ascRef.position[0];
-      const ady = this.state.position[1] - ascRef.position[1];
-      const adz = this.state.position[2] - ascRef.position[2];
-      const alt = Math.sqrt(adx*adx + ady*ady + adz*adz) - ((ascRef as any).radius ?? 6.371e6);
-      this.updateAutopilotStatus('ASCENT', `alt ${(alt/1000).toFixed(0)} km · warp OK — then burn to ${this.autopilotTarget.toUpperCase()}`);
-      // Reached space → recompute the transfer from the CURRENT state
-      // (a plan computed on the pad has velocity ≈ 0 and is meaningless)
-      if (alt > 120000) {
-        const sun = this.system.bodyByName('sun');
-        if (!sun) { this.abortAutopilot('Sun not found'); return; }
-        const sunVel = (sun as Body).velocity ?? [0, 0, 0];
-        const plan = planTransfer(
-          [
-            this.state.position[0] - sun.position[0],
-            this.state.position[1] - sun.position[1],
-            this.state.position[2] - sun.position[2],
-          ],
-          [
-            this.state.velocity[0] - sunVel[0],
-            this.state.velocity[1] - sunVel[1],
-            this.state.velocity[2] - sunVel[2],
-          ],
-          this.system,
-          this.autopilotTarget
-        );
-        if (!plan) { this.abortAutopilot('could not compute transfer from the current orbit'); return; }
-        this.autopilotPhase = 'burn';
-        this.autopilotDirection = plan.direction;
-        this.autopilotDeltaV = plan.deltaV;
-        this.autopilotBurnStartSpeed = speed;
-        this.autopilotStartMissionTime = this.missionTime;
-        this.autopilotStartFuel = fuel;
-        this.autopilotStartMass = this.state.rocket.totalMass();
-        this.sasMode = plan.direction;
-        this.hud.setSasMode(this.sasMode);
-    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
-        toast.show(`Space reached — burning ${plan.direction} toward ${this.autopilotTarget.toUpperCase()}`, 4000);
-      }
+  private updateAutopilot(dt: number): void {
+    if (!this.autopilotActive || !this.missionGuidance) return;
+    if (this.autopilotPhase === 'landing') {
+      this.landingAssist = true;
+      this.hud.setAutopilotStatus('LAND', this.autopilotTarget, this.landingStatus);
       return;
     }
-
-    // --- BURN PHASE ---
-    if (this.autopilotPhase === 'burn') {
-      // Force max throttle and SAS direction
-      this.state.throttle = 1.0;
-      this.sasMode = this.autopilotDirection;
-      // Ensure warp is 1x for burn
-      if (this.timeWarp > 1) {
-        this.warpIndex = 0;
-        this.timeWarp = 1;
-        this.hud.setWarp(1);
-      }
-      // Track velocity change
-      const dvBurned = this.autopilotDirection === 'prograde'
-        ? speed - this.autopilotBurnStartSpeed
-        : this.autopilotBurnStartSpeed - speed;
-      this.updateAutopilotStatus('BURN', `Δv ${dvBurned.toFixed(0)}/${this.autopilotDeltaV.toFixed(0)} m/s · fuel ${fuel.toFixed(0)}kg`);
-      // Check completion
-      if (dvBurned >= this.autopilotDeltaV) {
-        // Burn complete → coast
-        this.autopilotPhase = 'coast';
-        this.state.throttle = 0;
-        this.sasMode = 'off';
-        this.hud.setSasMode('off');
-        // Set max warp for coast
-        this.warpIndex = this.autopilotMaxWarpIndex;
-        this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarp(this.timeWarp);
-        toast.show('Burn complete — coasting to target', 3000);
-      }
-      // Abort if out of fuel and not enough dv
-      else if (fuel < 0.1) {
-        this.autopilotPhase = 'aborted';
-        this.state.throttle = 0;
-        this.sasMode = 'off';
-        this.hud.setSasMode('off');
-        this.autopilotActive = false;
-        this.hideAutopilotStatus();
-        toast.show('AUTOPILOT ABORTED: out of fuel before reaching target Δv', 5000);
-      }
-      return;
+    const command = this.missionGuidance.update({ position: this.state.position, velocity: this.state.velocity,
+      reference: this.navigationBody(getReferenceBody(this.state.position, this.system)),
+      mass: this.rocket.totalMass(), maxAcceleration: totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass(),
+      dt, grounded: this.grounded, fuel: this.rocket.totalFuelMass() });
+    if (command.phase === 'blocked') { this.abortAutopilot(command.status); return; }
+    this.autopilotPhase = command.phase;
+    this.missionDirection.set(...command.direction);
+    this.state.throttle = command.throttle;
+    this.timeWarp = 1; this.warpIndex = 0;
+    if (command.readyToLand) {
+      this.landingAssist = true;
+      if (this.hasLandingLegs() && !this.gearDeployed) this.toggleGear();
     }
-
-    // --- COAST PHASE ---
-    if (this.autopilotPhase === 'coast') {
-      this.state.throttle = 0;
-      // Keep warp at max
-      if (this.timeWarp !== this.warpLevels[this.autopilotMaxWarpIndex]) {
-        this.warpIndex = this.autopilotMaxWarpIndex;
-        this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarp(this.timeWarp);
-      }
-      // Check distance to target
-      const target = this.system.bodyByName(this.autopilotTarget);
-      if (!target) { this.abortAutopilot('Target not found'); return; }
-      const dx = target.position[0] - this.state.position[0];
-      const dy = target.position[1] - this.state.position[1];
-      const dz = target.position[2] - this.state.position[2];
-      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-      const targetR = (target as any).radius ?? 6e6;
-      const refBody = getReferenceBody(this.state.position, this.system);
-      // Arrived: within 3x target radius OR entered target's SOI
-      const arrived = dist < targetR * 3 || refBody.name === this.autopilotTarget;
-      // Time limit: 3x expected transfer time
-      const expectedTime = this.autopilotStartMissionTime + this.autopilotDeltaV * 0 + 999999; // no hard limit, use distance
-      const elapsed = this.missionTime - this.autopilotStartMissionTime;
-      this.updateAutopilotStatus('COAST', `${(dist/1000).toFixed(0)}km to ${this.autopilotTarget.toUpperCase()} · elapsed ${(elapsed/86400).toFixed(1)}d`);
-      if (arrived) {
-        this.autopilotPhase = 'arrived';
-        this.autopilotActive = false;
-        // Stop warp
-        this.warpIndex = 0;
-        this.timeWarp = 1;
-        this.hud.setWarp(1);
-        // Compute stats
-        const totalTime = this.missionTime - this.autopilotStartMissionTime;
-        const fuelConsumed = this.autopilotStartFuel - fuel;
-        const massLost = this.autopilotStartMass - this.state.rocket.totalMass();
-        this.hideAutopilotStatus();
-        this.showArrivalOverlay(this.autopilotTarget, totalTime, fuelConsumed, massLost);
-      }
-      // Abort if way past expected transfer time (5x)
-      else if (elapsed > 5 * (this.autopilotDeltaV > 0 ? 1e7 : 1e7)) {
-        // Very long time — give it a generous limit
-        // Don't abort too easily; interplanetary trips are long
-      }
-      return;
-    }
+    this.hud.setAutopilotStatus(command.phase.toUpperCase(), this.autopilotTarget, command.status);
   }
 
   private abortAutopilot(reason: string): void {
     this.autopilotActive = false;
     this.autopilotPhase = 'aborted';
+    this.missionGuidance = null; this.missionRate = 1; this.landingAssist = false;
+    this.hud.setAutopilotStatus(null, '', '');
     this.state.throttle = 0;
     this.sasMode = 'off';
     this.hud.setSasMode('off');
@@ -2643,12 +2526,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   private toggleLandingAssist(): void {
     if (this.grounded || this.crashed) { toast.show('Landing assist is available in flight.'); return; }
-    this.landingAssist = !this.landingAssist;
-    if (this.landingAssist) {
+    const enable = !this.landingAssist;
+    if (enable) {
       this.abortAutopilot('Landing control');
+      // abortAutopilot clears all automatic descent state; restore the
+      // explicitly requested manual landing assist after cancelling it.
+      this.landingAssist = true;
       this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
       this.sasMode = 'off';
       if (this.hasLandingLegs() && !this.gearDeployed) this.toggleGear();
+    } else {
+      this.landingAssist = false;
     }
     this.landingStatus = this.landingAssist ? 'Landing assist · braking toward the surface' : 'Manual control · L: landing assist';
     toast.show(this.landingStatus);
@@ -2742,6 +2630,13 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (Math.abs(vertical) < 3) this.achievements.unlock('first_landing');
     if (this.parachuteDeployed) this.achievements.unlock('parachute_landing');
     this.missions.recordLanding(body.name);
+    if (this.autopilotActive && body.name === this.autopilotTarget) {
+      this.autopilotActive = false; this.autopilotPhase = 'arrived';
+      this.missionGuidance = null; this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
+      this.hud.setAutopilotStatus('LANDED', body.name, 'Mission complete — engines shut down');
+      this.showArrivalOverlay(body.name, this.missionTime - this.autopilotStartMissionTime,
+        this.autopilotStartFuel - this.rocket.totalFuelMass(), this.autopilotStartMass - this.rocket.totalMass());
+    }
     toast.show(this.landingStatus);
     this.syncVisualTransform();
     this.persistFlight();
@@ -2802,6 +2697,27 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.crashed) return;
     if (this._spawnProtectionTimer > 0) return; // spawn grace period
     this.crashed = true;
+    this.missionGuidance = null; this.missionRate = 1;
+    this.hud.setAutopilotStatus(null, '', '');
+    this.grounded = false;
+    this.groundedDir = null;
+    this.paused = false;
+    this.countdownActive = false;
+    this.countdownTimer = 0;
+    this.countdownCooldown = 0;
+    this.hideCountdown();
+    this.autopilotActive = false;
+    this.autopilotPhase = 'aborted';
+    this.hideAutopilotStatus();
+    this.landingAssist = false;
+    this.angularVel.set(0, 0, 0);
+    this.controls.dispose();
+    this.groundSmoke.stop();
+    this.deployedChuteMesh && (this.deployedChuteMesh.visible = false);
+    this.orbitLine && (this.orbitLine.visible = false);
+    // Propagation may already have occurred this frame. Render the planet at
+    // that same instant before freezing so the impact cannot appear to bounce.
+    for (const planet of this.system.bodies) (planet as any).syncMesh?.();
     clearFlightSave();
     this.achievements.unlock('crash');
     this.sound.playCrash();
@@ -3044,7 +2960,13 @@ private positionFlameAtNozzle(): void {
     if (this.lifetime.disposed) return;
     if (this.crashed) { clearFlightSave(); return; }
     saveFlightState({
-      version: 2,
+      version: 3,
+      mission: this.autopilotActive && this.missionGuidance ? {
+        target: this.autopilotTarget,
+        departure: this.missionGuidance.departure.name,
+        autoWarp: this.missionAutoWarp,
+        ...(this.autopilotPhase === 'landing' ? { phase: 'landing' as const } : {}),
+      } : undefined,
       assembly: serializeAssembly(this.rocket.assembly),
       fuel: this.rocket.assembly.roots.map(n => this.rocket.fuelTanks.find(t => t.node === n)?.remaining ?? 0),
       fuelByPath: captureFuel(this.rocket),
