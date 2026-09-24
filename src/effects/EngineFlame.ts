@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { PART_SCALE } from '../config/constants';
+import { PART_SCALE, ROCKET_VISUAL_SCALE } from '../config/constants';
 
-const FLAME_SCALE = PART_SCALE / 0.08 * 1.5;
+// Positions are rocket-local; point sprites use world-sized material units.
+const FLAME_SCALE = PART_SCALE * 1.2;
+const SPRITE_SCALE = PART_SCALE * ROCKET_VISUAL_SCALE;
 const PARTICLE_COUNT = 900;
 
 function createCoreTexture(): THREE.Texture {
@@ -82,6 +84,7 @@ export class EngineFlame {
     this.outerTex = createOuterTexture();
 
     this.group = new THREE.Group();
+    this.group.visible = false;
 
     // Core particles
     const coreGeom = new THREE.BufferGeometry();
@@ -90,34 +93,44 @@ export class EngineFlame {
     coreGeom.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
 
     const coreMat = new THREE.PointsMaterial({
-      size: FLAME_SCALE * 0.6,
+      size: SPRITE_SCALE * 0.3,
       map: this.coreTex,
       vertexColors: true,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      // The rocket is visually enlarged relative to terrain. Near the pad,
+      // its visual plume extends below the physical surface; keep it visible.
+      depthTest: false,
       transparent: true,
       opacity: 1.0,
     });
 
     this.particles = new THREE.Points(coreGeom, coreMat);
+    this.particles.frustumCulled = false;
+    this.particles.renderOrder = 201;
     this.group.add(this.particles);
 
     // Outer glow particles (slightly larger, softer)
     const outerGeom = new THREE.BufferGeometry();
     outerGeom.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(), 3));
+    outerGeom.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     const outerMat = new THREE.PointsMaterial({
-      size: FLAME_SCALE * 1.5,
+      size: SPRITE_SCALE * 0.8,
       map: this.outerTex,
       color: 0xffaa66,
+      vertexColors: true,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: false,
       transparent: true,
       opacity: 0.6,
     });
 
     this.outerParticles = new THREE.Points(outerGeom, outerMat);
+    this.outerParticles.frustumCulled = false;
+    this.outerParticles.renderOrder = 201;
     this.group.add(this.outerParticles);
   }
 
@@ -131,10 +144,13 @@ export class EngineFlame {
 
   start(): void {
     this.active = true;
+    this.group.visible = true;
   }
 
   stop(): void {
     this.active = false;
+    this.group.visible = false;
+    this.colors.fill(0);
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       this.ages[i] = this.lifetimes[i]!;
       this.positions[i * 3] = 0;
@@ -185,7 +201,10 @@ export class EngineFlame {
       const age = age_i + dt;
       this.ages[i] = age;
 
-      if (age >= lifetime_i) continue;
+      if (age >= lifetime_i) {
+        this.colors[i * 3] = this.colors[i * 3 + 1] = this.colors[i * 3 + 2] = 0;
+        continue;
+      }
 
       const t = age / lifetime_i;
       const i3 = i * 3;
@@ -256,6 +275,7 @@ export class EngineFlame {
       outerPos.array[i3 + 2] = this.positions[i3 + 2] ?? 0;
     }
     outerPos.needsUpdate = true;
+    this.outerParticles.geometry.attributes.color!.needsUpdate = true;
   }
 
   getMesh(): THREE.Group {

@@ -54,11 +54,19 @@ export class MainMenuScene {
       return b;
     };
     this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay));
-    if (this.onContinue) this.root.appendChild(btn('CONTINUE', 'secondary', this.onContinue));
+    const continueButton = btn('CONTINUE', 'secondary', () => this.onContinue?.());
+    continueButton.disabled = !this.onContinue;
+    continueButton.title = this.onContinue ? 'Resume your last flight or saved build' : 'No saved flight yet — start with FLIGHT';
+    if (!this.onContinue) { continueButton.style.opacity = '0.45'; continueButton.style.cursor = 'default'; }
+    this.root.appendChild(continueButton);
     this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab));
     this.root.appendChild(btn('MISSIONS', 'ghost', () => this.toggleMissions()));
     this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
     this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
+    const version = document.createElement('div');
+    version.textContent = 'v2.4.0 · Flight & Assembly update';
+    version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
+    this.root.appendChild(version);
 
     // Score badge (top-right)
     if (this.missions) {
@@ -128,9 +136,9 @@ export class MainMenuScene {
     card.innerHTML =
       `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 HOW TO BUILD & LAUNCH</h2>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">VEHICLE ASSEMBLY</b> — build your rocket</p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack parts bottom→top: <b>capsule</b> → <b>fuel tank</b> → <b>engine</b></p>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack from bottom to top: <b>engine</b> → <b>fuel tank</b> → <b>capsule</b></p>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">3. (optional) Add <b>decoupler</b> between stages, <b>parachute</b> + <b>legs</b> for landing</p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Hit <b style="color:#c89838;">FLIGHT</b>, hold <b>↑</b> to spool engines, wait for countdown</p>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Enter flight, then click <b style="color:#c89838;">LAUNCH</b> or press <b>Space</b> for a full-throttle countdown</p>` +
       `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">💡 FLIGHT TIPS</h2>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>TWR ≥ 1.0</b> required to lift off — check the gauge on HUD (green = go)</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Tilt east (<b>A</b>) at ~10km to build horizontal speed for orbit</p>` +
@@ -143,7 +151,9 @@ export class MainMenuScene {
       `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">↑ / ↓</td><td>Engine Power (throttle)</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">W / S</td><td>Pitch — Tilt Up / Down</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">A / D</td><td>Yaw — Turn Left / Right</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Space</td><td>Stage Separation</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Space</td><td>Launch on the pad / separate a stage in flight</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">J / K</td><td>Roll</td></tr>` +
+      `<tr><td style="color:#889;padding:3px 12px 3px 0;">L</td><td>Landing assist — brakes using engine fuel</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">T</td><td>SAS — cycle OFF / HOLD / PROGRADE / RETROGRADE</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">P</td><td>Deploy Parachute</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">M / Tab</td><td>Map / Orbit view</td></tr>` +

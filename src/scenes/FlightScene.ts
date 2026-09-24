@@ -19,13 +19,19 @@ import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, R
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
-import { buildDeployedParachute } from '../parts/PartBuilder';
-import { saveFlightState, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
+import { buildDeployedParachute, gltfCache } from '../parts/PartBuilder';
+import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import { totalGravityOn } from '../physics/Gravity';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 import { EngineFlame } from '../effects/EngineFlame';
 import { GroundSmoke } from '../effects/GroundSmoke';
+import { Lifetime } from '../core/Lifetime';
+import { releaseSceneObjects } from '../core/disposeObject';
+import { aimAttitude, steerAttitude } from '../flight/Attitude';
+import { landingCommand, landingOutcome } from '../flight/LandingGuidance';
+import { flightTelemetry } from '../flight/Telemetry';
+import { propagateCoast } from '../flight/Coast';
 
 interface Debris {
   mesh: THREE.Group;
@@ -34,7 +40,15 @@ interface Debris {
 }
 
 export class FlightScene {
-  static readonly SPAWN_OFFSET_M = 150;
+  static readonly SPAWN_OFFSET_M = 2;
+  private lifetime = new Lifetime();
+  private structuralRoots: THREE.Object3D[] = [];
+  private ownedSceneObjects: THREE.Object3D[] = [];
+  private saveTimer = 0;
+  private stageSeparations = 0;
+  private landingAssist = false;
+  private landingDirection = new THREE.Vector3();
+  private landingStatus = 'LAUNCH or Space to lift off · ↑/↓ throttle · W/S, A/D steer';
   private renderer: Renderer;
   private sceneMgr: SceneManager;
   private system: System;
@@ -111,12 +125,14 @@ private hudVisible = true;
   private sonicBoomRing: THREE.Mesh | null = null;
   private sonicBoomLife = 0;
   private reentryGlowMesh: THREE.Mesh | null = null;
+  private rocketRadius = 0.1;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
   private _camSnapped = false;
   private _gravityTurnBias = 0;
-  private _gravityTurnAltThreshold = 5000;
+  private manualAttitude = false;
+  private _gravityTurnAltThreshold = 800;
 private rocketTopY = 0; // highest point of rocket mesh in local space
 
   // Autopilot state
@@ -144,7 +160,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         font-family:system-ui,sans-serif;pointer-events:none;
         transition:opacity 0.2s;
       `;
-      document.body.appendChild(this.countdownEl);
+      this.lifetime.append(this.countdownEl);
     }
     // Update ONLY when the text changes — the update loop calls this
     // every frame within each 1s window; per-frame reflow restarts
@@ -184,6 +200,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
 
   constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements, missions: Missions, save?: FlightSave) {
+    const existingSceneObjects = new Set(sceneMgr.scene.children);
     this.renderer = renderer;
     this.sceneMgr = sceneMgr;
     this.system = system;
@@ -230,6 +247,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), upDir);
 
     this.rocketGroup = rocket.assembly.toMesh();
+    this.structuralRoots = [...this.rocketGroup.children];
+    this.rocketGroup.quaternion.copy(this.rocketQuat);
     this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
     this.rocketGroup.position.set(
       this.state.position[0] * VISUAL_SCALE,
@@ -245,25 +264,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this._debugMarker.visible = false;
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
-
-    // Clean simple rocket materials
-    this.rocketGroup.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const mat of mats) {
-          mat.polygonOffset = true;
-          mat.polygonOffsetFactor = -1;
-          mat.polygonOffsetUnits = -1;
-          if (mat instanceof THREE.MeshStandardMaterial) {
-            mat.roughness = 0.45;
-            mat.metalness = 0.5;
-            mat.emissive = new THREE.Color(0x000000);
-            mat.emissiveIntensity = 0;
-            mat.needsUpdate = true;
-          }
-        }
-      }
-    });
 
     // Landing gear — completely disabled (user doesn't want hexagons)
     // for (let i = 0; i < 3; i++) { ... }
@@ -356,23 +356,18 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const azimuth = Math.atan2(tangent.z, tangent.x);
 
     this.chase = new ChaseCamera(sceneMgr.camera);
+    this.chase.frame((this.rocketTopY - this.rocketBottomY) * ROCKET_VISUAL_SCALE, this.rocketRadius * ROCKET_VISUAL_SCALE);
     this.chase.setAzimuth(azimuth);
     this.chase.enableOrbit(this.renderer.domElement);
     // Compute visual offset for initial camera placement. rocketBottomY is in
     // MODEL units but the group renders at ROCKET_VISUAL_SCALE — multiply, or
     // the rocket sits ~1 scene-unit (≈4 km) underground.
-    const initVisualOff = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
+    const initVisualOff = (-this.rocketBottomY + (this.rocketTopY + this.rocketBottomY) * 0.5) * ROCKET_VISUAL_SCALE;
     const initOffX = upDir.x * initVisualOff;
     const initOffY = upDir.y * initVisualOff;
     const initOffZ = upDir.z * initVisualOff;
     this.chase.initialiseAt(this.state, this.rocketQuat, upDir, { x: initOffX, y: initOffY, z: initOffZ });
     this._spawnProtectionTimer = 120;
-    // OVERRIDE: force camera to guaranteed visible position
-    const rocketVisX = this.state.position[0] * VISUAL_SCALE + upDir.x * initVisualOff;
-    const rocketVisY = this.state.position[1] * VISUAL_SCALE + upDir.y * initVisualOff;
-    const rocketVisZ = this.state.position[2] * VISUAL_SCALE + upDir.z * initVisualOff;
-    sceneMgr.camera.position.set(rocketVisX + 10, rocketVisY + 3, rocketVisZ + 10);
-    sceneMgr.camera.lookAt(rocketVisX, rocketVisY, rocketVisZ);
     this.controls = new Controls(this.state);
 
     // Auto-detect touch device
@@ -391,13 +386,19 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Debug/diagnostics hook (headless e2e tests read live state from here)
     (window as any).__ellipse = { flight: this };
     this.hud.onAction = (action) => {
-      if (action === 'stage') this.performStage();
+      if (this.lifetime.disposed || this.crashed) return;
+      if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100'].includes(action) && this.paused) return;
+      if (action === 'landing') this.toggleLandingAssist();
+      else if (action === 'warpDown') this.setPlayerWarp(this.warpIndex - 1);
+      else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
+      else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
+      else if (action === 'stage') this.stageOrLaunch();
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') {
         mapActive = !mapActive;
-        if (mapActive) { mapEl.style.display = 'block'; requestAnimationFrame(() => { mapEl.style.opacity = '1'; }); requestAnimationFrame(drawMap); }
-        else { mapEl.style.opacity = '0'; setTimeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
+        if (mapActive) { mapEl.style.display = 'block'; this.lifetime.frame(() => { mapEl.style.opacity = '1'; }); this.lifetime.frame(drawMap); }
+        else { mapEl.style.opacity = '0'; this.lifetime.timeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
       }
       else if (action === 'resume') {
         this.paused = false;
@@ -423,7 +424,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const mapCanvas = document.createElement('canvas');
     mapCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
     mapEl.appendChild(mapCanvas);
-    document.body.appendChild(mapEl);
+    this.lifetime.append(mapEl);
 
     // Map UI overlay
     const mapUI = document.createElement('div');
@@ -445,16 +446,16 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       <button id="transfer-go" style="padding:8px;background:rgba(124,255,178,0.12);color:#7CFFB2;border:1px solid rgba(124,255,178,0.3);border-radius:3px;font:700 11px system-ui;cursor:pointer;letter-spacing:0.08em;display:none;">▶ AUTOPILOT GO</button>
     `;
     mapEl.appendChild(transferPanel);
-    const targetSelect = transferPanel.querySelector('#transfer-target') as HTMLSelectElement;
-    const computeBtn = transferPanel.querySelector('#transfer-compute') as HTMLButtonElement;
-    const resultEl = transferPanel.querySelector('#transfer-result') as HTMLDivElement;
-    const goBtn = transferPanel.querySelector('#transfer-go') as HTMLButtonElement;
+    const targetSelect = transferPanel.querySelector('[id="transfer-target"]') as HTMLSelectElement;
+    const computeBtn = transferPanel.querySelector('[id="transfer-compute"]') as HTMLButtonElement;
+    const resultEl = transferPanel.querySelector('[id="transfer-result"]') as HTMLDivElement;
+    const goBtn = transferPanel.querySelector('[id="transfer-go"]') as HTMLButtonElement;
     let lastPlan: TransferPlan | null = null;
     // Populate target list with planets (not sun, not current ref body)
     const planetsForTransfer = this.system.bodies.filter(b => b.name !== 'sun' && b.mass > 0 && b.name !== 'moon');
     targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
 
-    computeBtn.addEventListener('click', () => {
+    this.lifetime.listen(computeBtn, 'click', () => {
       const targetName = targetSelect.value;
       const sun = this.system.bodyByName('sun');
       if (!sun) return;
@@ -479,7 +480,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       }
     });
 
-    goBtn.addEventListener('click', () => {
+    this.lifetime.listen(goBtn, 'click', () => {
       // No plan yet? Compute it right now — a SILENT return here made GO
       // look completely dead ("press it and nothing happens").
       if (!lastPlan) {
@@ -524,7 +525,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.autopilotTarget = lastPlan.targetName;
         mapActive = false;
         mapEl.style.opacity = '0';
-        setTimeout(() => { mapEl.style.display = 'none'; }, 240);
+        this.lifetime.timeout(() => { mapEl.style.display = 'none'; }, 240);
         toast.show(`AUTOPILOT: launching to space, then burning to ${lastPlan.targetName.toUpperCase()}`, 4000);
         this.showAutopilotStatus();
         return;
@@ -544,9 +545,10 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       // Close map, set SAS to prograde/retrograde
       mapActive = false;
       mapEl.style.opacity = '0';
-      setTimeout(() => { mapEl.style.display = 'none'; }, 240);
+      this.lifetime.timeout(() => { mapEl.style.display = 'none'; }, 240);
       this.sasMode = this.autopilotDirection;
       this.hud.setSasMode(this.sasMode);
+    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
       toast.show(`AUTOPILOT: burning ${this.autopilotDirection} to reach ${lastPlan.targetName.toUpperCase()}`, 4000);
       this.showAutopilotStatus();
     });
@@ -555,31 +557,31 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Re-appending here MOVED the canvas after the transfer panel in the DOM
     // — removed: canvas must stay under the UI panels.
 
-    mapCanvas.addEventListener('wheel', (e) => {
+    this.lifetime.listen(mapCanvas, 'wheel', (e) => {
       mapZoom *= e.deltaY > 0 ? 0.9 : 1.1;
       mapZoom = Math.max(0.05, Math.min(100, mapZoom));
     });
-    mapCanvas.addEventListener('mousedown', (e) => {
+    this.lifetime.listen(mapCanvas, 'mousedown', (e) => {
       mapDragStart = { x: e.clientX, y: e.clientY };
     });
-    window.addEventListener('mouseup', () => { mapDragStart = null; });
-    window.addEventListener('mousemove', (e) => {
+    this.lifetime.listen(window, 'mouseup', () => { mapDragStart = null; });
+    this.lifetime.listen(window, 'mousemove', (e) => {
       if (!mapDragStart) return;
       mapPanX += (e.clientX - mapDragStart.x);
       mapPanY += (e.clientY - mapDragStart.y);
       mapDragStart = { x: e.clientX, y: e.clientY };
     });
-    mapCanvas.addEventListener('touchstart', (e) => {
+    this.lifetime.listen(mapCanvas, 'touchstart', (e) => {
       if (e.touches.length === 1) mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
     });
-    mapCanvas.addEventListener('touchmove', (e) => {
+    this.lifetime.listen(mapCanvas, 'touchmove', (e) => {
       if (!mapDragStart || e.touches.length !== 1) return;
       mapPanX += (e.touches[0]!.clientX - mapDragStart.x);
       mapPanY += (e.touches[0]!.clientY - mapDragStart.y);
       mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
     });
-    mapCanvas.addEventListener('touchend', () => { mapDragStart = null; });
-    mapCanvas.addEventListener('dblclick', (e) => {
+    this.lifetime.listen(mapCanvas, 'touchend', () => { mapDragStart = null; });
+    this.lifetime.listen(mapCanvas, 'dblclick', (e) => {
       e.preventDefault();
       const rect = mapCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -620,7 +622,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const drawMap = () => {
       if (!mapActive) return;
       mapFrame++;
-      if (mapFrame % 5 !== 0) { requestAnimationFrame(drawMap); return; }
+      if (mapFrame % 5 !== 0) { this.lifetime.frame(drawMap); return; }
       const dpr = window.devicePixelRatio || 1;
       const w = mapCanvas.clientWidth;
       const h = mapCanvas.clientHeight;
@@ -668,7 +670,7 @@ if (sunPos) {
       b.position[2] - sunPos[2],
     ];
     if (b.velocity) {
-      const predOrbit = predictOrbit(relToSun, b.velocity, this.system.bodyByName('sun')!.mass, 5e14, 180);
+      const predOrbit = predictOrbit(relToSun, b.velocity.map((v, i) => v - this.system.bodyByName('sun')!.velocity[i]!) as Vec3, this.system.bodyByName('sun')!.mass, 5e14, 180);
       if (predOrbit.points.length > 10) {
         ctx.beginPath();
         ctx.strokeStyle = colors[b.name] + '30';
@@ -843,7 +845,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
       }
 
-      const prediction = predictOrbit(relPos, this.state.velocity, refBody.mass, 5e14, 360);
+      const prediction = predictOrbit(relPos, this.relVelocity(), refBody.mass, 5e14, 360);
       if (prediction.points.length > 1) {
         // Glow under line — pulsing opacity for "live" feel
         const pulse = 0.12 + 0.06 * (0.5 + 0.5 * Math.sin(mapFrame * 0.18));
@@ -952,49 +954,33 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       ctx.font = '9px sans-serif';
       ctx.fillText(`${(maxRelD / 1000).toFixed(0)} km | Zoom: ${mapZoom.toFixed(1)}x`, 10, h - 10);
 
-      requestAnimationFrame(drawMap);
+      this.lifetime.frame(drawMap);
     };
 
-    window.addEventListener('keydown', (e: KeyboardEvent) => {
+    this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
+      if (e.repeat || this.lifetime.disposed || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
       if (e.key === 'm' || e.key === 'Tab') {
         mapActive = !mapActive;
-        if (mapActive) { mapEl.style.display = 'block'; requestAnimationFrame(() => { mapEl.style.opacity = '1'; }); if (mapActive) requestAnimationFrame(drawMap); }
-        else { mapEl.style.opacity = '0'; setTimeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
+        if (mapActive) { mapEl.style.display = 'block'; this.lifetime.frame(() => { mapEl.style.opacity = '1'; }); if (mapActive) this.lifetime.frame(drawMap); }
+        else { mapEl.style.opacity = '0'; this.lifetime.timeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
         e.preventDefault();
       }
     });
 
-    window.addEventListener('keydown', (e: KeyboardEvent) => {
+    this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
+      if (this.lifetime.disposed || e.repeat || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
+      if (this.paused || this.crashed) return;
+      if (e.key.toLowerCase() === 'l') { this.toggleLandingAssist(); e.preventDefault(); return; }
       if (e.key === 'q' || e.key === '[') {
         if (this.paused) return;
-        this.warpIndex = Math.max(0, this.warpIndex - 1);
-        this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarp(this.timeWarp);
+        this.setPlayerWarp(this.warpIndex - 1);
         e.preventDefault();
       } else if (e.key === 'e' || e.key === ']') {
         if (this.paused) return;
-        this.warpIndex = Math.min(this.warpLevels.length - 1, this.warpIndex + 1);
-        this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarp(this.timeWarp);
+        this.setPlayerWarp(this.warpIndex + 1);
         e.preventDefault();
       } else if (e.key === 'p') {
-        const hasChute = rocket.assembly.roots.some(r => r.part.kind === 'parachute') ||
-          rocket.assembly.roots.some(r => r.children.some(c => c.part.kind === 'parachute'));
-        if (hasChute) {
-          this.parachuteDeployed = !this.parachuteDeployed;
-          if (this.parachuteDeployed) {
-            const d = { radius: 0.6 * PART_SCALE, height: 1.0 * PART_SCALE };
-            this.deployedChuteMesh = buildDeployedParachute(d);
-            this.deployedChuteMesh.scale.setScalar(0.001); // start collapsed
-            this.chuteDeployProgress = 0;
-            this.sceneMgr.scene.add(this.deployedChuteMesh);
-          } else if (this.deployedChuteMesh) {
-            this.sceneMgr.scene.remove(this.deployedChuteMesh);
-            this.deployedChuteMesh = null;
-            this.chuteDeployProgress = 0;
-          }
-          toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
-        }
+        this.toggleParachute();
         e.preventDefault();
       } else if (e.key === 'g') {
         this.toggleGear();
@@ -1029,7 +1015,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     });
 
-    window.addEventListener('keyup', (e: KeyboardEvent) => {
+    this.lifetime.listen(window, 'keyup', (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp') { this.throttleUpKey = false; this.freeCamKeys.up = false; }
       if (e.key === 'ArrowDown') { this.throttleDownKey = false; this.freeCamKeys.down = false; }
       if (e.key === 'ArrowLeft') { this.freeCamKeys.left = false; }
@@ -1054,17 +1040,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     };
     const endDrag = () => { this.freeCamDragging = false; };
 
-    dom.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
-    window.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
-    window.addEventListener('mouseup', endDrag);
-    dom.addEventListener('touchstart', (e) => {
+    this.lifetime.listen(dom, 'mousedown', (e) => startDrag(e.clientX, e.clientY));
+    this.lifetime.listen(window, 'mousemove', (e) => moveDrag(e.clientX, e.clientY));
+    this.lifetime.listen(window, 'mouseup', endDrag);
+    this.lifetime.listen(dom, 'touchstart', (e) => {
       if (e.touches.length === 1 && e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
-    dom.addEventListener('touchmove', (e) => {
+    this.lifetime.listen(dom, 'touchmove', (e) => {
       if (e.touches.length === 1 && e.touches[0]) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
-    dom.addEventListener('touchend', endDrag);
-    dom.addEventListener('wheel', (e) => {
+    this.lifetime.listen(dom, 'touchend', endDrag);
+    this.lifetime.listen(dom, 'wheel', (e) => {
       if (this.cameraMode === 'free') {
         e.preventDefault();
         this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
@@ -1072,13 +1058,33 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }, { passive: false });
 
-    this.achievements.unlock('first_launch');
     if (save) {
       this.applyFlightSave(save);
       toast.show('Flight resumed where you left off. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage.');
     } else {
-      toast.show('You are at the launchpad. ↑/↓ throttle, W/S pitch, A/D yaw, Space stage, Esc pause.');
+      toast.show('Click LAUNCH or press Space to lift off. W/S, A/D steer, ↑/↓ throttle, Esc pauses.');
     }
+    this.syncVisualTransform();
+    const initialRef = getReferenceBody(this.state.position, this.system);
+    const initialUp = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...initialRef.position)).normalize();
+    const cameraOffset = initialUp.clone().multiplyScalar(-this.rocketBottomY * ROCKET_VISUAL_SCALE);
+    cameraOffset.add(new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5, 0).applyQuaternion(this.rocketQuat));
+    this.chase.initialiseAt(this.state, this.rocketQuat, initialUp, cameraOffset);
+    this.ownedSceneObjects = sceneMgr.scene.children.filter(obj => !existingSceneObjects.has(obj));
+    this.lifetime.listen(window, 'resize', () => {
+      this.sceneMgr.camera.aspect = window.innerWidth / window.innerHeight;
+      this.sceneMgr.camera.updateProjectionMatrix();
+      this.chase.frame((this.rocketTopY - this.rocketBottomY) * ROCKET_VISUAL_SCALE, this.rocketRadius * ROCKET_VISUAL_SCALE);
+      this._camSnapped = false;
+    });
+    this.lifetime.listen(window, 'pagehide', () => this.persistFlight());
+    this.lifetime.listen(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.persistFlight();
+    });
+    this.lifetime.listen(window, 'blur', () => {
+      this.throttleUpKey = false; this.throttleDownKey = false;
+      this.freeCamKeys = { left: false, right: false, up: false, down: false };
+    });
   }
 
   /** Resume a saved flight: position, velocity, attitude, fuel, landing state. */
@@ -1092,38 +1098,34 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const sdz = save.position[2] - refBody.position[2];
     const sd = Math.sqrt(sdx * sdx + sdy * sdy + sdz * sdz);
     const refR = (refBody as any).radius ?? 0;
-    if (!isFinite(sd) || sd === 0 || sd < refR * 1.005) {
+    const oldRadius = save.bodyRadii?.[refBody.name] ?? (refBody.name === 'earth' ? 6.371e6 * 2 : refR / 1.25);
+    const resized = !save.bodyRadii || Math.abs(oldRadius - refR) > 1;
+    const direction: Vec3 = sd > 0 ? [sdx / sd, sdy / sd, sdz / sd] : [0, 1, 0];
+    const surface = (refBody as any).getSurfaceRadiusAt?.(save.position) ?? refR;
+    const savedRadius = resized ? Math.max(surface + FlightScene.SPAWN_OFFSET_M, sd + refR - oldRadius) : sd;
+    if (!isFinite(sd) || sd === 0) {
       this.resetToLaunchPad();
-      this.rocketGroup.quaternion.copy(this.rocketQuat);
-      this.rocketGroup.position.set(
-        this.state.position[0] * VISUAL_SCALE,
-        this.state.position[1] * VISUAL_SCALE,
-        this.state.position[2] * VISUAL_SCALE
-      );
     } else {
-      this.state.position = [...save.position] as [number, number, number];
-      this.state.velocity = [...save.velocity] as [number, number, number];
+      const distance = save.grounded ? surface + FlightScene.SPAWN_OFFSET_M : Math.max(savedRadius, surface + FlightScene.SPAWN_OFFSET_M);
+      this.state.position = refBody.position.map((x, i) => x + direction[i]! * distance) as Vec3;
+      this.state.velocity = [...save.velocity] as Vec3;
       this.state.throttle = save.throttle;
       this.missionTime = save.missionTime;
-      this.rocketQuat.set(save.quat[0], save.quat[1], save.quat[2], save.quat[3]);
-      this.rocketGroup.quaternion.copy(this.rocketQuat);
+      this.rocketQuat.fromArray(save.quat).normalize();
       this.launched = save.launched;
       this.grounded = save.grounded;
-      this.groundedDir = save.groundedDir ? ([...save.groundedDir] as [number, number, number]) : null;
-      // Snap visuals to the restored position immediately
-      this.rocketGroup.position.set(
-        this.state.position[0] * VISUAL_SCALE,
-        this.state.position[1] * VISUAL_SCALE,
-        this.state.position[2] * VISUAL_SCALE
-      );
+      this.groundedDir = save.grounded ? direction : null;
+      this.maxAlt = save.maxAlt ?? 0;
+      this.maxSpeed = save.maxSpeed ?? 0;
+      this.heatEnergy = save.heatEnergy ?? 0;
+      this.stageSeparations = save.stageSeparations ?? 0;
+      for (let i = 0; i < this.stageSeparations; i++) this.missions.recordStageSeparation();
+      if (save.parachuteDeployed) this.toggleParachute();
+      if (save.gearDeployed) this.toggleGear();
     }
     this._spawnProtectionTimer = 0; // resumed mid-flight: no pad grace needed
-    // Fuel per root index — uid counters reset between sessions, so match by order
-    const roots = this.rocket.assembly.roots;
-    for (let i = 0; i < roots.length && i < save.fuel.length; i++) {
-      const tank = this.rocket.fuelTanks.find(t => t.node === roots[i]);
-      if (tank) tank.remaining = save.fuel[i]!;
-    }
+    restoreFuel(this.rocket, save);
+    this.syncVisualTransform();
   }
 
   /** Re-spawn on the flat KSC launchpad (also used when a saved flight is invalid). */
@@ -1178,6 +1180,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
    *  (Earth: 17 km/s!) — drag, plasma, SAS prograde, orbits and HUD speed must
    *  all use local-relative velocity, or the pad would burn like a reentry. */
   private relVelocity(): [number, number, number] {
+    if (this.grounded) return [0, 0, 0];
     const ref = getReferenceBody(this.state.position, this.system);
     const rv = ref.velocity ?? [0, 0, 0];
     return [
@@ -1290,6 +1293,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
   update(_dt: number): void {
+    if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
     try {
       this.updateInner(_dt);
     } catch (e: any) {
@@ -1300,7 +1304,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   private updateInner(_dt: number): void {
     const baseDt = _dt;
-    if (this._spawnProtectionTimer > 0) this._spawnProtectionTimer -= 1;
+    if (this._spawnProtectionTimer > 0) this._spawnProtectionTimer = Math.max(0, this._spawnProtectionTimer - baseDt * 60);
+    this.saveTimer += baseDt;
+    if (this.saveTimer >= 5) { this.persistFlight(); this.saveTimer = 0; }
 
     // Pause toggle
     if (this.controls.consumePauseToggle()) {
@@ -1310,6 +1316,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     if (this.paused) {
+      this.controls.getStageRequested();
       this.system.propagate(0, FIXED_DT);
       for (const body of this.system.bodies) (body as any).syncMesh?.();
       return;
@@ -1323,8 +1330,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     // Track mission time (only when not crashed/paused)
-    this.missionTime += baseDt;
-    this.missionTime = Math.min(this.missionTime, 99999);
+
 
     // Atmosphere warp clamp: high warp in atmosphere tunnels through the 200m
     // crash band (and drag overshot) — rockets "landed" instead of crashing.
@@ -1335,34 +1341,29 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const cdy = this.state.position[1] - clampRef.position[1];
       const cdz = this.state.position[2] - clampRef.position[2];
       const cd = Math.sqrt(cdx*cdx + cdy*cdy + cdz*cdz) || 1;
-      const cR = (clampRef as any).radius ?? 0;
+      const cR = (clampRef as any).getSurfaceRadiusAt?.(this.state.position) ?? (clampRef as any).radius ?? 0;
       const cAlt = cd - cR;
       const atmoWarpLimit = 3; // index of 10x in warpLevels
       if (cR > 0 && cAlt < 70000 && this.warpIndex > atmoWarpLimit) {
         this.warpIndex = atmoWarpLimit;
         this.timeWarp = this.warpLevels[this.warpIndex]!;
         this.hud.setWarp(this.timeWarp);
-        toast.show('Time warp limited in atmosphere', 1800);
+        toast.show('Time warp limited near the surface', 1800);
       }
     }
 
-    _dt *= this.timeWarp;
-    if (!isFinite(_dt) || _dt <= 0) _dt = 1 / 60;
+
 
     this.controls.update(baseDt);
+    if (this.controls.getStageRequested()) this.stageOrLaunch();
     // Screen buttons throttle
     if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
     if (this.hud.throttleDownBtn) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
-    // Keyboard throttle
-    if (this.throttleUpKey) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
-    if (this.throttleDownKey) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
-
-    // Camera zoom
-    if (this.controls.getZoomIn()) this.chase.zoom(0.92);
-    if (this.controls.getZoomOut()) this.chase.zoom(1.08);
-
     // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
     this.updateAutopilot(baseDt);
+    this.updateLandingAssist(baseDt);
+    _dt = baseDt * this.timeWarp;
+    this.missionTime += _dt;
 
     // Throttle is locked only above 10x warp (silently zeroing it at ANY
     // warp made rockets "not lift off" for no visible reason). Physics warp
@@ -1374,8 +1375,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     // Free camera is just a CAMERA — it must not silently kill the throttle
     // (another "why doesn't it lift off" trap).
-
-    if (!warpActive && this.controls.getStageRequested()) this.performStage();
 
     // Auto-stage when the CURRENT (lowest) stage's tanks run dry — also
     // during warped autopilot ascent, otherwise a dry booster at 10x warp
@@ -1405,127 +1404,60 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const yawInput = warpActive ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
 
-    // Realistic rotation: yaw around surface normal, pitch around horizon tangent
-    const rocketFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-    const rocketRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rocketQuat);
-
-    // Surface normal (up from planet center)
     const rotRefBody = getReferenceBody(this.state.position, this.system);
-    const sx = this.state.position[0] - rotRefBody.position[0];
-    const sy = this.state.position[1] - rotRefBody.position[1];
-    const sz = this.state.position[2] - rotRefBody.position[2];
-    const sl = Math.sqrt(sx*sx + sy*sy + sz*sz) || 1;
-    const surfaceNormal = new THREE.Vector3(sx/sl, sy/sl, sz/sl);
-    const altM = sl - ((rotRefBody as any).radius ?? 6.371e6);
-
-    // Horizon tangent = perpendicular to both forward and surface normal
-    const horizon = new THREE.Vector3().crossVectors(rocketFwd, surfaceNormal);
-    const hLen = horizon.length();
-    if (hLen < 0.001) {
-      // Gimbal lock: rocket pointing straight up/down — use any perpendicular
-      horizon.set(-surfaceNormal.z, 0, surfaceNormal.x).normalize();
-      if (horizon.length() < 0.001) horizon.set(1, 0, 0);
-    } else {
-      horizon.normalize();
-    }
-
-    const turn = this.ANGULAR_ACCEL * baseDt;
-    // Yaw around surface normal — turns left/right on the horizon
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(surfaceNormal, yawInput * turn);
-    // Pitch around horizon tangent — tilts up/down relative to horizon
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(horizon, pitchInput * turn * 1.2);
-
-    // surfaceNormal/horizon are WORLD-space axes → PRE-multiply.
-    // Post-multiply rotated around the rocket's LOCAL axes: yaw acted around
-    // a tilted axis at launch, and controls twisted after every attitude change.
-    this.rocketQuat.premultiply(qYaw).premultiply(qPitch);
-
-    // SAS: hold attitude or track prograde/retrograde
-    if (this.sasMode !== 'off' && !warpActive) {
-      if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
-        const rvSas = this.relVelocity();
-        const velMagSas = Math.sqrt(rvSas[0]**2 + rvSas[1]**2 + rvSas[2]**2);
-        if (velMagSas > 0.1) {
-          let targetDir = new THREE.Vector3(
-            rvSas[0] / velMagSas,
-            rvSas[1] / velMagSas,
-            rvSas[2] / velMagSas
-          );
-          if (this.sasMode === 'retrograde') targetDir.negate();
-          this.sasTargetQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetDir);
-        }
+    const surfaceNormal = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...rotRefBody.position)).normalize();
+    const altM = new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...rotRefBody.position)) - ((rotRefBody as any).radius ?? 0);
+    const steering = pitchInput !== 0 || yawInput !== 0 || rollInput !== 0;
+    if (!this.grounded && !warpActive) {
+      if (steering) {
+        this.manualAttitude = true;
+        if (this.landingAssist) { this.landingAssist = false; this.landingStatus = 'Manual control · L: landing assist'; }
+        steerAttitude(this.rocketQuat, this.angularVel, pitchInput, yawInput, rollInput, baseDt);
+        this.sasTargetQuat.copy(this.rocketQuat);
+      } else if (this.landingAssist) {
+        aimAttitude(this.rocketQuat, this.landingDirection, baseDt, 1.4);
+        this.angularVel.set(0, 0, 0);
+      } else if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
+        const target = new THREE.Vector3(...this.relVelocity());
+        if (this.sasMode === 'retrograde') target.negate();
+        aimAttitude(this.rocketQuat, target, baseDt);
+        this.angularVel.set(0, 0, 0);
+      } else if (this.sasMode === 'hold') {
+        this.rocketQuat.rotateTowards(this.sasTargetQuat, baseDt * 0.8);
+        this.angularVel.set(0, 0, 0);
+      } else {
+        steerAttitude(this.rocketQuat, this.angularVel, 0, 0, 0, baseDt);
       }
-      const drift = new THREE.Quaternion().copy(this.sasTargetQuat).invert().multiply(this.rocketQuat);
-      const angle = 2 * Math.acos(Math.abs(drift.w));
-      if (angle > 0.001) {
-        const axis = new THREE.Vector3(drift.x, drift.y, drift.z).normalize();
-        this.angularVel.x -= axis.x * angle * 3 * baseDt;
-        this.angularVel.y -= axis.y * angle * 3 * baseDt;
-        this.angularVel.z -= axis.z * angle * 3 * baseDt;
-      }
-      this.angularVel.multiplyScalar(Math.exp(-5 * baseDt));
     }
-
-    // Automatic gravity turn: after clearing the low atmosphere the rocket
-    // gradually pitches toward the east horizon (instead of flying straight
-    // nose-up forever), then follows prograde for the rest of the burn. Only
-    // active while the player is not steering, SAS is off and throttle is up.
-    const canAutoturn = this.launched && !this.grounded && !warpActive && !this.paused &&
-      this.sasMode === 'off' && this.state.throttle > 0 &&
-      pitchInput === 0 && yawInput === 0;
+    // A gentle ascent turn is never allowed to follow a descending trajectory nose-down.
+    const radialSpeed = new THREE.Vector3(...this.relVelocity()).dot(surfaceNormal);
+    const canAutoturn = this.launched && !this.grounded && !warpActive && !this.landingAssist &&
+      !steering && !this.manualAttitude && this.sasMode === 'off' && this.state.throttle > 0 && radialSpeed > 5;
     if (canAutoturn && altM > this._gravityTurnAltThreshold) {
       this._gravityTurnBias = Math.min(this._gravityTurnBias + 0.012 * baseDt, 0.65);
-    }
-    if (this._gravityTurnBias > 0.001 && canAutoturn) {
-      const rvT = this.relVelocity();
-      const rvTm = Math.sqrt(rvT[0] ** 2 + rvT[1] ** 2 + rvT[2] ** 2) || 1;
-      const progradeDir = new THREE.Vector3(rvT[0] / rvTm, rvT[1] / rvTm, rvT[2] / rvTm);
-      // Blend the prograde target toward east only while the turn is starting
-      // (prograde is still near-vertical); once the arc curves, track pure
-      // prograde.
-      const horizComp = progradeDir.clone().sub(surfaceNormal.clone().multiplyScalar(progradeDir.dot(surfaceNormal)));
-      const hlen = horizComp.length();
-      const blend = this._gravityTurnBias * Math.max(0, 1 - hlen / 0.35);
-      const qPro = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), progradeDir);
-      let qTarget: THREE.Quaternion = qPro;
-      if (blend > 0.001) {
-        const eastSeed = new THREE.Vector3(-surfaceNormal.y, surfaceNormal.x, 0);
-        const eastLen = eastSeed.length();
-        if (eastLen > 0.001) {
-          const eastDir = eastSeed.divideScalar(eastLen);
-          const qEast = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), eastDir);
-          qTarget = new THREE.Quaternion().slerpQuaternions(qPro, qEast, blend);
-        }
-      }
-      this.rocketQuat.slerp(qTarget, 1 - Math.exp(-3 * baseDt));
-      this.rocketQuat.normalize();
-      // Autopilot drives the attitude directly — kill residual SAS/angular velocity.
-      this.angularVel.set(0, 0, 0);
-    }
-
-    // Integrate angular velocity (SAS torque) in world space — it was
-    // computed above but never applied, so SAS HOLD/PROGRADE did nothing.
-    const avLen = this.angularVel.length();
-    if (avLen > 1e-6) {
-      const qAv = new THREE.Quaternion().setFromAxisAngle(
-        this.angularVel.clone().divideScalar(avLen), avLen * baseDt
-      );
-      this.rocketQuat.premultiply(qAv);
+      const east = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), surfaceNormal);
+      if (east.lengthSq() < 1e-8) east.set(1, 0, 0);
+      east.normalize();
+      const targetDir = surfaceNormal.clone().multiplyScalar(Math.cos(this._gravityTurnBias)).addScaledVector(east, Math.sin(this._gravityTurnBias));
+      aimAttitude(this.rocketQuat, targetDir, baseDt, 0.25);
     }
     this.rocketQuat.normalize();
-
-    // Apply rotation to mesh
     this.rocketGroup.quaternion.copy(this.rocketQuat);
-    // Thrust direction from quaternion (rocketFwd already computed above)
-    const fwd = rocketFwd;
+    // Use the orientation that will actually be rendered this frame.
+    const fwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     const tx = fwd.x, ty = fwd.y, tz = fwd.z;
 
     // Apply thrust — TWR gate: must have enough thrust at current throttle
     let canLiftOff = false;
     if (this.countdownCooldown > 0) this.countdownCooldown -= baseDt;
+    if (!engineActive && this.grounded && this.countdownActive) {
+      this.countdownActive = false;
+      this.countdownTimer = 0;
+      this.hideCountdown();
+    }
     if (engineActive && this.grounded) {
       // Countdown — start once
-      if (!this.countdownActive && !this.launched && this.countdownCooldown <= 0) {
+      if (!this.countdownActive && this.countdownCooldown <= 0) {
         this.countdownActive = true;
         this.countdownTimer = 0;
         this.showCountdown('3');
@@ -1567,7 +1499,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           }
           if (canLiftOff) {
             this.showCountdown('LIFTOFF!');
-            setTimeout(() => this.hideCountdown(), 1500);
+            this.lifetime.timeout(() => this.hideCountdown(), 1500);
           }
         }
       }
@@ -1581,6 +1513,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.groundedDir = null;
       this.liftoffFrames = 60;
       this.launched = true;
+      this.landingStatus = 'W/S, A/D steer · ↑/↓ throttle · Space stage · L landing assist';
       this._camSnapped = false; // reset camera snap on liftoff
       // Inherit the planet's ORBITAL velocity (Earth: 17 km/s). Without it
       // the planet races away from the rocket and everything downstream
@@ -1590,7 +1523,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       this.state.velocity[0] += liftoffVel[0];
       this.state.velocity[1] += liftoffVel[1];
       this.state.velocity[2] += liftoffVel[2];
-      this.achievements.unlock('reach_space');
+      this.achievements.unlock('first_launch');
       this.sound.startEngine();
       // Brief camera shake on liftoff
       this.screenShake = 0.8;
@@ -1646,27 +1579,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Reentry glow — RELATIVE speed (planet's 17 km/s orbital motion removed;
     // absolute speed would light the pad up like a reentry)
     const speed = this.relSpeed();
-// Aerodynamic stability: rocket naturally aligns with velocity in atmosphere.
-     // Never fights the player: suspended while steering input is held, and
-     // softened (the old 0.1 factor yanked ~12%/s at sea level against turns
-     // — steering felt "barely working").
-     const steering = pitchInput !== 0 || yawInput !== 0 || (canAutoturn && this._gravityTurnBias > 0);
-     if (!this.grounded && !warpActive && !steering && speed > 5 && nearestBody && (nearestBody as any).radius) {
-       const aeroAlt = nearestDist - (nearestBody as any).radius;
-       const atmoScale = this.atmosphereScale((nearestBody as any).name);
-       if (atmoScale > 0 && aeroAlt > 0 && aeroAlt < 70000) {
-         const rho = Math.exp(-aeroAlt / 8500) * atmoScale;
-          const rvAero = this.relVelocity();
-          const velDir = new THREE.Vector3(rvAero[0], rvAero[1], rvAero[2]).normalize();
-         const currFwd = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-         const dot = Math.abs(currFwd.dot(velDir));
-         if (dot < 0.99) {
-           const alignQ = new THREE.Quaternion().setFromUnitVectors(currFwd, velDir);
-           this.rocketQuat.slerp(alignQ, rho * 0.04 * baseDt);
-           this.rocketQuat.normalize();
-         }
-       }
-     }
     if (!this.grounded && nearestBody && (nearestBody as any).radius) {
       const alt = nearestDist - (nearestBody as any).radius;
       if (alt > 0 && alt < 120000 && speed > 2000) {
@@ -1693,7 +1605,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       if (outer) (outer.material as THREE.MeshBasicMaterial).opacity = 0;
     }
 
-    if (this.liftoffFrames > 0) this.liftoffFrames--;
+    if (this.liftoffFrames > 0) this.liftoffFrames = Math.max(0, this.liftoffFrames - baseDt * 60);
 
     if (!this.grounded) {
       const dx = ndx;
@@ -1701,7 +1613,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const dz = ndz;
       const r = nearestDist;
       const r2 = r * r;
-      if (r > 1 && r2 > 0) {
+      if (r > 1 && r2 > 0 && this.timeWarp <= 10) {
         const f = (G * nearRef.mass) / r2;
         const gDelta = f * _dt;
         this.state.velocity[0] += gDelta * dx / r;
@@ -1808,105 +1720,35 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
         // Heat-related part failure
         if (this.heatEnergy > this.MAX_HEAT) {
-          this.crashed = true;
-          toast.show(`OVERHEATED! Ship disintegrated at ${this.heatEnergy.toFixed(0)}J`);
+          const delta = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...nearRef.position));
+          this.doCrash('Overheated during reentry', nearRef, delta.x, delta.y, delta.z, delta.length(), (nearRef as any).getSurfaceRadiusAt?.(this.state.position) ?? (nearRef as any).radius ?? 0);
         }
       }
 
 
-      // Collision with surface
-      const bodyR = nearestBody ? (nearestBody as any).radius ?? 0 : 0;
-      const surfaceR = nearestBody ? ((nearestBody as any).getSurfaceRadiusAt?.(this.state.position) ?? bodyR) : 0;
-      if (nearestBody && bodyR > 0 && isFinite(nearestDist) && this._spawnProtectionTimer <= 0) {
-        const dx = this.state.position[0] - nearestBody.position[0];
-        const dy = this.state.position[1] - nearestBody.position[1];
-        const dz = this.state.position[2] - nearestBody.position[2];
-        const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        // Vertical speed must use the body-RELATIVE velocity. On liftoff the
-        // rocket inherits the planet's orbital velocity (Earth: 17 km/s), but
-        // that velocity's radial projection at the pad is NOT zero (KSC sits
-        // off the orbital plane) — using absolute velocity reads ~-14.7 km/s
-        // "falling" and instantly crashes every rocket after the countdown.
-        const refVel = (nearestBody as any).velocity ?? [0, 0, 0];
-        const vertSpeed = ((this.state.velocity[0] - refVel[0]) * dx + (this.state.velocity[1] - refVel[1]) * dy + (this.state.velocity[2] - refVel[2]) * dz) / d;
-        // Inside planet or on surface: always crash at orbital speeds
-        if (d < surfaceR && !this.grounded) {
-          this.doCrash(`Impact on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        } else if (d < surfaceR + 200 && d > 0.001 && this.liftoffFrames <= 0 && !this.grounded && isFinite(vertSpeed) && vertSpeed <= 0) {
-          const surfaceNorm = new THREE.Vector3(dx / d, dy / d, dz / d);
-          const rocketUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
-          const tiltDeg = Math.acos(Math.min(1, Math.abs(rocketUp.dot(surfaceNorm)))) * 180 / Math.PI;
-          const hasLegs = this.hasLandingLegs();
-          const speedLimit = this.parachuteDeployed ? 15 : 20;
-          const softLimit = this.parachuteDeployed ? 8 : 5;
-          const tiltLimit = hasLegs ? 60 : 45;
-
-          if (isFinite(vertSpeed) && Math.abs(vertSpeed) > speedLimit) {
-            this.doCrash(`Too fast! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-          } else if (tiltDeg > tiltLimit) {
-            this.doCrash(`Tipped over! (${tiltDeg.toFixed(0)}°) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-          } else if (isFinite(vertSpeed) && Math.abs(vertSpeed) < softLimit) {
-            this.state.velocity = [0, 0, 0];
-            this.grounded = true;
-            this.groundedDir = [dx / d, dy / d, dz / d];
-            const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
-            this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            if (this.state.position[0] !== nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M) ||
-                this.state.position[1] !== nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M) ||
-                this.state.position[2] !== nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)) {
-              this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)];
-              this.sound.playLand();
-              this.sound.stopEngine();
-              const bodyName = nearestBody.name;
-              toast.show(`Landed on ${bodyName}!`);
-              if (bodyName === 'earth') this.achievements.unlock('land_earth');
-              else if (bodyName === 'moon') this.achievements.unlock('land_moon');
-              else if (bodyName === 'mars') this.achievements.unlock('land_mars');
-              else if (bodyName === 'venus') this.achievements.unlock('land_venus');
-              else if (bodyName === 'mercury') this.achievements.unlock('land_mercury');
-              this.missions.recordLanding(bodyName);
-            }
-          } else if (isFinite(vertSpeed)) {
-            this.state.velocity = [0, 0, 0];
-            this.state.position = [nearestBody.position[0] + dx / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[1] + dy / d * (surfaceR + FlightScene.SPAWN_OFFSET_M), nearestBody.position[2] + dz / d * (surfaceR + FlightScene.SPAWN_OFFSET_M)];
-            this.grounded = true;
-            this.groundedDir = [dx / d, dy / d, dz / d];
-            const landUp = new THREE.Vector3(dx / d, dy / d, dz / d);
-            this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), landUp);
-            this.screenShake = Math.abs(vertSpeed) * 0.05;
-            this.sound.playLand();
-            this.sound.stopEngine();
-            const bodyName = nearestBody.name;
-            toast.show(`Rough landing on ${bodyName}! (${Math.abs(vertSpeed).toFixed(1)} m/s)`);
-            if (bodyName === 'earth') this.achievements.unlock('land_earth');
-            else if (bodyName === 'moon') this.achievements.unlock('land_moon');
-          }
-        } else if (d < surfaceR + 250 && !this.grounded && isFinite(vertSpeed) && vertSpeed < -50000) {
-          // Altitude-based fallback: very fast near ground → crash even if outside surfaceR
-          this.doCrash(`High-speed impact! (${Math.abs(vertSpeed).toFixed(0)} m/s) on ${nearestBody.name}`, nearestBody, dx, dy, dz, d, surfaceR);
-        }
-      }
     } else {
       this.state.velocity = [0, 0, 0];
     }
 
+    const motionRef = nearRef;
+    const oldRelative = this.state.position.map((x, i) => x - motionRef.position[i]!) as Vec3;
+    const relativeVelocity = this.state.velocity.map((x, i) => x - motionRef.velocity[i]!) as Vec3;
+    const surfaceBefore = (motionRef as any).getSurfaceRadiusAt?.(this.state.position) ?? (motionRef as any).radius ?? 0;
+    const coast = !this.grounded && this.timeWarp > 10
+      ? propagateCoast(oldRelative, relativeVelocity, motionRef.mass, _dt, surfaceBefore + FlightScene.SPAWN_OFFSET_M)
+      : null;
     this.system.propagate(_dt, FIXED_DT);
-
-    // Integrate position AFTER propagate and AFTER the collision check: the
-    // check reads positions as of the START of this frame. If we integrated the
-    // absolute velocity (which on liftoff includes the planet's 17 km/s orbital
-    // motion) first, the rocket would jump ~283 m/tick before the reference body
-    // has moved, dipping 250 m INSIDE the planet at KSC and insta-crashing.
-    // (Skip when grounded to prevent bounce-through.)
     if (!this.grounded) {
-      this.state.position[0] += this.state.velocity[0] * _dt;
-      this.state.position[1] += this.state.velocity[1] * _dt;
-      this.state.position[2] += this.state.velocity[2] * _dt;
+      const relativeEnd = coast?.position ?? oldRelative.map((x, i) => x + relativeVelocity[i]! * _dt) as Vec3;
+      this.state.position = relativeEnd.map((x, i) => x + motionRef.position[i]!) as Vec3;
+      // Account for acceleration of the reference body's heliocentric frame.
+      this.state.velocity = (coast?.velocity ?? relativeVelocity).map((x, i) => x + motionRef.velocity[i]!) as Vec3;
+      this.resolveSurfaceContact(motionRef, coast ? relativeEnd : oldRelative, relativeEnd, coast?.impacted ?? false);
     }
 
     // Track body surface while grounded (body moves during propagate)
     if (this.grounded && this.groundedDir) {
-      const refBody = getReferenceBody(this.state.position, this.system);
+      const refBody = motionRef;
       const bodyR = (refBody as any).radius ?? 6.371e6;
       // Use groundedDir direction (not stale this.state.position) for terrain height lookup
       const surfPos: [number, number, number] = [
@@ -1986,6 +1828,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         d.life -= baseDt;
         if (d.life <= 0 || d.body.mass <= 0) {
           this.sceneMgr.scene.remove(d.mesh);
+          releaseSceneObjects([d.mesh], [this.rocketGroup, ...gltfCache.values()]);
           this.debris.splice(i, 1);
           continue;
         }
@@ -2009,6 +1852,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const bodyR = (refBody as any).getSurfaceRadiusAt?.(d.body.position) ?? (refBody as any).radius ?? 6.371e6;
         if (bd < bodyR) {
           this.sceneMgr.scene.remove(d.mesh);
+          releaseSceneObjects([d.mesh], [this.rocketGroup, ...gltfCache.values()]);
           this.debris.splice(i, 1);
         }
       }
@@ -2045,56 +1889,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const upYv = this.state.position[1] - refBodyVis.position[1];
       const upZv = this.state.position[2] - refBodyVis.position[2];
       const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
-
-      // Debug overlay — live readout of physics vs. visual altitude.
-      if (!this._debugShown) {
-        this._debugShown = true;
-        const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:90;font-family:monospace;font-size:11px;color:#c89838;background:rgba(8,10,24,0.65);padding:3px 10px;border-radius:10px;pointer-events:none;letter-spacing:0.05em;border:1px solid rgba(200,152,56,0.25);white-space:pre;';
-        dbg.id = 'rocket-debug';
-        document.body.appendChild(dbg);
-        this._dbgEl = dbg;
-        console.log('ROCKET DEBUG:', {
-          rocketBottomY: this.rocketBottomY,
-          visualOffset,
-          VISUAL_SCALE,
-          ROCKET_VISUAL_SCALE,
-          earthVisualR: 6.371e6 * VISUAL_SCALE,
-          rocketGroupPos: this.rocketGroup.position.toArray(),
-          statePos: this.state.position,
-        });
-      }
-      const dbg = this._dbgEl;
-      if (dbg) {
-        let altH = Infinity;
-        for (const b of this.system.bodies) {
-          if (b.mass <= 0) continue;
-          const bdx = this.state.position[0] - b.position[0];
-          const bdy = this.state.position[1] - b.position[1];
-          const bdz = this.state.position[2] - b.position[2];
-          const bd = Math.sqrt(bdx * bdx + bdy * bdy + bdz * bdz);
-          const br = (b as any).getSurfaceRadiusAt?.(this.state.position) ?? (b as any).radius ?? 0;
-          const alt = bd - br;
-          if (alt < altH) altH = alt;
-        }
-        const velM = Math.sqrt(
-          this.state.velocity[0] ** 2 + this.state.velocity[1] ** 2 + this.state.velocity[2] ** 2
-        );
-        const gyy2 = Math.sqrt(
-          (this.rocketGroup.position.x - refBodyVis.position[0] * VISUAL_SCALE) ** 2 +
-          (this.rocketGroup.position.y - refBodyVis.position[1] * VISUAL_SCALE) ** 2 +
-          (this.rocketGroup.position.z - refBodyVis.position[2] * VISUAL_SCALE) ** 2
-        );
-        const refVisR2 = (refBodyVis as any).visualRadius ?? (refBodyVis as any).radius * VISUAL_SCALE;
-        const visualAlt2 = gyy2 - refVisR2;
-        dbg.textContent =
-          'v4.7  H' + Math.round(altH) +
-          'm V' + Math.round(velM) +
-          ' vR' + Math.round(visualAlt2 * 1000) / 1000 +
-          ' th' + Math.round(this.state.throttle * 100) +
-          (this._gravityTurnBias > 0.001 ? ' T' + Math.round(this._gravityTurnBias * 57.3) + '°' : '') +
-          (this.launched ? ' FLY' : this.countdownActive ? ' CD' + Math.max(1, Math.ceil(3 - this.countdownTimer)) : this.grounded ? ' PAD' : '');
-      }
 
       this.rocketGroup.position.set(
         this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
@@ -2142,16 +1936,19 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           y: (upYv / upLenV) * visualOffset,
           z: (upZv / upLenV) * visualOffset,
         };
+        const modelCenter = new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5, 0).applyQuaternion(this.rocketQuat);
+        lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
         this.chase.follow(this.state, baseDt, camUp, warpActive || !this._camSnapped, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
       }
 
       if (this.deployedChuteMesh) {
         this.deployedChuteMesh.position.set(
-          this.state.position[0] * VISUAL_SCALE,
-          this.state.position[1] * VISUAL_SCALE + 0.02,
-          this.state.position[2] * VISUAL_SCALE
+          this.rocketGroup.position.x,
+          this.rocketGroup.position.y,
+          this.rocketGroup.position.z
         );
+        this.deployedChuteMesh.position.add(new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(this.rocketQuat));
         this.deployedChuteMesh.rotation.copy(this.rocketGroup.rotation);
         // Animate deployment: ease-out with slight overshoot (back-out)
         if (this.chuteDeployProgress < 1) {
@@ -2166,14 +1963,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
     }
 
-    const nearestAlt = nearestBody && (nearestBody as any).radius ? nearestDist - (nearestBody as any).radius : 0;
+    const nearestAlt = nearestBody && (nearestBody as any).radius ? Math.hypot(...this.state.position.map((x, i) => x - nearestBody!.position[i]!)) - ((nearestBody as any).getSurfaceRadiusAt?.(this.state.position) ?? (nearestBody as any).radius) : 0;
     const stageCount = this.countStages(this.rocket.assembly.roots);
 
     // Stage info (internal only, no display)
     const stageData = this.computeStageData();
     this.stageInfo = stageData;
 
-    // Compute Ap/Pe from orbit prediction
+    // All orbital elements are computed in physical metres and the body's velocity frame.
     let ape: number | undefined;
     let pe: number | undefined;
     let timeToAp: number | undefined;
@@ -2181,52 +1978,34 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     let eccentricity: number | undefined;
     let period: number | undefined;
     const orbitRefBody = getReferenceBody(this.state.position, this.system);
-    if (orbitRefBody && orbitRefBody.mass > 0) {
-      const relPos: [number, number, number] = [
-        (this.state.position[0] - orbitRefBody.position[0]) * VISUAL_SCALE,
-        (this.state.position[1] - orbitRefBody.position[1]) * VISUAL_SCALE,
-        (this.state.position[2] - orbitRefBody.position[2]) * VISUAL_SCALE,
-      ];
-      const orbitPred = predictOrbit(relPos, this.state.velocity, orbitRefBody.mass, 5e14, 360);
+    if (!this.grounded && orbitRefBody && orbitRefBody.mass > 0) {
+      const relPos = this.state.position.map((x, i) => x - orbitRefBody.position[i]!) as Vec3;
+      const orbitPred = predictOrbit(relPos, this.relVelocity(), orbitRefBody.mass, 5e14, 90);
+      const bodyRadius = (orbitRefBody as any).radius ?? 0;
       if (orbitPred.bound) {
-        ape = orbitPred.apoapsis;
-        pe = orbitPred.periapsis;
+        ape = orbitPred.apoapsis - bodyRadius;
+        pe = orbitPred.periapsis - bodyRadius;
         timeToAp = orbitPred.timeToAp;
         timeToPe = orbitPred.timeToPe;
         eccentricity = orbitPred.eccentricity;
-        period = orbitPred.timeToAp !== undefined && orbitPred.timeToPe !== undefined
-          ? (orbitPred.timeToAp + orbitPred.timeToPe) * 2 : undefined;
+        const semiMajor = (orbitPred.apoapsis + orbitPred.periapsis) / 2;
+        period = 2 * Math.PI * Math.sqrt(semiMajor ** 3 / (G * orbitRefBody.mass));
       }
     }
 
-    // Update impact marker position
+    // Ground cue below the predicted near-term landing point (surface-relative velocity).
     if (this.impactMarker) {
-      const refBodyMarker = getReferenceBody(this.state.position, this.system);
-      const rPos: [number, number, number] = [
-        (this.state.position[0] - refBodyMarker.position[0]),
-        (this.state.position[1] - refBodyMarker.position[1]),
-        (this.state.position[2] - refBodyMarker.position[2]),
-      ];
-      const markerPred = predictOrbit(rPos, this.state.velocity, refBodyMarker.mass, 5e14, 360);
-      if (markerPred.points.length > 10 && !markerPred.bound) {
-        const last = markerPred.points[markerPred.points.length - 1]!;
-        const surfaceR = (refBodyMarker as any).getSurfaceRadiusAt?.([last[0], 0, last[1]]) ?? (refBodyMarker as any).radius ?? 6371000;
-        const surfacePos: [number, number, number] = [
-          refBodyMarker.position[0] + last[0],
-          0,
-          refBodyMarker.position[2] + last[1],
-        ];
-        const dir = Math.sqrt(last[0]*last[0] + last[1]*last[1]);
-        if (dir > surfaceR * 0.5) {
-          const hitX = refBodyMarker.position[0] + last[0] / dir * surfaceR;
-          const hitZ = refBodyMarker.position[2] + last[1] / dir * surfaceR;
-          this.impactMarker.position.set(hitX * VISUAL_SCALE, 0, hitZ * VISUAL_SCALE);
-          this.impactMarker.visible = true;
-        } else {
-          this.impactMarker.visible = false;
-        }
-      } else {
-        this.impactMarker.visible = false;
+      const radius = (orbitRefBody as any).radius ?? 0;
+      const relative = new THREE.Vector3(...this.relVelocity());
+      const up = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...orbitRefBody.position)).normalize();
+      const down = relative.dot(up);
+      this.impactMarker.visible = !this.grounded && down < 0 && nearestAlt < 20000 && radius > 0;
+      if (this.impactMarker.visible) {
+        const estimate = new THREE.Vector3(...this.state.position).addScaledVector(relative, Math.min(60, nearestAlt / Math.max(1, -down)));
+        const normal = estimate.clone().sub(new THREE.Vector3(...orbitRefBody.position)).normalize();
+        const surface = (orbitRefBody as any).getSurfaceRadiusAt?.(estimate.toArray()) ?? radius;
+        this.impactMarker.position.copy(normal).multiplyScalar((surface + 5) * VISUAL_SCALE).add(new THREE.Vector3(...orbitRefBody.position).multiplyScalar(VISUAL_SCALE));
+        this.impactMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
       }
     }
     const activeStage = this.stageInfo.filter(s => s.active).length > 0
@@ -2250,6 +2029,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.hud.setTwr(twr);
     this.hud.setSasMode(this.sasMode);
+    this.hud.setGrounded(this.grounded);
+    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
 
     // Delta-V budget: Tsiolkovsky with game fuel-flow scaling
     // (effective exhaust velocity = Isp * g0 / FUEL_FLOW_MULT)
@@ -2263,7 +2044,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.hud.setDeltaV(deltaV);
 
-    this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle);
+    this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle, flightTelemetry(this.state.position, this.state.velocity, getReferenceBody(this.state.position, this.system), this.grounded));
 
     // Orbit info → HUD
     this.hud.setOrbit({
@@ -2290,22 +2071,22 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       bound: ape !== undefined && pe !== undefined,
       apoapsis: ape ?? -1,
       periapsis: pe ?? -1,
-      stageSeparations: 0,
+      stageSeparations: this.stageSeparations,
       softLanded: false,
     });
 
     // Draw 3D orbit path
     const refBodyOrbit = getReferenceBody(this.state.position, this.system);
     const relPosOrbit: [number, number, number] = [
-      (this.state.position[0] - refBodyOrbit.position[0]) * VISUAL_SCALE,
-      (this.state.position[1] - refBodyOrbit.position[1]) * VISUAL_SCALE,
-      (this.state.position[2] - refBodyOrbit.position[2]) * VISUAL_SCALE,
+      (this.state.position[0] - refBodyOrbit.position[0]),
+      (this.state.position[1] - refBodyOrbit.position[1]),
+      (this.state.position[2] - refBodyOrbit.position[2]),
     ];
-    const orbitPred3d = predictOrbit(relPosOrbit, this.state.velocity, refBodyOrbit.mass, 5e14, 90);
-    if (orbitPred3d.points.length > 5) {
+    const orbitPred3d = predictOrbit(relPosOrbit, this.relVelocity(), refBodyOrbit.mass, 5e14, 90);
+    if (!this.grounded && orbitPred3d.points.length > 5) {
       if (!this.orbitLine) {
         const geom = new THREE.BufferGeometry();
-        const positions = new Float32Array(orbitPred3d.points.length * 3);
+        const positions = new Float32Array(91 * 3);
         geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const mat = new THREE.LineBasicMaterial({
           color: orbitPred3d.bound ? 0x4488cc : 0xddaa44,
@@ -2316,11 +2097,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       const pos = this.orbitLine.geometry.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < orbitPred3d.points.length; i++) {
-        pos.array[i * 3] = refBodyOrbit.position[0] * VISUAL_SCALE + orbitPred3d.points[i]![0];
-        pos.array[i * 3 + 1] = this.state.position[1] * VISUAL_SCALE;
-        pos.array[i * 3 + 2] = refBodyOrbit.position[2] * VISUAL_SCALE + orbitPred3d.points[i]![1];
+        pos.array[i * 3] = (refBodyOrbit.position[0] + orbitPred3d.points3d[i]![0]) * VISUAL_SCALE;
+        pos.array[i * 3 + 1] = (refBodyOrbit.position[1] + orbitPred3d.points3d[i]![1]) * VISUAL_SCALE;
+        pos.array[i * 3 + 2] = (refBodyOrbit.position[2] + orbitPred3d.points3d[i]![2]) * VISUAL_SCALE;
       }
       pos.needsUpdate = true;
+      this.orbitLine.geometry.computeBoundingSphere();
       this.orbitLine.geometry.setDrawRange(0, orbitPred3d.points.length);
       (this.orbitLine.material as THREE.LineBasicMaterial).color.set(orbitPred3d.bound ? 0x4488cc : 0xddaa44);
       this.orbitLine.visible = true;
@@ -2437,7 +2219,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       bodyDirs.push({ name: body.name, dir: [dx/d, dy/d, dz/d], color: mapColors[body.name] || '#888' });
     }
     this.hud.setNavballData(
-      [rocketFwd.x, rocketFwd.y, rocketFwd.z],
+      [fwd.x, fwd.y, fwd.z],
       velDir,
       [upX / upNorm, upY / upNorm, upZ / upNorm],
       [normX / normLen, normY / normLen, normZ / normLen],
@@ -2451,7 +2233,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     el.style.cssText = 'position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:250;background:rgba(8,10,24,0.85);border:1px solid rgba(124,255,178,0.3);border-radius:6px;padding:6px 14px;font:600 11px system-ui;color:#7CFFB2;letter-spacing:0.05em;pointer-events:auto;cursor:pointer;text-align:center;';
     el.innerHTML = `<div id="ap-phase">AUTOPILOT: BURN</div><div id="ap-detail" style="font-size:9px;color:#889;margin-top:2px;font-weight:400;"></div><div style="font-size:8px;color:#ff6644;margin-top:3px;font-weight:400;">click to cancel</div>`;
     el.addEventListener('click', () => this.abortAutopilot('Cancelled by user'));
-    document.body.appendChild(el);
+    this.lifetime.append(el);
     this.autopilotStatusEl = el;
   }
 
@@ -2522,6 +2304,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.autopilotStartMass = this.state.rocket.totalMass();
         this.sasMode = plan.direction;
         this.hud.setSasMode(this.sasMode);
+    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
         toast.show(`Space reached — burning ${plan.direction} toward ${this.autopilotTarget.toUpperCase()}`, 4000);
       }
       return;
@@ -2647,11 +2430,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">CONTINUE</button>
     `;
     overlay.appendChild(card);
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+    this.lifetime.append(overlay);
+    this.lifetime.frame(() => { overlay.style.opacity = '1'; });
     card.querySelector('#arrival-close')!.addEventListener('click', () => {
       overlay.style.opacity = '0';
-      setTimeout(() => overlay.remove(), 420);
+      this.lifetime.timeout(() => overlay.remove(), 420);
     });
     this.achievements.unlock('reach_space');
   }
@@ -2663,6 +2446,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       return;
     }
 
+    if (this.lifetime.disposed || this.paused || this.crashed) return;
     this.sound.playStaging();
 
     const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.uid ?? decoupler.part.id);
@@ -2753,9 +2537,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const pushForce = 5 + Math.random() * 5;
         const refVel = refBody.velocity ?? [0, 0, 0];
         const sepVel: Vec3 = [
-          this.state.velocity[0] + refVel[0] + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[1] + refVel[1] + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[2] + refVel[2] + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[0] + (this.grounded ? refVel[0] : 0) + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[1] + (this.grounded ? refVel[1] : 0) + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
+          this.state.velocity[2] + (this.grounded ? refVel[2] : 0) + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
         ];
 
         const debrisBody = new Body('debris', 100, pos, sepVel);
@@ -2772,6 +2556,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.positionFlameAtNozzle();
     this.achievements.unlock('stage_separate');
     this.missions.recordStageSeparation();
+    this.stageSeparations++;
     // Visual feedback: brief white flash + rocket scale pulse
     this.triggerStageFlash();
     this.stagePulseTimer = 0.35;
@@ -2783,8 +2568,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   private triggerStageFlash(): void {
     const flash = document.createElement('div');
     flash.className = 'stage-flash';
-    document.body.appendChild(flash);
-    setTimeout(() => flash.remove(), 240);
+    this.lifetime.append(flash);
+    this.lifetime.timeout(() => flash.remove(), 240);
   }
 
   /** Bottom-most decoupler by PHYSICAL position (lowest Y) — stages drop bottom-first.
@@ -2803,9 +2588,171 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     return best;
   }
 
+  private setPlayerWarp(index: number): void {
+    if (this.paused || this.crashed || this.lifetime.disposed) return;
+    const nextIndex = Math.max(0, Math.min(this.warpLevels.length - 1, index));
+    const warp = this.warpLevels[nextIndex]!;
+    const body = getReferenceBody(this.state.position, this.system);
+    const surface = (body as any).getSurfaceRadiusAt?.(this.state.position) ?? (body as any).radius ?? 0;
+    const altitude = new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...body.position)) - surface;
+    if (warp > 10 && (this.grounded || altitude < 70000 || this.landingAssist)) {
+      const reason = this.landingAssist ? 'Disable landing assist before using high time warp.' : '100× and higher warp is available above 70 km. Use up to 10× near the surface.';
+      this.landingStatus = reason;
+      this.hud.setLandingStatus(reason, false);
+      toast.show(reason, 4500);
+      return;
+    }
+    if (this.autopilotActive) this.abortAutopilot('Manual time warp');
+    this.warpIndex = nextIndex; this.timeWarp = warp; this.hud.setWarp(warp);
+    if (warp > 10) {
+      this.state.throttle = 0;
+      this.landingStatus = `${warp}× coast · engines off · use − or [ to slow down`;
+      this.hud.setLandingStatus(this.landingStatus, false);
+    }
+  }
+
+  private stageOrLaunch(): void {
+    if (this.paused || this.crashed || this.lifetime.disposed) return;
+    if (!this.grounded) {
+      if (this.timeWarp === 1) this.performStage();
+      else toast.show('Return time warp to ×1 before staging.');
+      return;
+    }
+    const thrust = totalThrust(this.rocket.assembly.roots) * 1000;
+    const body = getReferenceBody(this.state.position, this.system);
+    const radiusSq = new THREE.Vector3(...this.state.position).distanceToSquared(new THREE.Vector3(...body.position));
+    const gravity = G * body.mass / Math.max(1, radiusSq);
+    const twr = thrust / (this.rocket.totalMass() * gravity);
+    const reason = thrust <= 0 ? 'No engine — add an engine in Vehicle Assembly.'
+      : this.rocket.totalFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
+      : twr <= 1 ? `Insufficient thrust (TWR ${twr.toFixed(2)}). Use a stronger engine or reduce mass.`
+      : '';
+    if (reason) {
+      this.state.throttle = 0;
+      this.landingStatus = reason;
+      this.hud.setLandingStatus(reason, false);
+      toast.show(reason, 5000);
+      return;
+    }
+    this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
+    this.state.throttle = 1;
+    this.countdownCooldown = 0;
+    this.landingStatus = 'Engines starting · countdown 3…2…1 · ↓ to reduce throttle';
+    this.hud.setLandingStatus(this.landingStatus, false);
+  }
+
+  private toggleLandingAssist(): void {
+    if (this.grounded || this.crashed) { toast.show('Landing assist is available in flight.'); return; }
+    this.landingAssist = !this.landingAssist;
+    if (this.landingAssist) {
+      this.abortAutopilot('Landing control');
+      this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
+      this.sasMode = 'off';
+      if (this.hasLandingLegs() && !this.gearDeployed) this.toggleGear();
+    }
+    this.landingStatus = this.landingAssist ? 'Landing assist · braking toward the surface' : 'Manual control · L: landing assist';
+    toast.show(this.landingStatus);
+  }
+
+  private updateLandingAssist(dt: number): void {
+    const ref = getReferenceBody(this.state.position, this.system);
+    const radial = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position));
+    const radius = radial.length();
+    const up = radial.normalize();
+    const surface = (ref as any).getSurfaceRadiusAt?.(this.state.position) ?? (ref as any).radius ?? 0;
+    const altitude = Math.max(0, radius - surface - FlightScene.SPAWN_OFFSET_M);
+    const relative = new THREE.Vector3(...this.relVelocity());
+    const verticalSpeed = relative.dot(up);
+    const lateral = relative.clone().addScaledVector(up, -verticalSpeed);
+    // A returning craft needs normal-speed control before it reaches the surface.
+    if (this.landingAssist || (!this.grounded && verticalSpeed < 0 && altitude < 20000)) {
+      if (this.timeWarp !== 1) { this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1); }
+    }
+    if (!this.landingAssist || this.grounded) {
+      if (!this.grounded && altitude < 20000 && verticalSpeed < 0) {
+        this.landingStatus = `GROUND ${altitude.toFixed(0)} m · DESCENT ${(-verticalSpeed).toFixed(1)} m/s · DRIFT ${lateral.length().toFixed(1)} m/s · L: assist`;
+      }
+      return;
+    }
+    if (this.controls.getPitch() || this.controls.getYaw() || this.controls.getRoll()) {
+      this.landingAssist = false;
+      this.landingStatus = 'Manual control · L: landing assist';
+      return;
+    }
+    const maxAcceleration = this.rocket.totalFuelMass() > 0 ? totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass() : 0;
+    const command = landingCommand({ altitude, verticalSpeed, horizontalSpeed: lateral.length(), gravity: G * ref.mass / (radius * radius), maxAcceleration });
+    this.landingDirection.copy(up).multiplyScalar(command.verticalAcceleration);
+    if (lateral.lengthSq() > 1e-8) this.landingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
+    if (this.landingDirection.lengthSq() === 0) this.landingDirection.copy(up);
+    this.landingDirection.normalize();
+    const nose = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
+    // Point the engine in the useful direction before applying descent thrust.
+    const aligned = Math.max(0, nose.dot(this.landingDirection));
+    this.state.throttle = aligned > 0.7 ? command.throttle : 0;
+    this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${altitude.toFixed(0)} m · DESCENT ${Math.max(0, -verticalSpeed).toFixed(1)} m/s · L: cancel`;
+  }
+
+  /** Test the travelled segment, not only the next endpoint: fast falls must not tunnel. */
+  private resolveSurfaceContact(body: Body, previous: Vec3, next: Vec3, coastImpact: boolean): void {
+    if (this.grounded || this.crashed || !(body as any).radius) return;
+    const start = new THREE.Vector3(...previous), end = new THREE.Vector3(...next);
+    const movement = end.clone().sub(start);
+    const denominator = movement.lengthSq();
+    const closestT = denominator > 0 ? THREE.MathUtils.clamp(-start.dot(movement) / denominator, 0, 1) : 1;
+    const closest = start.clone().addScaledVector(movement, closestT);
+    const terrainPoint = closest.clone().add(new THREE.Vector3(...body.position)).toArray() as Vec3;
+    const surface = (body as any).getSurfaceRadiusAt?.(terrainPoint) ?? (body as any).radius;
+    const contactRadius = surface + FlightScene.SPAWN_OFFSET_M;
+    if (!coastImpact && closest.length() > contactRadius) return;
+    let point = end.clone();
+    const a = denominator, b = 2 * start.dot(movement), c = start.lengthSq() - contactRadius * contactRadius;
+    const discriminant = b * b - 4 * a * c;
+    if (a > 0 && discriminant >= 0 && c > 0) {
+      const t = (-b - Math.sqrt(discriminant)) / (2 * a);
+      if (t >= 0 && t <= 1) point = start.clone().addScaledVector(movement, t);
+    }
+    const normal = point.normalize();
+    if (normal.lengthSq() === 0) normal.copy(start).normalize();
+    const velocity = new THREE.Vector3(...this.state.velocity).sub(new THREE.Vector3(...body.velocity));
+    const vertical = velocity.dot(normal);
+    // Moving away from the pad is not a touchdown.
+    if (vertical >= 0 && start.length() >= contactRadius - 1) return;
+    const lateral = velocity.clone().addScaledVector(normal, -vertical).length();
+    const tilt = THREE.MathUtils.radToDeg(new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat).angleTo(normal));
+    const outcome = landingOutcome(vertical, lateral, tilt, this.parachuteDeployed || (this.gearDeployed && this.hasLandingLegs()));
+    if (outcome === 'crash') {
+      this.doCrash(`Impact: ${Math.abs(vertical).toFixed(0)} m/s descent, ${lateral.toFixed(0)} m/s drift, ${tilt.toFixed(0)}° tilt`, body, normal.x, normal.y, normal.z, 1, surface);
+      this.persistFlight();
+      return;
+    }
+    this.grounded = true;
+    this.groundedDir = normal.toArray() as Vec3;
+    this.state.position = normal.clone().multiplyScalar(contactRadius).add(new THREE.Vector3(...body.position)).toArray() as Vec3;
+    this.state.velocity = [0, 0, 0];
+    this.state.throttle = 0;
+    this.countdownActive = false; this.countdownCooldown = 1;
+    this.landingAssist = false;
+    this.angularVel.set(0, 0, 0);
+    this.rocketQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    this.sasTargetQuat.copy(this.rocketQuat);
+    this.sound.stopEngine(); this.sound.playLand(); this.engineFlame.stop();
+    this.screenShake = outcome === 'rough' ? 0.2 : 0;
+    this.landingStatus = `Landed on ${body.name.toUpperCase()} · throttle up to launch again`;
+    this.achievements.unlock(`land_${body.name}`);
+    if (Math.abs(vertical) < 3) this.achievements.unlock('first_landing');
+    if (this.parachuteDeployed) this.achievements.unlock('parachute_landing');
+    this.missions.recordLanding(body.name);
+    toast.show(this.landingStatus);
+    this.syncVisualTransform();
+    this.persistFlight();
+  }
+
   private toggleParachute(): void {
-    const hasChute = this.rocket.assembly.roots.some(r => r.part.kind === 'parachute') ||
-      this.rocket.assembly.roots.some(r => r.children.some(c => c.part.kind === 'parachute'));
+    const containsChute = (nodes: AssemblyNode[]): boolean => nodes.some(n => n.part.kind === 'parachute' || n.part.hasParachute || containsChute(n.children));
+    const hasChute = containsChute(this.rocket.assembly.roots);
+    if (!hasChute) { toast.show('This rocket has no parachute.'); return; }
+    const ref = getReferenceBody(this.state.position, this.system);
+    if (!this.parachuteDeployed && this.atmosphereScale(ref.name) === 0) { toast.show('No atmosphere here — use engines to brake.'); return; }
     if (hasChute) {
       this.parachuteDeployed = !this.parachuteDeployed;
       if (this.parachuteDeployed) {
@@ -2816,6 +2763,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         this.sceneMgr.scene.add(this.deployedChuteMesh);
       } else if (this.deployedChuteMesh) {
         this.sceneMgr.scene.remove(this.deployedChuteMesh);
+        releaseSceneObjects([this.deployedChuteMesh]);
         this.deployedChuteMesh = null;
         this.chuteDeployProgress = 0;
       }
@@ -2839,6 +2787,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     };
     toast.show(labels[this.sasMode]!);
     this.hud.setSasMode(this.sasMode);
+    this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
   }
 
   private toggleGear(): void {
@@ -2853,6 +2802,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.crashed) return;
     if (this._spawnProtectionTimer > 0) return; // spawn grace period
     this.crashed = true;
+    clearFlightSave();
     this.achievements.unlock('crash');
     this.sound.playCrash();
     this.sound.stopEngine();
@@ -2887,10 +2837,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Flash effect
     const flash = document.createElement('div');
     flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:999;pointer-events:none;opacity:0;transition:opacity 0.1s;';
-    document.body.appendChild(flash);
-    requestAnimationFrame(() => { flash.style.opacity = '1'; });
-    setTimeout(() => { flash.style.opacity = '0'; }, 100);
-    setTimeout(() => flash.remove(), 500);
+    this.lifetime.append(flash);
+    this.lifetime.frame(() => { flash.style.opacity = '1'; });
+    this.lifetime.timeout(() => { flash.style.opacity = '0'; }, 100);
+    this.lifetime.timeout(() => flash.remove(), 500);
 
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -2910,9 +2860,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#ff0;cursor:pointer;transition:all 0.15s;">LAUNCH AGAIN</button>
       </div>
     `;
-    document.body.appendChild(overlay);
+    this.lifetime.append(overlay);
     this.crashOverlay = overlay;
-    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+    this.lifetime.frame(() => { overlay.style.opacity = '1'; });
 
     overlay.querySelector('#crash-menu')!.addEventListener('click', () => {
       this.onCrashAction?.('menu');
@@ -3063,71 +3013,67 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
 private positionFlameAtNozzle(): void {
-      // Find the lowest and highest point of rocket meshes in the GROUP's LOCAL space.
-      // Box3.setFromObject returns WORLD-space coordinates once the scene has rendered;
-      // at construction time (before first render) matrixWorld is identity and the box
-      // happens to be local. A mid-flight re-call (staging) would otherwise store a huge
-      // world coordinate (~+1400 near Earth) in rocketBottomY, exploding visualOffset
-      // and teleporting the rocket + camera inside the planet ("planets disappear" bug).
-      let minY = Infinity;
-      let maxY = -Infinity;
-      const inv = this.rocketGroup.matrixWorld.clone().invert();
-      this.rocketGroup.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
-          if (this.gearMeshes.includes(obj)) return;
-          if (obj === this.rocketShadow) return;
-          if (obj === this.reentryGlow) return;
-          if (obj === this.reentryGlowMesh) return;
-          if (obj.name === 'reentry-outer') return; // reentry glow effect — not rocket structure
-          const worldBox = new THREE.Box3().setFromObject(obj);
-          // Convert to rocket-group local space (applyMatrix4 covers all 8 corners,
-          // so rotation of the rocket mid-flight is handled correctly)
-          const localBox = worldBox.applyMatrix4(inv);
-          if (localBox.min.y < minY) minY = localBox.min.y;
-          if (localBox.max.y > maxY) maxY = localBox.max.y;
-        }
+    this.rocketGroup.updateWorldMatrix(true, true);
+    const inverse = this.rocketGroup.matrixWorld.clone().invert();
+    const bounds = new THREE.Box3();
+    for (const root of this.structuralRoots) {
+      if (root.parent !== this.rocketGroup) continue;
+      root.traverse(obj => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        obj.geometry.computeBoundingBox();
+        if (obj.geometry.boundingBox) bounds.union(obj.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(obj.matrixWorld)));
       });
-      this.rocketBottomY = minY === Infinity ? -0.1 : minY;
-      this.rocketTopY = maxY === -Infinity ? 0.1 : maxY;
-      // Position flame at the bottom center, in local space
-      const flameY = minY === Infinity ? -0.1 : minY - 0.01;
-      this.engineFlame.getMesh().position.set(0, flameY, 0);
-      this.engineFlame.getMesh().rotation.set(0, 0, 0);
-// Adjust visual position so that the rocket's bottom sits at the spawn point.
-       // The rocket's local origin is at (0,0,0); its bottom is at rocketBottomY.
-       // We want the bottom to be at the physics reference point (state.position).
-       // Therefore shift the model up by -rocketBottomY in local Y.
-       const offsetLocal = new THREE.Vector3(0, -this.rocketBottomY, 0);
-       const offsetWorld = offsetLocal.applyQuaternion(this.rocketQuat);
-       this.rocketGroup.position.add(offsetWorld.multiplyScalar(VISUAL_SCALE));
     }
+    this.rocketRadius = bounds.isEmpty() ? 0.1 : Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x), Math.abs(bounds.min.z), Math.abs(bounds.max.z));
+    this.rocketBottomY = bounds.isEmpty() ? -0.05 : bounds.min.y;
+    this.rocketTopY = bounds.isEmpty() ? 0.05 : bounds.max.y;
+    this.engineFlame.getMesh().position.set(0, this.rocketBottomY - 0.002, 0);
+    this.engineFlame.getMesh().rotation.set(0, 0, 0);
+    this.syncVisualTransform();
+  }
+
+  private syncVisualTransform(): void {
+    const ref = getReferenceBody(this.state.position, this.system);
+    const up = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position)).normalize();
+    this.rocketGroup.quaternion.copy(this.rocketQuat);
+    this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE).addScaledVector(up, -this.rocketBottomY * ROCKET_VISUAL_SCALE);
+    this.rocketGroup.updateMatrixWorld(true);
+  }
+
+  private persistFlight(): void {
+    if (this.lifetime.disposed) return;
+    if (this.crashed) { clearFlightSave(); return; }
+    saveFlightState({
+      version: 2,
+      assembly: serializeAssembly(this.rocket.assembly),
+      fuel: this.rocket.assembly.roots.map(n => this.rocket.fuelTanks.find(t => t.node === n)?.remaining ?? 0),
+      fuelByPath: captureFuel(this.rocket),
+      bodyRadii: Object.fromEntries(this.system.bodies.map(b => [b.name, (b as any).radius ?? 0])),
+      position: [...this.state.position] as Vec3, velocity: [...this.state.velocity] as Vec3,
+      throttle: this.state.throttle, missionTime: this.missionTime,
+      quat: this.rocketQuat.toArray() as [number, number, number, number],
+      launched: this.launched, grounded: this.grounded, groundedDir: this.groundedDir,
+      parachuteDeployed: this.parachuteDeployed, gearDeployed: this.gearDeployed,
+      heatEnergy: this.heatEnergy, maxAlt: this.maxAlt, maxSpeed: this.maxSpeed, stageSeparations: this.stageSeparations,
+      bodies: this.system.bodies.map(b => ({ name: b.name, position: [...b.position] as Vec3, velocity: [...b.velocity] as Vec3 })),
+    });
+  }
 
   dispose(): void {
-    // Persist the flight so main-menu CONTINUE resumes here — not on the pad.
-    // Crashed flights are not saved (nothing left to resume).
-    if (!this.crashed) {
-      const roots = this.rocket.assembly.roots;
-      saveFlightState({
-        assembly: serializeAssembly(this.rocket.assembly),
-        fuel: roots.map(n => {
-          const t = this.rocket.fuelTanks.find(tk => tk.node === n);
-          return t ? t.remaining : 0;
-        }),
-        position: [...this.state.position] as [number, number, number],
-        velocity: [...this.state.velocity] as [number, number, number],
-        throttle: this.state.throttle,
-        missionTime: this.missionTime,
-        quat: [this.rocketQuat.x, this.rocketQuat.y, this.rocketQuat.z, this.rocketQuat.w],
-        launched: this.launched,
-        grounded: this.grounded,
-        groundedDir: this.groundedDir ? ([...this.groundedDir] as [number, number, number]) : null,
-        bodies: this.system.bodies.map(b => ({
-          name: b.name,
-          position: [...b.position] as [number, number, number],
-          velocity: [...(b.velocity ?? [0, 0, 0])] as [number, number, number],
-        })),
-      });
-    }
+    if (this.lifetime.disposed) return;
+    this.persistFlight();
+    this.lifetime.dispose();
+    this.engineFlame.getMesh().removeFromParent();
+    this.groundSmoke.getMesh().removeFromParent();
+    const protectedObjects: THREE.Object3D[] = [...gltfCache.values(), ...this.system.bodies.map(b => (b as any).mesh).filter(Boolean)];
+    releaseSceneObjects([
+      ...this.ownedSceneObjects, this.rocketGroup, ...this.debris.map(d => d.mesh),
+      ...[this.orbitLine, this.deployedChuteMesh].filter((x): x is THREE.Line | THREE.Group => x !== null),
+    ], protectedObjects);
+    this.ownedSceneObjects.forEach(obj => obj.removeFromParent());
+    this.deployedChuteMesh?.removeFromParent();
+    this.orbitLine?.removeFromParent();
+    if ((window as any).__ellipse?.flight === this) delete (window as any).__ellipse;
     if (this.crashOverlay) {
       this.crashOverlay.remove();
       this.crashOverlay = null;

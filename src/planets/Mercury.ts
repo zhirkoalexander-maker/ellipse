@@ -4,7 +4,7 @@ import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
-const SEGMENTS = 64;
+const SEGMENTS = 192;
 
 const hash = (x: number, y: number, z: number) => {
   const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.9) * 43758.5453;
@@ -47,13 +47,13 @@ export class Mercury extends Planet {
     const craters = fbm3D(nx * 10 + 500, ny * 10 + 600, nz * 10 + 700, 4);
     const micro = fbm3D(nx * 40 + 100, ny * 40 + 200, nz * 40 + 300, 3);
     const elev = craters * 0.8 + micro * 0.2;
-    const maxDisp = this.visualRadius * 0.03;
+    const maxDisp = this.visualRadius * 0.0078;
     if (elev > 0.4) return ((elev - 0.4) / 0.6) ** 2 * maxDisp;
     return -(0.4 - elev) / 0.4 * maxDisp * 0.12;
   }
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("mercury", 1e24, position, velocity, 2.440e6);
+    super("mercury", 1e24, position, velocity, 2.440e6 * 1.25);
 
     const visualR = this.visualRadius;
 
@@ -66,21 +66,10 @@ export class Mercury extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.03;
-
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR;
-      const ny = vert.y / visualR;
-      const nz = vert.z / visualR;
-
-      const craters = fbm3D(nx * 10 + 500, ny * 10 + 600, nz * 10 + 700, 4);
-      const micro = fbm3D(nx * 40 + 100, ny * 40 + 200, nz * 40 + 300, 3);
-      const elev = craters * 0.8 + micro * 0.2;
-
-      let disp = 0;
-      if (elev > 0.4) disp = ((elev - 0.4) / 0.6) ** 2 * maxDisp;
-      else disp = -(0.4 - elev) / 0.4 * maxDisp * 0.12;
+      const direction = vert.clone().normalize();
+      const disp = this.getTerrainHeightVisual(direction.x, direction.y, direction.z);
 
       vert.setLength(visualR + disp);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);

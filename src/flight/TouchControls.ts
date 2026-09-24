@@ -12,7 +12,7 @@ export class TouchControls {
   constructor() {
     this.container = document.createElement('div');
     this.container.style.cssText = `
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      position: fixed; bottom: 145px; left: 0; right: 0; z-index: 101;
       display: none; pointer-events: none;
       height: 200px; padding: 8px;
     `;

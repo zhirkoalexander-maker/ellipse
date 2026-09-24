@@ -1,5 +1,5 @@
 import { Assembly, type AssemblyNode } from '../rocket/Assembly';
-import type { Part } from '../parts/Part';
+import type { Rocket } from '../rocket/Rocket';
 import { findPart } from '../parts/PartCatalog';
 
 const KEY_PREFIX = 'ellipse_assembly_';
@@ -7,14 +7,14 @@ const INDEX_KEY = 'ellipse_assemblies';
 const LAST_KEY = 'ellipse_assembly_last';
 
 function serializeNode(n: AssemblyNode): any {
-  return { partId: n.part.id, position: n.position, rotation: n.rotation, children: n.children.map(serializeNode) };
+  return { partId: n.part.id, position: [...n.position], rotation: n.rotation, children: n.children.map(serializeNode) };
 }
 function deserializeNode(data: any): AssemblyNode | null {
   const part = findPart(data.partId);
   if (!part) return null;
   return {
     part,
-    position: data.position,
+    position: [...data.position] as [number, number, number],
     rotation: data.rotation,
     children: (data.children ?? []).map(deserializeNode).filter((x: AssemblyNode | null): x is AssemblyNode => x !== null)
   };
@@ -25,6 +25,7 @@ export function serializeAssembly(assembly: Assembly): any[] {
 }
 
 export function deserializeAssembly(data: any[]): Assembly | null {
+  if (!Array.isArray(data) || !data.every(n => validNode(n))) return null;
   const a = new Assembly();
   let any = false;
   for (const n of data) {
@@ -44,9 +45,10 @@ export function saveAssembly(name: string, assembly: Assembly): void {
 }
 
 export function loadAssembly(name: string): Assembly | null {
-  const raw = localStorage.getItem(KEY_PREFIX + name);
-  if (!raw) return null;
-  return deserializeAssembly(JSON.parse(raw) as any[]);
+  try {
+    const raw = localStorage.getItem(KEY_PREFIX + name);
+    return raw ? deserializeAssembly(JSON.parse(raw)) : null;
+  } catch { return null; }
 }
 
 export function listAssemblies(): string[] {
@@ -78,6 +80,15 @@ export function hasLastAssembly(): boolean {
 const FLIGHT_KEY = 'ellipse_flight_save';
 
 export interface FlightSave {
+  version?: 2;
+  fuelByPath?: Record<string, number>;
+  bodyRadii?: Record<string, number>;
+  parachuteDeployed?: boolean;
+  gearDeployed?: boolean;
+  heatEnergy?: number;
+  maxAlt?: number;
+  maxSpeed?: number;
+  stageSeparations?: number;
   assembly: any[];
   /** Remaining fuel per assembly root index (parallel to assembly array). */
   fuel: number[];
@@ -106,11 +117,11 @@ export function saveFlightState(s: FlightSave): void {
 }
 
 export function loadFlightState(): FlightSave | null {
-  const raw = localStorage.getItem(FLIGHT_KEY);
-  if (!raw) return null;
   try {
+    const raw = localStorage.getItem(FLIGHT_KEY);
+    if (!raw) return null;
     const s = JSON.parse(raw) as FlightSave;
-    if (!Array.isArray(s.assembly) || !Array.isArray(s.position) || !Array.isArray(s.velocity)) return null;
+    if (!validFlight(s)) return null;
     return s;
   } catch {
     return null;
@@ -125,3 +136,66 @@ export function clearFlightSave(): void {
   localStorage.removeItem(FLIGHT_KEY);
 }
 
+
+function finite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+function vector(value: unknown, length: number): value is number[] {
+  return Array.isArray(value) && value.length === length && value.every(finite);
+}
+function validNode(node: any, depth = 0): boolean {
+  return depth < 100 && node !== null && typeof node === 'object' && typeof node.partId === 'string'
+    && vector(node.position, 3) && finite(node.rotation)
+    && (node.children === undefined || (Array.isArray(node.children) && node.children.every((n: any) => validNode(n, depth + 1))));
+}
+function numberMap(value: unknown): boolean {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Object.values(value).every(v => finite(v) && v >= 0);
+}
+function validFlight(s: any): s is FlightSave {
+  if (!s || !Array.isArray(s.assembly) || !s.assembly.length || !s.assembly.every((n: any) => validNode(n))) return false;
+  if (!vector(s.position, 3) || !vector(s.velocity, 3) || !vector(s.quat, 4)) return false;
+  const quatLength = Math.hypot(...s.quat);
+  if (quatLength < 0.5 || quatLength > 1.5) return false;
+  if (!finite(s.throttle) || s.throttle < 0 || s.throttle > 1 || !finite(s.missionTime) || s.missionTime < 0) return false;
+  if (typeof s.launched !== 'boolean' || typeof s.grounded !== 'boolean') return false;
+  if (s.groundedDir !== null && (!vector(s.groundedDir, 3) || Math.hypot(...s.groundedDir) < 1e-8)) return false;
+  if (!Array.isArray(s.fuel) || !s.fuel.every((v: unknown) => finite(v) && v >= 0)) return false;
+  if (!Array.isArray(s.bodies) || !s.bodies.every((b: any) => b && typeof b.name === 'string' && vector(b.position, 3) && vector(b.velocity, 3))) return false;
+  // Resume replays these events; reject corrupt values that could stall the browser.
+  if (s.stageSeparations !== undefined && (!Number.isInteger(s.stageSeparations) || s.stageSeparations > 10000)) return false;
+  if (s.version !== undefined && s.version !== 2) return false;
+  if (s.fuelByPath !== undefined && !numberMap(s.fuelByPath)) return false;
+  if (s.bodyRadii !== undefined && !numberMap(s.bodyRadii)) return false;
+  for (const key of ['parachuteDeployed', 'gearDeployed']) if (s[key] !== undefined && typeof s[key] !== 'boolean') return false;
+  for (const key of ['heatEnergy', 'maxAlt', 'maxSpeed', 'stageSeparations']) if (s[key] !== undefined && (!finite(s[key]) || s[key] < 0)) return false;
+  return true;
+}
+
+function visitNodes(nodes: AssemblyNode[], visit: (node: AssemblyNode, path: string) => void, prefix = ''): void {
+  nodes.forEach((node, i) => {
+    const path = prefix ? `${prefix}.${i}` : String(i);
+    visit(node, path);
+    visitNodes(node.children, visit, path);
+  });
+}
+
+/** Paths identify tanks in the assembly tree, independently of the burn-order sorting. */
+export function captureFuel(rocket: Rocket): Record<string, number> {
+  const tanks = new Map(rocket.fuelTanks.map(t => [t.node, t]));
+  const result: Record<string, number> = {};
+  visitNodes(rocket.assembly.roots, (node, path) => {
+    const tank = tanks.get(node);
+    if (tank) result[path] = tank.remaining;
+  });
+  return result;
+}
+
+export function restoreFuel(rocket: Rocket, save: Pick<FlightSave, 'fuel' | 'fuelByPath'>): void {
+  const tanks = new Map(rocket.fuelTanks.map(t => [t.node, t]));
+  visitNodes(rocket.assembly.roots, (node, path) => {
+    const tank = tanks.get(node);
+    const amount = save.fuelByPath?.[path] ?? (!path.includes('.') ? save.fuel[Number(path)] : undefined);
+    if (tank && finite(amount)) tank.remaining = Math.max(0, Math.min(tank.capacity, amount));
+  });
+}

@@ -1,7 +1,15 @@
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
+import { Lifetime } from '../core/Lifetime';
+import { flightTelemetry, type FlightTelemetry } from './Telemetry';
+import { getReferenceBody } from '../physics/SoiResolver';
 
 export class HUD {
+  private lifetime = new Lifetime();
+  private paused = false;
+  private landingStatusEl = document.createElement('div');
+  private stageButton!: HTMLButtonElement;
+  private grounded?: boolean;
   private root: HTMLDivElement;
   private speedVal!: HTMLSpanElement;
   private fuelVal!: HTMLSpanElement;
@@ -32,6 +40,7 @@ export class HUD {
 
   constructor() {
     this.root = document.createElement('div');
+    this.root.className = 'flight-hud';
     this.root.style.cssText = 'position:fixed;inset:0;z-index:100;pointer-events:none;';
 
     this.pauseOverlay = document.createElement('div');
@@ -52,27 +61,38 @@ export class HUD {
 
     // Screen control buttons
     const bar = document.createElement('div');
-    bar.classList.add('hud-panel-in-bottom');
+    bar.classList.add('hud-panel-in-bottom', 'flight-actions');
     bar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;pointer-events:auto;';
     const addBtn = (label: string, action: string, color: string) => {
       const b = document.createElement('button');
       b.className = 'hud-ctrl-btn';
+      b.dataset.action = action;
       b.textContent = label;
       b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
       b.addEventListener('click', () => { if (this.onAction) this.onAction(action); });
-      b.addEventListener('mousedown', () => { if (action === 'throttleUp') this._throttleBtn = true; if (action === 'throttleDown') this._throttleDn = true; });
-      b.addEventListener('mouseup', () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
+      b.style.touchAction = 'none';
+      b.addEventListener('pointerdown', e => { b.setPointerCapture?.(e.pointerId); if (action === 'throttleUp') this._throttleBtn = true; if (action === 'throttleDown') this._throttleDn = true; });
+      for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(event, () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
       return b;
     };
     bar.appendChild(addBtn('THR−', 'throttleDown', '#ff8844'));
     bar.appendChild(addBtn('THR+', 'throttleUp', '#44ff88'));
-    bar.appendChild(addBtn('STAGE', 'stage', '#ffcc44'));
+    this.stageButton = addBtn('LAUNCH', 'stage', '#ffcc44');
+    bar.appendChild(this.stageButton);
+    this.setGrounded(true);
     bar.appendChild(addBtn('MAP', 'map', '#4488ff'));
     bar.appendChild(addBtn('SAS', 'sas', '#8888cc'));
     bar.appendChild(addBtn('CHUTE', 'parachute', '#44cc88'));
+    bar.appendChild(addBtn('LAND [L]', 'landing', '#8fb6cf'));
+    bar.style.flexWrap = 'wrap'; bar.style.justifyContent = 'center'; bar.style.width = 'min(96vw, 760px)';
+    this.landingStatusEl.className = 'flight-landing-status';
+    this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none';
+    this.landingStatusEl.textContent = 'LAUNCH or Space to lift off · ↑/↓ throttle · W/S, A/D steer';
+    this.root.appendChild(this.landingStatusEl);
     this.root.appendChild(bar);
     this._throttleBtn = false;
     this._throttleDn = false;
+    this.lifetime.listen(window, 'blur', () => { this._throttleBtn = false; this._throttleDn = false; });
   }
 
   _throttleBtn = false;
@@ -80,10 +100,19 @@ export class HUD {
   get throttleUpBtn() { return this._throttleBtn; }
   get throttleDownBtn() { return this._throttleDn; }
 
+  setGrounded(grounded: boolean): void {
+    if (this.grounded === grounded) return;
+    this.grounded = grounded;
+    this.stageButton.textContent = grounded ? 'LAUNCH' : 'STAGE';
+    this.stageButton.title = grounded ? 'Start engines at full throttle (Space)' : 'Separate the next stage (Space)';
+    this.stageButton.style.background = grounded ? '#b94f20' : 'rgba(0,0,0,0.6)';
+    this.stageButton.style.color = grounded ? '#fff' : '#ffcc44';
+  }
+
   mount(parent: HTMLElement = document.body): void {
     // Compact top-right panel
     const panel = document.createElement('div');
-    panel.classList.add('hud-panel-in-left');
+    panel.classList.add('hud-panel-in-left', 'flight-readouts');
     panel.style.cssText = `
       position:fixed;top:16px;left:16px;z-index:100;pointer-events:auto;
       font-family:monospace;font-size:11px;
@@ -146,6 +175,21 @@ export class HUD {
         <span class="warp-val" style="color:#c89838;font-size:10px;">x1</span>
       </div>
     `;
+    const warpControls = document.createElement('div');
+    warpControls.style.cssText = 'display:flex;gap:4px;margin-top:4px;';
+    for (const [label, action, title] of [
+      ['−', 'warpDown', 'Slower time warp ([ / Q)'],
+      ['+', 'warpUp', 'Faster time warp (] / E)'],
+      ['100×', 'warp100', '100× coast above 70 km — engines off'],
+    ]) {
+      const button = document.createElement('button');
+      button.textContent = label!; button.dataset.action = action!; button.title = title!;
+      button.setAttribute('aria-label', title!);
+      button.style.cssText = 'flex:1;min-width:0;padding:6px 3px;background:#172335;color:#eacd9e;border:1px solid #394759;border-radius:4px;font:11px monospace;cursor:pointer;';
+      button.addEventListener('click', () => this.onAction?.(action!));
+      warpControls.appendChild(button);
+    }
+    panel.appendChild(warpControls);
     this.root.appendChild(panel);
 
     this.speedVal = panel.querySelector('.speed-val')!;
@@ -204,7 +248,7 @@ export class HUD {
 
     // Navball (bottom-right)
     const navballContainer = document.createElement('div');
-    navballContainer.classList.add('hud-fade-up');
+    navballContainer.classList.add('hud-fade-up', 'flight-navball');
     navballContainer.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:100;pointer-events:none;';
     const canvas = document.createElement('canvas');
     canvas.width = 150;
@@ -316,12 +360,13 @@ setFreeCamera(active: boolean): void {
   }
 
   setPaused(paused: boolean): void {
+    this.paused = paused;
     if (paused) {
       this.pauseOverlay.style.display = 'flex';
-      requestAnimationFrame(() => { this.pauseOverlay.style.opacity = '1'; });
+      this.lifetime.frame(() => { if (this.paused) this.pauseOverlay.style.opacity = '1'; });
     } else {
       this.pauseOverlay.style.opacity = '0';
-      setTimeout(() => { if (!paused) this.pauseOverlay.style.display = 'none'; }, 230);
+      this.lifetime.timeout(() => { if (!this.paused) this.pauseOverlay.style.display = 'none'; }, 230);
     }
   }
 
@@ -495,21 +540,11 @@ setFreeCamera(active: boolean): void {
     }
   }
 
-  update(state: FlightState, system: System, heat: number = 0, throttle: number = 0): void {
-    const speed = Math.sqrt(
-      state.velocity[0] ** 2 + state.velocity[1] ** 2 + state.velocity[2] ** 2
-    );
-    let nearestAlt = Infinity;
-    for (const body of system.bodies) {
-      if (body.mass <= 0) continue;
-      const dx = state.position[0] - body.position[0];
-      const dy = state.position[1] - body.position[1];
-      const dz = state.position[2] - body.position[2];
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const r = (body as any).getSurfaceRadiusAt?.(state.position) ?? (body as any).radius ?? 0;
-      const alt = d - r;
-      if (alt < nearestAlt) nearestAlt = alt;
-    }
+  update(state: FlightState, system: System, heat: number = 0, throttle: number = 0, telemetry?: Pick<FlightTelemetry, 'speed' | 'verticalSpeed' | 'altitude'>): void {
+    const reference = system.bodyByName('sun') ? getReferenceBody(state.position, system) : system.bodies[0];
+    const values = telemetry ?? flightTelemetry(state.position, state.velocity, reference, false);
+    const speed = values.speed;
+    const nearestAlt = values.altitude;
 
     const heatPct = Math.min(100, (heat / 300000) * 100);
 
@@ -517,7 +552,7 @@ setFreeCamera(active: boolean): void {
     this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
     const nearestAltKm = nearestAlt / 1000; this.altVal.textContent = nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0);
     // Vertical speed
-    const vs = state.velocity[1]; // Y-component is radial at surface
+    const vs = values.verticalSpeed;
     this.vsVal.textContent = vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0);
     this.vsVal.style.color = vs > 0 ? '#88ff88' : vs < 0 ? '#ff6644' : '#88ccff';
     const fuelKg = state.rocket.totalFuelMass();
@@ -543,7 +578,13 @@ setFreeCamera(active: boolean): void {
     this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
   }
 
+  setLandingStatus(text: string, active: boolean): void {
+    this.landingStatusEl.textContent = text;
+    this.landingStatusEl.style.borderColor = active ? '#7fafbc' : '#40515d';
+  }
+
   unmount(): void {
+    this.lifetime.dispose();
     this.root.remove();
     this.pauseOverlay.remove();
   }

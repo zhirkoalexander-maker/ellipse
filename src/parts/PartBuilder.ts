@@ -1,4 +1,6 @@
+import { buildDesignedPart } from './DesignedParts';
 import * as THREE from 'three';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Part } from './Part';
 import { PART_SCALE, assetUrl } from '../config/constants';
@@ -53,6 +55,11 @@ function perturbVertices(geom: THREE.BufferGeometry, strength: number): void {
 
 // GLTF loader
 export const gltfLoader = new GLTFLoader();
+// Existing imported spacecraft use KHR_draco_mesh_compression. Decode locally
+// so previews and flight models also work offline and on the deployed base path.
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath(assetUrl('/draco/'));
+gltfLoader.setDRACOLoader(dracoLoader);
 export const gltfCache = new Map<string, THREE.Group>();
 
 export async function loadGLTF(url: string, scale = 1): Promise<THREE.Group | null> {
@@ -267,6 +274,7 @@ function applyCylindricalUV(geometry: THREE.BufferGeometry, heightScale = 1.0): 
 }
 
 export async function buildPartMeshAsync(part: Part): Promise<THREE.Group> {
+  if (!part.gltfUrl && part.kind !== 'gltf') return buildPartMesh(part);
   const g = new THREE.Group();
   g.name = part.id;
   
@@ -295,6 +303,11 @@ export async function buildPartMeshAsync(part: Part): Promise<THREE.Group> {
 }
 
 export function buildPartMesh(part: Part): THREE.Group {
+  return part.kind === 'gltf' ? buildLegacyPartMesh(part) : buildDesignedPart(part, SIZE_DIMS[part.size]);
+}
+
+/** Original procedural models retained for comparison and compatibility. */
+export function buildLegacyPartMesh(part: Part): THREE.Group {
   const g = new THREE.Group();
   g.name = part.id;
   const d = SIZE_DIMS[part.size];

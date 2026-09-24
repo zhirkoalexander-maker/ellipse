@@ -84,3 +84,36 @@ describe('VAB camera framing', () => {
     expect(cameraDistance()).toBe(before); // unchanged — list scroll ≠ zoom
   });
 });
+
+it('shows engine thrust in the catalog kN units without dividing by 1000', () => {
+  const vab = new VABScene(() => {}, () => {}); vab.mount();
+  try {
+    const engine = findPart('engine_ant')!;
+    const button = Array.from(document.querySelectorAll('button')).find(b => b.title === `Add ${engine.name}`)!;
+    expect(button.textContent).toContain(`${engine.thrust} kN`);
+  } finally { vab.unmount(); }
+});
+
+it('frames the whole starter rocket inside the free viewport on a portrait phone', () => {
+  const oldWidth=innerWidth,oldHeight=innerHeight;
+  Object.defineProperty(window,'innerWidth',{value:390,configurable:true});
+  Object.defineProperty(window,'innerHeight',{value:844,configurable:true});
+  const vab = new VABScene(() => {}, () => {}); vab.mount();
+  try {
+    const scene=vab as any;
+    for (const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']) scene.add(findPart(id)!);
+    vab.camera.updateMatrixWorld();
+    const box=new THREE.Box3().setFromObject(scene.rg);
+    for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z]){
+      const p=new THREE.Vector3(x,y,z).project(vab.camera);
+      const screenX=(p.x+1)*390/2;
+      expect(screenX).toBeGreaterThan(156);
+      expect(screenX).toBeLessThan(390);
+      expect(Math.abs(p.y)).toBeLessThan(1);
+    }
+  } finally {
+    vab.unmount();
+    Object.defineProperty(window,'innerWidth',{value:oldWidth,configurable:true});
+    Object.defineProperty(window,'innerHeight',{value:oldHeight,configurable:true});
+  }
+});

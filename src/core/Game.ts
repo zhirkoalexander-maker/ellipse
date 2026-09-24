@@ -25,7 +25,7 @@ import { toast } from '../ui/Toast';
 import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
-import { loadLastAssembly, hasLastAssembly, loadFlightState, hasFlightSave, clearFlightSave, deserializeAssembly, type FlightSave } from '../storage/SaveLoad';
+import { loadLastAssembly, hasLastAssembly, loadFlightState, hasFlightSave, clearFlightSave, serializeAssembly, deserializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import * as THREE from 'three';
 
 export class Game {
@@ -213,9 +213,11 @@ if (!rocket) {
         a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank2Y, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
       }
-      const r = new Rocket(a);
+      // Keep an immutable launch blueprint: staging mutates the live assembly.
+      const launchBlueprint = serializeAssembly(a);
+      const r = new Rocket(deserializeAssembly(launchBlueprint)!);
       this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions, save);
-      this.flight.onCrashAction = (action) => { if (action === 'menu') this.showMainMenu(); else this.showFlight(rocket); };
+      this.flight.onCrashAction = (action) => { if (action === 'menu') this.showMainMenu(); else this.showFlight(new Rocket(deserializeAssembly(launchBlueprint)!)); };
     });
   }
 

@@ -225,3 +225,19 @@
   width: 1px;
   height: 100%;
 }
+
+/* Keep flight controls clear of the vehicle on narrow displays. */
+.toast-stack { max-width: min(90vw, 560px); }
+.toast { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .flight-hud .flight-readouts { left: 8px !important; top: 8px !important; min-width: 94px !important; padding: 6px !important; font-size: 9px !important; }
+  .flight-hud .flight-actions { bottom: 12px !important; width: calc(100vw - 24px) !important; gap: 6px !important; display: grid !important; grid-template-columns: repeat(4, 1fr); }
+  .flight-hud .flight-actions button { min-height: 40px; padding: 6px 4px !important; font-size: 10px !important; }
+  .flight-hud .flight-landing-status { bottom: 110px !important; width: calc(100vw - 48px); padding: 6px !important; font-size: 10px !important; }
+  .flight-hud .flight-navball { right: 12px !important; bottom: 155px !important; }
+  .flight-hud .flight-navball canvas { width: 76px !important; height: 76px !important; }
+}
+
+@media (max-width: 640px) and (pointer: coarse) {
+  .flight-hud .flight-navball { display: none; }
+}

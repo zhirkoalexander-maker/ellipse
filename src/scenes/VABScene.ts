@@ -1,3 +1,4 @@
+import { PartThumbnails } from '../parts/PartThumbnails';
 import * as THREE from 'three';
 import { PART_CATALOG } from '../parts/PartCatalog';
 import { Assembly } from '../rocket/Assembly';
@@ -86,7 +87,7 @@ export class VABScene {
     // Keep aspect correct on window resize
     this._onResize = () => {
       this.camera.aspect = innerWidth / innerHeight;
-      this.camera.updateProjectionMatrix();
+      this.frame();
     };
     document.addEventListener('mousedown', this._onDown);
     document.addEventListener('mousemove', this._onMove);
@@ -101,7 +102,7 @@ export class VABScene {
     this.root = document.createElement('div');
     this.root.style.cssText = 'position:fixed;inset:0;z-index:150;pointer-events:none;display:flex;';
     this.root.innerHTML = `
-      <div style="width:260px;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
+      <div style="width:clamp(148px,40vw,260px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
         <div style="padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.15);">
           <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.1em;">ASSEMBLY</div>
           <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">select parts</div>
@@ -153,6 +154,7 @@ export class VABScene {
 
   private build() {
     const el = this.root.querySelector('#vl')!;
+    const thumbnails = new PartThumbnails();
 
     // ─── PRESETS ───
     const presetHeader = document.createElement('div');
@@ -180,15 +182,18 @@ export class VABScene {
       el.appendChild(h);
       for (const p of g.parts) {
         const b = document.createElement('button');
-        const has = p.kind==='engine'?`${(p.thrust!/1000).toFixed(0)}kN · Isp ${p.isp}`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:p.kind==='rcs'?`${p.thrust}kN`:p.kind==='fairing'?'aero':'';
-        b.innerHTML = `<span style="width:2px;height:12px;background:${g.color};border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">${p.name}</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">${has}</span>`;
-        b.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
+        const has = p.kind==='engine'?`${Number(p.thrust!.toFixed(1))} kN · Isp ${p.isp}`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:p.kind==='rcs'?`${p.thrust}kN`:p.kind==='fairing'?'aero':'';
+        const thumbnail = thumbnails.get(p);
+        b.innerHTML = `${thumbnail ? `<img src="${thumbnail}" alt="" width="44" height="44" style="width:44px;height:44px;flex:none;object-fit:contain;background:rgba(255,255,255,0.025);border-radius:5px;">` : `<span style="width:3px;height:28px;flex:none;background:${g.color};border-radius:2px;"></span>`}<span style="min-width:0;flex:1;"><span style="display:block;color:#fff;line-height:1.3;">${p.name}</span><span style="display:block;color:rgba(255,255,255,0.6);font-size:9px;margin-top:4px;">${p.size}${has ? ' · '+has : ''}</span></span>`;
+        b.title = `Add ${p.name}`;
+        b.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:5px 12px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
         b.addEventListener('mouseenter', () => { b.style.background='rgba(255,255,255,0.05)'; b.style.color='#fff'; });
         b.addEventListener('mouseleave', () => { b.style.background='transparent'; b.style.color='#fff'; });
         b.addEventListener('click', () => this.add(p));
         el.appendChild(b);
       }
     }
+    thumbnails.dispose();
   }
 
   private add(p: Part) {
@@ -227,11 +232,13 @@ export class VABScene {
     if (box.isEmpty()) { this.tg.set(0, PART_SCALE, 0); this.dt = 1.5; this.cam(); return; }
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    // Tight framing: visible height at distance d (fov 50°) ≈ 0.93·d,
-    // so d ≈ span·0.92 makes the rocket fill ~the whole view height.
-    const span = Math.max(size.y, size.x * 2.5, 0.03);
+    const sidebar = Math.max(148, Math.min(260, innerWidth * 0.4));
+    const usableAspect = Math.max(80, innerWidth - sidebar - 24) / innerHeight;
+    const halfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const verticalDistance = size.y / (2 * halfFov);
+    const horizontalDistance = Math.max(size.x, size.z) / (2 * halfFov * usableAspect);
     this.tg.copy(center);
-    this.dt = Math.max(0.16, Math.min(40, span * 0.92 + 0.04));
+    this.dt = Math.max(0.16, Math.min(40, Math.max(verticalDistance, horizontalDistance) * 1.16 + Math.max(size.x,size.z) / 2));
     this.cam();
   }
   private up() {
@@ -250,7 +257,12 @@ export class VABScene {
     // async GLTF path (mesh lands only after await).
     this.frame();
   }
-  private cam(){const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
+  private cam(){
+    const sidebar = Math.max(148, Math.min(260, innerWidth * 0.4));
+    this.camera.aspect = innerWidth / innerHeight;
+    // Shift projection into the open area; keep orbit target at the rocket itself.
+    this.camera.setViewOffset(innerWidth,innerHeight,-sidebar/2,0,innerWidth,innerHeight);
+    const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
   mount(){document.body.appendChild(this.root);}
   unmount(){
     this.root.remove();

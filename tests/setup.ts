@@ -1,3 +1,4 @@
+import { afterEach, vi } from 'vitest';
 // Minimal WebGL shim for jsdom so THREE.WebGLRenderer can initialize in tests.
 const WEBGL_TYPES = new Set(['webgl', 'webgl2', 'experimental-webgl']);
 
@@ -106,3 +107,9 @@ if (typeof (globalThis as any).window !== 'undefined' && !(globalThis as any).wi
   (globalThis as any).window.localStorage = ls;
   (globalThis as any).localStorage = ls;
 }
+// Each flight owns listeners, DOM and GPU-side effects; exercise its teardown between tests.
+afterEach(() => {
+  (window as any).__ellipse?.flight?.dispose();
+  document.body.replaceChildren();
+  vi.restoreAllMocks();
+});

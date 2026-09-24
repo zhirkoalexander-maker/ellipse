@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { Renderer } from '../../src/core/Renderer';
 import { SceneManager } from '../../src/core/SceneManager';
 import { System } from '../../src/physics/System';
@@ -8,7 +9,7 @@ import { Moon } from '../../src/planets/Moon';
 import { Rocket } from '../../src/rocket/Rocket';
 import { Assembly } from '../../src/rocket/Assembly';
 import { findPart, PART_CATALOG } from '../../src/parts/PartCatalog';
-import { PART_SCALE, ORBIT_SCALE, VISUAL_PLANET_MULT, ROCKET_VISUAL_SCALE } from '../../src/config/constants';
+import { PART_SCALE, ORBIT_SCALE, VISUAL_PLANET_MULT, ROCKET_VISUAL_SCALE, G, EARTH_MASS, EARTH_RADIUS } from '../../src/config/constants';
 import { FlightScene } from '../../src/scenes/FlightScene';
 import { Achievements } from '../../src/core/Achievements';
 import { Missions } from '../../src/core/Missions';
@@ -54,8 +55,8 @@ describe('FlightScene launch from KSC pad', () => {
     // Full throttle so the countdown starts immediately.
     anyFlight.state.throttle = 1;
 
-    // 3s countdown + ~4.5s of climbing = 7.5s (450 frames @60fps).
-    for (let i = 0; i < 450; i++) {
+    // 3s countdown + 7s of climbing with the new controllable thrust balance.
+    for (let i = 0; i < 600; i++) {
       flight.update(1 / 60);
     }
 
@@ -89,13 +90,49 @@ describe('FlightScene launch from KSC pad', () => {
     const ecdy = group.y - earth.position[1] * VISUAL_SCALE;
     const ecdz = group.z - earth.position[2] * VISUAL_SCALE;
     const groupDist = Math.sqrt(ecdx * ecdx + ecdy * ecdy + ecdz * ecdz);
-    const bottomY = groupDist - (anyFlight.rocketBottomY as number) * ROCKET_VISUAL_SCALE;
+    const bottomY = groupDist + (anyFlight.rocketBottomY as number) * ROCKET_VISUAL_SCALE;
     expect(bottomY).toBeGreaterThanOrEqual(earth.visualRadius - 0.1);
     expect(anyFlight.rocketBottomY).toBeLessThan(0);
   });
 
   it('engine_ant TWR uses default thrust that clears the 1.0 gate (regression guard)', () => {
     const engine = PART_CATALOG.find((p) => p.id === 'engine_ant')!;
-    expect(engine.thrust).toBeGreaterThanOrEqual(2400);
+    const rocket = buildDefaultRocket();
+    const twr = engine.thrust! * 1000 / (rocket.totalMass() * G * EARTH_MASS / EARTH_RADIUS ** 2);
+    // The faster-launch tune deliberately targets about 2.78 at full fuel.
+    expect(twr).toBeGreaterThan(2.5);
+    expect(twr).toBeLessThan(3);
+  });
+
+  it('gravity-turn autopilot pitches the rocket over after clearing the pad', () => {
+    const renderer = new Renderer();
+    const sceneMgr = new SceneManager();
+    const system = buildSystem();
+    const flight = new FlightScene(renderer, sceneMgr, system, buildDefaultRocket(), new Achievements(), new Missions());
+    const anyFlight = flight as any;
+    anyFlight.state.throttle = 1;
+
+    // ~30s of flight: past the 800 m turn-start altitude and ~15s into the turn.
+    const frames = 1800;
+    for (let i = 0; i < frames; i++) {
+      flight.update(1 / 60);
+    }
+
+    expect(anyFlight.crashed).toBe(false);
+    expect(anyFlight.grounded).toBe(false);
+
+    const earth = system.bodies.find((b) => (b as any).name === 'earth') as any;
+    const [px, py, pz] = anyFlight.state.position as [number, number, number];
+    const fdx = px - earth.position[0];
+    const fdy = py - earth.position[1];
+    const fdz = pz - earth.position[2];
+    const fd = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
+    const surfX = fdx / fd, surfY = fdy / fd, surfZ = fdz / fd;
+
+    // The nose must have tilted away from straight-up (surface normal).
+    const fwd = new THREE.Vector3(0, 1, 0).applyQuaternion(anyFlight.rocketGroup.quaternion).normalize();
+    const dot = fwd.x * surfX + fwd.y * surfY + fwd.z * surfZ;
+    const tiltDeg = Math.acos(Math.min(1, Math.max(-1, dot))) * 180 / Math.PI;
+    expect(tiltDeg).toBeGreaterThan(6);
   });
 });
