@@ -8,6 +8,12 @@ export class HUD {
   private lifetime = new Lifetime();
   private paused = false;
   private landingStatusEl = document.createElement('div');
+  private autopilotPicker!: HTMLDivElement;
+  private autopilotMission!: HTMLDivElement;
+  private autopilotTitle!: HTMLElement;
+  private autopilotDetail!: HTMLElement;
+  private autopilotWarp!: HTMLInputElement;
+  private autopilotEntry!: HTMLButtonElement;
   private stageButton!: HTMLButtonElement;
   private grounded?: boolean;
   private root: HTMLDivElement;
@@ -53,9 +59,9 @@ export class HUD {
       </div>
     `;
     document.body.appendChild(this.pauseOverlay);
-    this.pauseOverlay.querySelectorAll('.pause-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        if (this.onAction) this.onAction((e.target as HTMLElement).dataset.action!);
+    this.pauseOverlay.querySelectorAll<HTMLButtonElement>('.pause-btn').forEach(btn => {
+      this.lifetime.listen(btn, 'click', () => {
+        this.onAction?.((btn as HTMLElement).dataset.action!);
       });
     });
 
@@ -69,7 +75,10 @@ export class HUD {
       b.dataset.action = action;
       b.textContent = label;
       b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
-      b.addEventListener('click', () => { if (this.onAction) this.onAction(action); });
+      this.lifetime.listen(b, 'click', () => {
+        if (action === 'autopilotOpen') this.openAutopilotPicker();
+        else this.onAction?.(action);
+      });
       b.style.touchAction = 'none';
       b.addEventListener('pointerdown', e => { b.setPointerCapture?.(e.pointerId); if (action === 'throttleUp') this._throttleBtn = true; if (action === 'throttleDown') this._throttleDn = true; });
       for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(event, () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
@@ -84,6 +93,9 @@ export class HUD {
     bar.appendChild(addBtn('SAS', 'sas', '#8888cc'));
     bar.appendChild(addBtn('CHUTE', 'parachute', '#44cc88'));
     bar.appendChild(addBtn('LAND [L]', 'landing', '#8fb6cf'));
+    this.autopilotEntry = addBtn('AUTOPILOT', 'autopilotOpen', '#eacd9e');
+    bar.appendChild(this.autopilotEntry);
+    this.createAutopilotControls();
     bar.style.flexWrap = 'wrap'; bar.style.justifyContent = 'center'; bar.style.width = 'min(96vw, 760px)';
     this.landingStatusEl.className = 'flight-landing-status';
     this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none';
@@ -93,6 +105,83 @@ export class HUD {
     this._throttleBtn = false;
     this._throttleDn = false;
     this.lifetime.listen(window, 'blur', () => { this._throttleBtn = false; this._throttleDn = false; });
+  }
+
+  get autopilotAutoWarp(): boolean { return this.autopilotWarp.checked; }
+
+  private openAutopilotPicker(): void {
+    if (this.paused || this.lifetime.disposed) return;
+    this.autopilotPicker.hidden = false;
+    this.autopilotPicker.querySelector('select')?.focus();
+  }
+
+  private closeAutopilotPicker(): void {
+    this.autopilotPicker.hidden = true;
+    this.autopilotEntry.focus();
+  }
+
+  private createAutopilotControls(): void {
+    const style = document.createElement('style');
+    style.textContent = `
+      .autopilot-picker[hidden],.autopilot-mission[hidden]{display:none!important}
+      .autopilot-picker{position:fixed;inset:0;z-index:450;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,9,17,.78);pointer-events:auto}
+      .autopilot-dialog{width:min(360px,100%);max-height:85dvh;overflow:auto;border:1px solid #536273;border-radius:12px;background:#111d2b;color:#ecf0f3;padding:24px;font:14px/1.5 system-ui;box-shadow:0 20px 80px #0008}
+      .autopilot-dialog select{display:block;width:100%;margin:6px 0 18px;padding:12px;border:1px solid #566577;border-radius:5px;background:#1b2b3c;color:#fff;font:inherit}
+      .autopilot-dialog button,.autopilot-mission button{padding:10px 12px;border:1px solid #536273;border-radius:5px;background:#233549;color:#eaf1f8;font:11px system-ui;cursor:pointer}
+      .autopilot-dialog [data-action=autopilotStart]{background:#eacd9e;color:#142233;border-color:#eacd9e;font-weight:600}
+      .autopilot-mission{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:min(340px,calc(100vw - 360px));box-sizing:border-box;z-index:180;padding:10px 12px;background:rgba(13,25,39,.94);border:1px solid #788d9f;border-radius:7px;color:#e8f0f4;font:11px/1.45 system-ui;pointer-events:auto}
+      .autopilot-mission button{padding:5px 8px;margin-top:7px;font-size:9px}
+      @media(max-width:700px){.autopilot-mission{top:auto;bottom:152px;left:8px;transform:none;width:min(260px,calc(100vw - 120px));font-size:10px;padding:8px}.autopilot-dialog{padding:20px}}
+    `;
+    this.root.appendChild(style);
+    this.autopilotPicker = document.createElement('div');
+    this.autopilotPicker.className = 'autopilot-picker'; this.autopilotPicker.hidden = true;
+    this.autopilotPicker.innerHTML = `
+      <section class="autopilot-dialog" role="dialog" aria-modal="true" aria-label="Autopilot mission">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Fly & land</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
+        <p style="color:#a6b8c9;margin:0 0 20px">Choose a destination. Autopilot handles the flight and touchdown.</p>
+        <label>Destination<select aria-label="Destination"><option value="moon">Moon</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth</option><option value="mars">Mars</option><option value="pluto">Pluto</option></select></label>
+        <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px"><input type="checkbox" checked style="width:18px;height:18px;accent-color:#eacd9e">Auto time warp</label>
+        <button type="button" data-action="autopilotStart" style="width:100%">FLY & LAND</button>
+      </section>`;
+    this.autopilotWarp = this.autopilotPicker.querySelector('input')!;
+    const close = this.autopilotPicker.querySelector<HTMLButtonElement>('[data-action="autopilotClose"]')!;
+    const start = this.autopilotPicker.querySelector<HTMLButtonElement>('[data-action="autopilotStart"]')!;
+    this.lifetime.listen(close, 'click', () => this.closeAutopilotPicker());
+    this.lifetime.listen(start, 'click', () => {
+      if (this.paused) return;
+      const target = this.autopilotPicker.querySelector('select')!.value;
+      this.closeAutopilotPicker();
+      this.onAction?.('autopilot:' + target);
+    });
+    this.lifetime.listen(this.autopilotPicker, 'click', event => {
+      if (event.target === this.autopilotPicker) this.closeAutopilotPicker();
+    });
+    this.lifetime.listen(this.autopilotPicker, 'keydown', event => {
+      const key = event as KeyboardEvent;
+      key.stopPropagation();
+      if (key.key === 'Escape') { key.preventDefault(); this.closeAutopilotPicker(); }
+      if (key.key === 'Tab') {
+        const controls = Array.from(this.autopilotPicker.querySelectorAll<HTMLElement>('button,select,input'));
+        const first = controls[0]!, last = controls[controls.length - 1]!;
+        if (key.shiftKey && document.activeElement === first) { key.preventDefault(); last.focus(); }
+        if (!key.shiftKey && document.activeElement === last) { key.preventDefault(); first.focus(); }
+      }
+    });
+    this.autopilotMission = document.createElement('div');
+    this.autopilotMission.className = 'autopilot-mission'; this.autopilotMission.hidden = true;
+    this.autopilotTitle = document.createElement('strong');
+    this.autopilotDetail = document.createElement('div'); this.autopilotDetail.style.color = '#b7c8d6';
+    const cancel = document.createElement('button'); cancel.textContent = 'CANCEL MISSION'; cancel.dataset.action = 'autopilotCancel';
+    this.lifetime.listen(cancel, 'click', () => this.onAction?.('autopilotCancel'));
+    this.autopilotMission.append(this.autopilotTitle, this.autopilotDetail, cancel);
+    this.root.append(this.autopilotPicker, this.autopilotMission);
+  }
+
+  setAutopilotStatus(phase: string | null, target: string, detail: string): void {
+    this.autopilotMission.hidden = phase === null;
+    this.autopilotTitle.textContent = phase === null ? '' : `${target.toUpperCase()} · ${phase}`;
+    this.autopilotDetail.textContent = detail;
   }
 
   _throttleBtn = false;
@@ -186,7 +275,6 @@ export class HUD {
       button.textContent = label!; button.dataset.action = action!; button.title = title!;
       button.setAttribute('aria-label', title!);
       button.style.cssText = 'flex:1;min-width:0;padding:6px 3px;background:#172335;color:#eacd9e;border:1px solid #394759;border-radius:4px;font:11px monospace;cursor:pointer;';
-      button.addEventListener('click', () => this.onAction?.(action!));
       warpControls.appendChild(button);
     }
     panel.appendChild(warpControls);
@@ -207,7 +295,7 @@ export class HUD {
     this.sasModeEl = panel.querySelector('.sas-mode')!;
     this.dvVal = panel.querySelector('.dv-val')!;
 
-    panel.addEventListener('click', (e) => {
+    this.lifetime.listen(panel, 'click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
       if (btn && this.onAction) this.onAction(btn.dataset.action!);
     });
@@ -362,6 +450,7 @@ setFreeCamera(active: boolean): void {
   setPaused(paused: boolean): void {
     this.paused = paused;
     if (paused) {
+      this.autopilotPicker.hidden = true;
       this.pauseOverlay.style.display = 'flex';
       this.lifetime.frame(() => { if (this.paused) this.pauseOverlay.style.opacity = '1'; });
     } else {

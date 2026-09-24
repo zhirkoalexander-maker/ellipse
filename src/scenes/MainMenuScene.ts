@@ -64,7 +64,7 @@ export class MainMenuScene {
     this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
     this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
-    version.textContent = 'v2.4.0 · Flight & Assembly update';
+    version.textContent = 'v2.5.0 · Guided flight update';
     version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
     this.root.appendChild(version);
 

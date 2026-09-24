@@ -80,7 +80,8 @@ export function hasLastAssembly(): boolean {
 const FLIGHT_KEY = 'ellipse_flight_save';
 
 export interface FlightSave {
-  version?: 2;
+  version?: 2 | 3;
+  mission?: { target: string; departure: string; autoWarp: boolean; phase?: 'landing' };
   fuelByPath?: Record<string, number>;
   bodyRadii?: Record<string, number>;
   parachuteDeployed?: boolean;
@@ -164,7 +165,15 @@ function validFlight(s: any): s is FlightSave {
   if (!Array.isArray(s.bodies) || !s.bodies.every((b: any) => b && typeof b.name === 'string' && vector(b.position, 3) && vector(b.velocity, 3))) return false;
   // Resume replays these events; reject corrupt values that could stall the browser.
   if (s.stageSeparations !== undefined && (!Number.isInteger(s.stageSeparations) || s.stageSeparations > 10000)) return false;
-  if (s.version !== undefined && s.version !== 2) return false;
+  if (s.version !== undefined && s.version !== 2 && s.version !== 3) return false;
+  if (s.mission !== undefined) {
+    const solidBodies = ['mercury', 'venus', 'earth', 'moon', 'mars', 'pluto'];
+    const allBodies = [...solidBodies, 'sun', 'jupiter', 'saturn', 'uranus', 'neptune'];
+    const m = s.mission;
+    if (!m || typeof m !== 'object' || Array.isArray(m)
+      || !solidBodies.includes(m.target) || !allBodies.includes(m.departure)
+      || typeof m.autoWarp !== 'boolean' || (m.phase !== undefined && m.phase !== 'landing')) return false;
+  }
   if (s.fuelByPath !== undefined && !numberMap(s.fuelByPath)) return false;
   if (s.bodyRadii !== undefined && !numberMap(s.bodyRadii)) return false;
   for (const key of ['parachuteDeployed', 'gearDeployed']) if (s[key] !== undefined && typeof s[key] !== 'boolean') return false;

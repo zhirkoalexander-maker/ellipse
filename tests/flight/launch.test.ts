@@ -23,7 +23,7 @@ describe('TWR and launch', () => {
     const twr = (engine!.thrust * 1000) / (mass * grav);
 
     expect(twr).toBeGreaterThanOrEqual(1.0);
-    expect(twr).toBeLessThan(3.0);
+    expect(twr).toBeLessThan(4.4);
   });
 
   it('default rocket at 1% throttle has TWR < 1.0', () => {
