@@ -11,14 +11,22 @@ function hideLoadingScreen(): void {
   if (label) (label as any).dataset.done = '1';
 }
 
+function showStartupError(error: unknown): void {
+  console.error('Failed to start Ellipse:', error);
+  hideLoadingScreen();
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;inset:0;z-index:10000;color:white;padding:32px;font-family:monospace;background:#06080f;';
+  const title = document.createElement('h1');
+  title.textContent = 'Failed to start';
+  const detail = document.createElement('pre');
+  detail.textContent = String(error);
+  panel.append(title, detail);
+  document.body.appendChild(panel);
+}
+
 try {
   const game = new Game();
-  game.start();
-} catch (e) {
-  console.error('Failed to start Ellipse:', e);
-  hideLoadingScreen();
-  document.body.innerHTML += `<div style="position:fixed;inset:0;z-index:950;color:white;padding:32px;font-family:monospace;background:#06080f;">
-      <h1>Failed to start</h1>
-      <pre>${String(e)}</pre>
-    </div>`;
+  void game.start().catch(showStartupError);
+} catch (error) {
+  showStartupError(error);
 }

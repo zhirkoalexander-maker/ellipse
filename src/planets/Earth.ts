@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, assetUrl } from '../config/constants';
+import { ORBIT_SCALE, VISUAL_PLANET_MULT, EARTH_MASS, EARTH_RADIUS, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -86,7 +86,7 @@ export class Earth extends Planet {
   private static readonly PAD_BLEND = 0.06;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super('earth', EARTH_MASS, position, velocity, 6.371e6 * 2);
+    super('earth', EARTH_MASS, position, velocity, EARTH_RADIUS);
 
     const visualR = this.visualRadius;
     const SEG = 512;
@@ -95,7 +95,7 @@ export class Earth extends Planet {
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
     const colors: number[] = [];
-    const maxDisp = visualR * 0.035;
+    const maxDisp = visualR * 0.0078;
 
     // Single pass: compute height → displace → color
     for (let i = 0; i < posAttr.count; i++) {
@@ -144,7 +144,7 @@ export class Earth extends Planet {
     });
     const cloudGeom = new THREE.SphereGeometry(visualR * 1.008, 64, 32);
     this.cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
-    this.cloudMesh.position.copy(this.mesh.position);
+    // Cloud coordinates are local to the terrain mesh.
     this.mesh.add(this.cloudMesh);
   }
 
@@ -153,12 +153,12 @@ export class Earth extends Planet {
    *  of buried inside a mountain. Physics (getSurfaceRadiusAt) calls this
    *  exact same function, keeping the visual mesh and collision surface in sync. */
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    const maxDisp = this.visualRadius * 0.035;
-    const oceanD = this.visualRadius * 0.007;
+    const maxDisp = this.visualRadius * 0.0078;
+    const oceanD = this.visualRadius * 0.00156;
     const elev = this.elevationAt(nx, ny, nz);
 
     let h: number;
-    if (elev > 0.48) { const t = (elev - 0.48) / 0.52; h = t * t * maxDisp; }
+    if (elev > 0.48) { const t = (elev - 0.48) / 0.52; h = (0.2 + 0.8 * t * t) * maxDisp; }
     else if (elev > 0.38) { h = (elev - 0.38) / 0.1 * maxDisp * 0.2; }
     else { h = -(0.38 - elev) / 0.38 * oceanD; }
 
@@ -194,12 +194,6 @@ export class Earth extends Planet {
     this.cloudMesh.rotation.y += dt * 0.01;
     if (sunPosWC) {
       const mat = this.mesh.material as THREE.MeshStandardMaterial;
-      const sl = Math.sqrt(sunPosWC[0] ** 2 + sunPosWC[1] ** 2 + sunPosWC[2] ** 2) || 1;
-      this.mesh.lookAt(
-        this.mesh.position.x + sunPosWC[0] / sl * 100,
-        this.mesh.position.y + sunPosWC[1] / sl * 100,
-        this.mesh.position.z + sunPosWC[2] / sl * 100
-      );
       mat.emissiveIntensity = 0.15;
     }
   }

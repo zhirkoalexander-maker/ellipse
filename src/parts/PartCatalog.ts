@@ -60,7 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    thrust: 2700,
+    thrust: 453.6,
     isp: 350,
     fuelType: 'LFO'
   },
@@ -70,7 +70,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 80,
-    thrust: 600,
+    thrust: 134.4,
     isp: 385,
     fuelType: 'LFO'
   },
@@ -80,7 +80,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 400,
-    thrust: 2400,
+    thrust: 2016.0,
     isp: 340,
     fuelType: 'LFO'
   },
@@ -90,7 +90,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'M',
     mass: 300,
-    thrust: 2400,
+    thrust: 2016.0,
     isp: 290,
     fuelType: 'LFO'
   },
@@ -100,7 +100,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 1200,
-    thrust: 7500,
+    thrust: 4200.0,
     isp: 330,
     fuelType: 'LFO'
   },
@@ -110,7 +110,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 900,
-    thrust: 4000,
+    thrust: 2016,
     isp: 370,
     fuelType: 'LFO'
   },
@@ -120,7 +120,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'L',
     mass: 1800,
-    thrust: 45000,
+    thrust: 7560.0,
     isp: 300,
     fuelType: 'LFO'
   },
@@ -130,7 +130,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'XL',
     mass: 3000,
-    thrust: 55000,
+    thrust: 9240.0,
     isp: 310,
     fuelType: 'LFO'
   },
@@ -140,7 +140,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'XL',
     mass: 4500,
-    thrust: 70000,
+    thrust: 11760.0,
     isp: 280,
     fuelType: 'LFO'
   },
@@ -247,7 +247,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'rcs',
     size: 'S',
     mass: 10,
-    thrust: 20,
+    thrust: 22.4,
     isp: 240,
     fuelType: 'LFO',
     dragCoeff: 0.05
@@ -290,7 +290,7 @@ export const PART_CATALOG: Part[] = [
     size: 'XL',
     mass: 30000,
     fuelCapacity: 500000,
-    thrust: 55000,
+    thrust: 92400.0,
     isp: 310,
     dragCoeff: 0.3,
     gltfUrl: '/models/saturn_v.glb',

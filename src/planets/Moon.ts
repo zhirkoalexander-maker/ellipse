@@ -4,7 +4,7 @@ import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
-const SEGMENTS = 64;
+const SEGMENTS = 192;
 
 const hash = (x: number, y: number, z: number) => {
   const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.9) * 43758.5453;
@@ -47,13 +47,13 @@ export class Moon extends Planet {
     const craters = fbm3D(nx * 8 + 100, ny * 8 + 200, nz * 8 + 300, 4);
     const micro = fbm3D(nx * 30 + 400, ny * 30 + 500, nz * 30 + 600, 3);
     const elev = craters * 0.7 + micro * 0.3;
-    const maxDisp = this.visualRadius * 0.04;
+    const maxDisp = this.visualRadius * 0.0078;
     if (elev > 0.45) return ((elev - 0.45) / 0.55) ** 2 * maxDisp;
     return -(0.45 - elev) / 0.45 * maxDisp * 0.15;
   }
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("moon", 2.2e23, position, velocity, 1.737e6);
+    super("moon", 2.2e23, position, velocity, 1.737e6 * 1.25);
 
     const visualR = this.visualRadius;
 
@@ -66,21 +66,10 @@ export class Moon extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.04;
-
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR;
-      const ny = vert.y / visualR;
-      const nz = vert.z / visualR;
-
-      const craters = fbm3D(nx * 8 + 100, ny * 8 + 200, nz * 8 + 300, 4);
-      const micro = fbm3D(nx * 30 + 400, ny * 30 + 500, nz * 30 + 600, 3);
-      const elev = craters * 0.7 + micro * 0.3;
-
-      let disp = 0;
-      if (elev > 0.45) disp = ((elev - 0.45) / 0.55) ** 2 * maxDisp;
-      else disp = -(0.45 - elev) / 0.45 * maxDisp * 0.15;
+      const direction = vert.clone().normalize();
+      const disp = this.getTerrainHeightVisual(direction.x, direction.y, direction.z);
 
       vert.setLength(visualR + disp);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);

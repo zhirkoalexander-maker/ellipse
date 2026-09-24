@@ -1,7 +1,9 @@
 import type { FlightState } from './FlightState';
 import { TouchControls } from './TouchControls';
+import { Lifetime } from '../core/Lifetime';
 
 export class Controls {
+  private lifetime = new Lifetime();
   private keys: Set<string> = new Set();
   private stagePressed = false;
   private pauseToggle = false;
@@ -13,6 +15,8 @@ export class Controls {
   constructor(state: FlightState) {
     this.state = state;
     this._onKeyDown = (e) => {
+      if (e.key === 'Shift') { this.keys.delete('arrowup'); this.keys.delete('arrowdown'); }
+      if (e.shiftKey && e.key.startsWith('Arrow')) return;
       if (e.repeat) return;
       this.keys.add(e.key.toLowerCase());
       if (e.key === ' ') this.stagePressed = true;
@@ -24,8 +28,9 @@ export class Controls {
     this._onKeyUp = (e) => {
       this.keys.delete(e.key.toLowerCase());
     };
-    window.addEventListener('keydown', this._onKeyDown);
-    window.addEventListener('keyup', this._onKeyUp);
+    this.lifetime.listen(window, 'keydown', this._onKeyDown);
+    this.lifetime.listen(window, 'keyup', this._onKeyUp);
+    this.lifetime.listen(window, 'blur', () => this.clearInput());
   }
 
   enableTouch(): void {
@@ -58,7 +63,7 @@ export class Controls {
     return v;
   }
 
-  getRoll(): number { return 0; }
+  getRoll(): number { return Number(this.keys.has('j')) - Number(this.keys.has('k')); }
 
   getZoomIn(): boolean { return this.keys.has('z'); }
   getZoomOut(): boolean { return this.keys.has('x'); }
@@ -75,9 +80,15 @@ export class Controls {
     return was;
   }
 
+  private clearInput(): void {
+    this.keys.clear();
+    this.stagePressed = false;
+    this.pauseToggle = false;
+  }
+
   dispose(): void {
-    window.removeEventListener('keydown', this._onKeyDown);
-    window.removeEventListener('keyup', this._onKeyUp);
+    this.lifetime.dispose();
+    this.clearInput();
     this.touch?.dispose();
     this.touch = null;
   }

@@ -66,7 +66,7 @@ export function planTransfer(
     direction = 'prograde';
   } else {
     // Burn at r1 (outer) from circular to transfer aphelion
-    deltaV = vCircInner - vApo; // retrograde magnitude
+    deltaV = vCircOuter - vApo; // retrograde magnitude
     direction = 'retrograde';
   }
   deltaV = Math.abs(deltaV);

@@ -5,7 +5,7 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
-const SEGMENTS = 64;
+const SEGMENTS = 192;
 
 const hash = (x: number, y: number, z: number) => {
   const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.9) * 43758.5453;
@@ -48,7 +48,7 @@ export class Mars extends Planet {
     const mountains = fbm3D(nx * 4 + 10, ny * 4 + 20, nz * 4 + 30, 5);
     const detail = fbm3D(nx * 20 + 100, ny * 20 + 200, nz * 20 + 300, 3);
     const elev = mountains * 0.7 + detail * 0.3;
-    const maxDisp = this.visualRadius * 0.035;
+    const maxDisp = this.visualRadius * 0.0078;
     if (elev > 0.4) return ((elev - 0.4) / 0.6) ** 2 * maxDisp;
     return -(0.4 - elev) / 0.4 * maxDisp * 0.1;
   }
@@ -56,7 +56,7 @@ export class Mars extends Planet {
   atmosphereGlow: AtmosphereGlow;
 
   constructor(position: Vec3, velocity: Vec3) {
-    super("mars", 1.9e24, position, velocity, 3.390e6);
+    super("mars", 1.9e24, position, velocity, 3.390e6 * 1.25);
 
     const visualR = this.visualRadius;
 
@@ -69,21 +69,10 @@ export class Mars extends Planet {
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     const posAttr = geom.attributes.position!;
     const vert = new THREE.Vector3();
-    const maxDisp = visualR * 0.035;
-
     for (let i = 0; i < posAttr.count; i++) {
       vert.fromBufferAttribute(posAttr, i);
-      const nx = vert.x / visualR;
-      const ny = vert.y / visualR;
-      const nz = vert.z / visualR;
-
-      const mountains = fbm3D(nx * 4 + 10, ny * 4 + 20, nz * 4 + 30, 5);
-      const detail = fbm3D(nx * 20 + 100, ny * 20 + 200, nz * 20 + 300, 3);
-      const elev = mountains * 0.7 + detail * 0.3;
-
-      let disp = 0;
-      if (elev > 0.4) disp = ((elev - 0.4) / 0.6) ** 2 * maxDisp;
-      else disp = -(0.4 - elev) / 0.4 * maxDisp * 0.1;
+      const direction = vert.clone().normalize();
+      const disp = this.getTerrainHeightVisual(direction.x, direction.y, direction.z);
 
       vert.setLength(visualR + disp);
       posAttr.setXYZ(i, vert.x, vert.y, vert.z);
