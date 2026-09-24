@@ -1,3 +1,4 @@
+import { surfaceReadout } from './SurfaceReadout';
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
 import { Lifetime } from '../core/Lifetime';
@@ -8,6 +9,7 @@ export class HUD {
   private lifetime = new Lifetime();
   private paused = false;
   private landingStatusEl = document.createElement('div');
+  private surfacePanel = document.createElement('div');
   private autopilotPicker!: HTMLDivElement;
   private autopilotMission!: HTMLDivElement;
   private autopilotTitle!: HTMLElement;
@@ -105,6 +107,11 @@ export class HUD {
     this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity 160ms ease;';
     this.landingStatusEl.textContent = 'Ready to launch';
     this.root.appendChild(this.landingStatusEl);
+    this.surfacePanel.className = 'surface-readout';
+    this.surfacePanel.hidden = true;
+    this.surfacePanel.innerHTML = '<span>Above surface</span><strong data-surface-height></strong><span data-surface-speed></span><div class="surface-distance-track"><i></i></div><button data-action="lookDown">Look down</button>';
+    this.root.appendChild(this.surfacePanel);
+    this.lifetime.listen(this.surfacePanel.querySelector('button')!, 'click', () => this.onAction?.('lookDown'));
     this.root.appendChild(bar);
     this._throttleBtn = false;
     this._throttleDn = false;
@@ -634,6 +641,15 @@ setFreeCamera(active: boolean): void {
       ctx.strokeStyle = '#4a6a8a'; ctx.lineWidth = 1;
       ctx.stroke();
     }
+  }
+
+  updateSurfaceReadout(altitude: number, verticalSpeed: number, grounded: boolean): void {
+    const value = surfaceReadout(altitude, verticalSpeed, grounded);
+    this.surfacePanel.hidden = !value.visible;
+    this.surfacePanel.classList.toggle('near-surface', value.near);
+    this.surfacePanel.querySelector('[data-surface-height]')!.textContent = value.height;
+    this.surfacePanel.querySelector('[data-surface-speed]')!.textContent = value.descent;
+    (this.surfacePanel.querySelector('i') as HTMLElement).style.width = `${value.progress * 100}%`;
   }
 
   update(state: FlightState, system: System, heat: number = 0, throttle: number = 0, telemetry?: Pick<FlightTelemetry, 'speed' | 'verticalSpeed' | 'altitude'>): void {

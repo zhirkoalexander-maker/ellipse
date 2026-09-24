@@ -410,6 +410,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'warpDown') this.setPlayerWarp(this.warpIndex - 1);
       else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
       else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
+      else if (action === 'lookDown') { this.cameraMode = 'chase'; this.hud.setFreeCamera(false); this.chase.setPolar(0.55); }
       else if (action === 'cameraZoomIn') this.chase.zoom(0.82);
       else if (action === 'cameraZoomOut') this.chase.zoom(1.22);
       else if (action === 'stage') this.stageOrLaunch();
@@ -1633,7 +1634,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     this.hud.setDeltaV(deltaV);
 
-    this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle, flightTelemetry(this.state.position, this.state.velocity, getReferenceBody(this.state.position, this.system), this.grounded));
+    const surfaceTelemetry = flightTelemetry(this.state.position, this.state.velocity, this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system), this.grounded);
+    this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle, surfaceTelemetry);
+    this.hud.updateSurfaceReadout(surfaceTelemetry.altitude, surfaceTelemetry.verticalSpeed, this.grounded);
 
     // Orbit info → HUD
     this.hud.setOrbit({

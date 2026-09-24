@@ -17,3 +17,16 @@ it('draws a finite radial trajectory beginning at the craft',()=>{
  expect(points[0]).toEqual([7e6,0,0]);expect(points.length).toBeGreaterThan(2);
  expect(points.every(p=>p.every(Number.isFinite))).toBe(true);
 });
+
+import { simpleCorrection, destinationBasis } from '../../src/flight/MapNavigation';
+it('provides predictable plain-language course corrections',()=>{
+ expect(simpleCorrection([0,0,0],[30,0,0],[0,100,0],'toward',10)).toEqual([0,10,0]);
+ expect(new Vector3(...simpleCorrection([0,0,0],[30,0,0],[0,100,0],'slower',10)).distanceTo(new Vector3(-10,0,0))).toBeCloseTo(0);
+ expect(Math.hypot(...simpleCorrection([0,0,0],[30,0,0],[0,100,0],'slower',100))).toBeCloseTo(30);
+ expect(simpleCorrection([0,0,0],[0,0,0],[0,100,0],'faster',10)).toEqual([0,0,0]);
+});
+it('keeps an inclined destination visible beside the craft',()=>{
+ const basis=destinationBasis([0,0,0],[0,1000,0]);
+ expect(projectMap([0,1000,0],[0,0,0],basis,10,[0,0])[0]).toBeCloseTo(100);
+ expect(basis[0].dot(basis[1])).toBeCloseTo(0);
+});
