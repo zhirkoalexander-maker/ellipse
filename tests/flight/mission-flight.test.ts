@@ -37,7 +37,11 @@ describe('automatic flight and landing', () => {
     expect(f.autopilotActive).toBe(true);
     let fastFrames = 0;
     for (let i = 0; i < 30000 && !f.crashed && f.autopilotActive; i++) {
+      const beforeAttitude = f.rocketGroup.quaternion.clone();
       f.update(1 / 30);
+      if (f.autopilotActive && !f.grounded) {
+        expect(beforeAttitude.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 / 30 + 1e-6);
+      }
       if (f.autopilotActive && f.missionRate >= 100) {
         const body = f.autopilotSurfaceBody() ?? getReferenceBody(f.state.position, f.system);
         const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
@@ -65,6 +69,18 @@ describe('automatic flight and landing', () => {
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }));
     expect(f.autopilotActive).toBe(false);
     expect(f.timeWarp).toBe(1);
+  });
+
+  it('keeps the displayed attitude continuous when autopilot is cancelled', () => {
+    const f = create();
+    f.hud.onAction('autopilot:moon');
+    for (let i = 0; i < 300; i++) f.update(1 / 30);
+    expect(f.grounded).toBe(false);
+    const before = f.rocketGroup.quaternion.clone();
+    f.rocketQuat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), 0.8));
+    f.abortAutopilot('Manual control');
+    f.update(1 / 30);
+    expect(before.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 / 30 + 1e-6);
   });
 
   it('persists and resumes an in-progress automatic mission', () => {
