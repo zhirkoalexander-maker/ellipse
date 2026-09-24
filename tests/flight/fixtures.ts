@@ -5,7 +5,7 @@ import { SceneManager } from '../../src/core/SceneManager';
 import { System } from '../../src/physics/System';
 import { Sun } from '../../src/planets/Sun';
 import { Earth } from '../../src/planets/Earth';
-import { Moon } from '../../src/planets/Moon';
+import { Moon, lunarOrbitVelocity } from '../../src/planets/Moon';
 import { Rocket } from '../../src/rocket/Rocket';
 import { Assembly } from '../../src/rocket/Assembly';
 import { findPart, PART_CATALOG } from '../../src/parts/PartCatalog';
@@ -40,7 +40,6 @@ export function buildSystem(): System {
   const system = new System();
   system.add(new Sun([0, 0, 0], [0, 0, 0], 2e26));
   system.add(new Earth([1e9, 0, 0], [0, 0, 17000]));
-  system.add(new Moon([1e9, 0, 6e7], [0, 0, 17900]));
+  system.add(new Moon([1e9, 0, 6e7], lunarOrbitVelocity(system.bodyByName('earth')!.mass, [0, 0, 17000], 6e7)));
   return system;
 }
-

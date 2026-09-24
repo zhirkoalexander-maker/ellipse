@@ -8,7 +8,7 @@ import { Mercury } from '../planets/Mercury';
 import { Venus } from '../planets/Venus';
 import { Pluto } from '../planets/Pluto';
 import { Earth } from '../planets/Earth';
-import { Moon } from '../planets/Moon';
+import { Moon, lunarOrbitVelocity } from '../planets/Moon';
 import { Mars } from '../planets/Mars';
 import { Jupiter } from '../planets/Jupiter';
 import { Saturn } from '../planets/Saturn';
@@ -26,6 +26,7 @@ import { loadSettings, SettingsPanel } from '../ui/Settings';
 import { PART_SCALE, assetUrl } from '../config/constants';
 import { loadAllTextures } from '../effects/TextureLoader';
 import { loadLastAssembly, hasLastAssembly, loadFlightState, hasFlightSave, clearFlightSave, serializeAssembly, deserializeAssembly, type FlightSave } from '../storage/SaveLoad';
+import { migrateLegacyLunarOrbit } from '../storage/Migration';
 import * as THREE from 'three';
 
 export class Game {
@@ -55,7 +56,7 @@ export class Game {
     const earthVel: [number, number, number] = [0, 0, 17000];
     this.system.add(new Earth(earthPos, earthVel));
     const moonPos: [number, number, number] = [earthPos[0], 0, earthPos[2] + 6e7];
-    const moonVel: [number, number, number] = [0, 0, earthVel[2] + 900];
+    const moonVel = lunarOrbitVelocity(this.system.bodyByName('earth')!.mass, earthVel, 6e7);
     this.system.add(new Moon(moonPos, moonVel));
     this.system.add(new Mars([1.5e9, 1e9, -4e8], [0, 0, 13500]));
     this.system.add(new Jupiter([3e9, -6e8, 2e8], [0, 0, 9000]));
@@ -142,7 +143,8 @@ export class Game {
       // CONTINUE: resume the saved flight where it was left off (position,
       // velocity, fuel, planets) — falls back to last build on the pad.
       const onContinue = (hasFlightSave() || hasLastAssembly()) ? () => {
-        const save = loadFlightState();
+        const loadedSave = loadFlightState();
+        const save = loadedSave ? migrateLegacyLunarOrbit(loadedSave, this.system) : null;
         if (save) {
           // Old saves may reference parts that no longer exist (catalog
           // changes) — deserializeAssembly SILENTLY drops them, which once

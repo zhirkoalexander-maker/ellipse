@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
-import { ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
+import { G, ORBIT_SCALE, VISUAL_PLANET_MULT, assetUrl } from '../config/constants';
+
+/** Moon starts on +Z from Earth; +X is tangential to that orbit. */
+export function lunarOrbitVelocity(primaryMass: number, primaryVelocity: Vec3, separation: number): Vec3 {
+  return [primaryVelocity[0] + Math.sqrt(G * (primaryMass + 2.2e23) / separation), primaryVelocity[1], primaryVelocity[2]];
+}
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 192;

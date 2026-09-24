@@ -35,6 +35,11 @@ describe('flight persistence', () => {
     saves.saveFlightState({ ...valid(), bodyRadii: { sun: 0, earth: 6371000 } });
     expect(saves.loadFlightState()?.bodyRadii?.sun).toBe(0);
   });
+  it('round trips a version 3 mission', () => {
+    const save = { ...valid(), version: 3 as const, mission: { target: 'moon', departure: 'earth', autoWarp: true, phase: 'landing' as const } };
+    saves.saveFlightState(save);
+    expect(saves.loadFlightState()).toEqual(save);
+  });
   it('accepts legacy complete flight saves', () => {
     saves.saveFlightState(valid());
     expect(saves.loadFlightState()).toEqual(valid());
@@ -42,6 +47,10 @@ describe('flight persistence', () => {
   it.each([
     { quat: [0, 0, 0, 0] }, { velocity: [0, null, 0] }, { position: [0, 1] },
     { throttle: 2 }, { missionTime: -1 }, { bodies: null }, { grounded: 'yes' },
+    { mission: { target: 'sun', departure: 'earth', autoWarp: true } },
+    { mission: { target: 'moon', departure: 'invalid', autoWarp: true } },
+    { mission: { target: 'moon', departure: 'earth', autoWarp: 'yes' } },
+    { mission: { target: 'moon', departure: 'earth', autoWarp: true, phase: 'invalid' } },
     { stageSeparations: 1e100 }, { stageSeparations: 1.5 },
     { assembly: [null] }, { fuelByPath: { '0': 'bad' } }, { bodyRadii: { Earth: -1 } },
   ])('rejects corrupt state %j', patch => {
