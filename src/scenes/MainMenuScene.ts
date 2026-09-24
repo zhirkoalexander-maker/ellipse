@@ -53,18 +53,18 @@ export class MainMenuScene {
       b.addEventListener('click', cb);
       return b;
     };
-    this.root.appendChild(btn('FLIGHT', 'primary', this.onPlay));
-    const continueButton = btn('CONTINUE', 'secondary', () => this.onContinue?.());
+    this.root.appendChild(btn('Flight', 'primary', this.onPlay));
+    const continueButton = btn('Continue', 'secondary', () => this.onContinue?.());
     continueButton.disabled = !this.onContinue;
     continueButton.title = this.onContinue ? 'Resume your last flight or saved build' : 'No saved flight yet — start with FLIGHT';
     if (!this.onContinue) { continueButton.style.opacity = '0.45'; continueButton.style.cursor = 'default'; }
     this.root.appendChild(continueButton);
-    this.root.appendChild(btn('VEHICLE ASSEMBLY', 'secondary', this.onVab));
-    this.root.appendChild(btn('MISSIONS', 'ghost', () => this.toggleMissions()));
-    this.root.appendChild(btn('SETTINGS', 'ghost', this.onSettings));
-    this.root.appendChild(btn('GUIDE', 'ghost', () => this.toggleHelp()));
+    this.root.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
+    this.root.appendChild(btn('Missions', 'ghost', () => this.toggleMissions()));
+    this.root.appendChild(btn('Settings', 'ghost', this.onSettings));
+    this.root.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
-    version.textContent = 'v2.5.0 · Guided flight update';
+    version.textContent = 'v2.5.1 · Guided flight update';
     version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
     this.root.appendChild(version);
 
@@ -134,19 +134,19 @@ export class MainMenuScene {
     card.className = 'guide-card';
     card.style.cssText = 'max-width:560px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;';
     card.innerHTML =
-      `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 HOW TO BUILD & LAUNCH</h2>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">VEHICLE ASSEMBLY</b> — build your rocket</p>` +
+      `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 How to build and launch</h2>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">Vehicle assembly</b> and build your rocket</p>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack from bottom to top: <b>engine</b> → <b>fuel tank</b> → <b>capsule</b></p>` +
       `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">3. (optional) Add <b>decoupler</b> between stages, <b>parachute</b> + <b>legs</b> for landing</p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Enter flight, then click <b style="color:#c89838;">LAUNCH</b> or press <b>Space</b> for a full-throttle countdown</p>` +
-      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">💡 FLIGHT TIPS</h2>` +
+      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Enter flight, then click <b style="color:#c89838;">Launch</b> or press <b>Space</b> for a full-throttle countdown</p>` +
+      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">💡 Flight tips</h2>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>TWR ≥ 1.0</b> required to lift off — check the gauge on HUD (green = go)</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Tilt east (<b>A</b>) at ~10km to build horizontal speed for orbit</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Watch the <b style="color:#88ccff;">ORBIT panel</b> (top-right): Ap/Pe show your orbit shape</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Press <b>T</b> to cycle SAS — holds attitude / prograde / retrograde</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>Space</b> drops empty stages — watch the stage panel</p>` +
       `<p style="font-size:12px;color:#889;margin-bottom:14px;">• Land slow (< 5 m/s). Deploy <b>parachute</b> in atmosphere, extend <b>legs</b></p>` +
-      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">⌨ ROCKET CONTROLS</h2>` +
+      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">⌨ Rocket controls</h2>` +
       `<table style="width:100%;font-size:13px;border-collapse:collapse;">` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">↑ / ↓</td><td>Engine Power (throttle)</td></tr>` +
       `<tr><td style="color:#889;padding:3px 12px 3px 0;">W / S</td><td>Pitch — Tilt Up / Down</td></tr>` +

@@ -20,7 +20,7 @@ describe('launch through player input', () => {
   it('launches from a single visible button click without pre-setting throttle', () => {
     const f = create();
     const button = document.querySelector<HTMLButtonElement>('[data-action="stage"]');
-    expect(button?.textContent).toContain('LAUNCH');
+    expect(button?.textContent).toContain('Launch');
     const stages = vi.spyOn(f, 'performStage');
     const fuel = f.rocket.totalFuelMass();
     button!.click();
@@ -30,7 +30,7 @@ describe('launch through player input', () => {
     expect(f.relSpeed()).toBeGreaterThan(20);
     expect(f.rocket.totalFuelMass()).toBeLessThan(fuel);
     expect(stages).not.toHaveBeenCalled();
-    expect(button!.textContent).toContain('STAGE');
+    expect(button!.textContent).toContain('Stage');
   });
 
   it('Space ignites on the pad and stages only after liftoff', () => {
