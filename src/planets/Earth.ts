@@ -1,3 +1,4 @@
+import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
@@ -120,6 +121,7 @@ export class Earth extends Planet {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geom.computeVertexNormals();
 
+    paintTerrain(geom, 'earth', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({
       roughness: 0.85,
       metalness: 0.05,
@@ -132,7 +134,7 @@ export class Earth extends Planet {
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 
-    this.loadTexture().catch(() => {});
+    // Surface colors follow geometry; close-up detail uses the same palette.
 
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0x4488ff, 2.5, visualR * 0.10);
     this.mesh.add(this.atmosphereGlow.getMesh());
@@ -153,24 +155,7 @@ export class Earth extends Planet {
    *  of buried inside a mountain. Physics (getSurfaceRadiusAt) calls this
    *  exact same function, keeping the visual mesh and collision surface in sync. */
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    const maxDisp = this.visualRadius * 0.0078;
-    const oceanD = this.visualRadius * 0.00156;
-    const elev = this.elevationAt(nx, ny, nz);
-
-    let h: number;
-    if (elev > 0.48) { const t = (elev - 0.48) / 0.52; h = (0.2 + 0.8 * t * t) * maxDisp; }
-    else if (elev > 0.38) { h = (elev - 0.38) / 0.1 * maxDisp * 0.2; }
-    else { h = -(0.38 - elev) / 0.38 * oceanD; }
-
-    const dot = nx * Earth.KSC_X + ny * Earth.KSC_Y + nz * Earth.KSC_Z;
-    const ang = Math.acos(Math.max(-1, Math.min(1, dot)));
-    if (ang < Earth.PAD_R) return 0;
-    if (ang < Earth.PAD_BLEND) {
-      const t = (ang - Earth.PAD_R) / (Earth.PAD_BLEND - Earth.PAD_R);
-      const s = t * t * (3 - 2 * t);
-      return h * s;
-    }
-    return h;
+    return this.visualRadius * rockyTerrain('earth', nx, ny, nz);
   }
 
   private elevationAt(nx: number, ny: number, nz: number): number {

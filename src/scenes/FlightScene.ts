@@ -22,6 +22,8 @@ import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
 import { buildDeployedParachute, gltfCache } from '../parts/PartBuilder';
 import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import { gravitationalAccelerationAt, totalGravityOn } from '../physics/Gravity';
+import { LaunchClamps } from '../flight/LaunchClamps';
+import { SurfaceView, magnifyPoint } from '../planets/SurfaceView';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 import { EngineFlame } from '../effects/EngineFlame';
@@ -70,6 +72,8 @@ export class FlightScene {
   private groundSmoke: GroundSmoke;
   private rocketShadow: THREE.Mesh | null = null;
   private launchPadGroup: THREE.Group | null = null;
+  private launchClamps: LaunchClamps | null = null;
+  private surfaceView = new SurfaceView();
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
@@ -291,7 +295,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       if (pbody.mesh) sceneMgr.scene.add(pbody.mesh);
       if (pbody.light) sceneMgr.scene.add(pbody.light);
     }
-    this.buildLaunchPad(earth, dirNorm, surfaceR);
     const fillLight = new THREE.DirectionalLight(0x8899cc, 1.5);
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
@@ -997,6 +1000,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       toast.show('Ready to launch');
     }
     this.syncVisualTransform();
+    this.buildLaunchPad(earth, dirNorm, surfaceR);
+    this.updateSurfaceView(0);
     const initialRef = getReferenceBody(this.state.position, this.system);
     const initialUp = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...initialRef.position)).normalize();
     const cameraOffset = initialUp.clone().multiplyScalar(-this.rocketBottomY * ROCKET_VISUAL_SCALE);
@@ -1298,7 +1303,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.paused) {
       this.controls.getStageRequested();
       this.system.propagate(0, FIXED_DT);
-      for (const body of this.system.bodies) (body as any).syncMesh?.();
       return;
     }
 
@@ -1777,11 +1781,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
     }
-    if (this.launchPadGroup) {
-      const earth = this.system.bodyByName('earth')!;
-      this.launchPadGroup.position.copy(this.launchPadGroup.userData.surfaceOffset)
-        .add(new THREE.Vector3(...earth.position).multiplyScalar(VISUAL_SCALE));
-    }
+    this.updateSurfaceView(baseDt);
 
     // Keep the planet under the rocket fully visible. Previously every body
     // except Earth was faded to 5% opacity while landed, which made the Moon
@@ -2015,6 +2015,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const normal = estimate.clone().sub(new THREE.Vector3(...orbitRefBody.position)).normalize();
         const surface = (orbitRefBody as any).getSurfaceRadiusAt?.(estimate.toArray()) ?? radius;
         this.impactMarker.position.copy(normal).multiplyScalar((surface + 5) * VISUAL_SCALE).add(new THREE.Vector3(...orbitRefBody.position).multiplyScalar(VISUAL_SCALE));
+        this.impactMarker.position.copy(magnifyPoint(this.impactMarker.position, this.surfaceView.pivot, this.surfaceView.scale));
         this.impactMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
       }
     }
@@ -2107,9 +2108,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       }
       const pos = this.orbitLine.geometry.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < orbitPred3d.points.length; i++) {
-        pos.array[i * 3] = (refBodyOrbit.position[0] + orbitPred3d.points3d[i]![0]) * VISUAL_SCALE;
-        pos.array[i * 3 + 1] = (refBodyOrbit.position[1] + orbitPred3d.points3d[i]![1]) * VISUAL_SCALE;
-        pos.array[i * 3 + 2] = (refBodyOrbit.position[2] + orbitPred3d.points3d[i]![2]) * VISUAL_SCALE;
+        const point = new THREE.Vector3(...orbitPred3d.points3d[i]!).add(new THREE.Vector3(...refBodyOrbit.position)).multiplyScalar(VISUAL_SCALE);
+        const visual = magnifyPoint(point, this.surfaceView.pivot, this.surfaceView.scale);
+        pos.setXYZ(i, visual.x, visual.y, visual.z);
       }
       pos.needsUpdate = true;
       this.orbitLine.geometry.computeBoundingSphere();
@@ -2185,7 +2186,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Dynamic sky color — smooth blue→black transition from surface to space
     const nearestAltSky = nearestAlt ?? 0;
     // Blend from 0m (bright blue) -> 100km (pure black)
-    const skyBlend = Math.min(1, Math.max(0, nearestAltSky / 30000));
+    const skyBlend = this.atmosphereScale(nearRef.name) === 0 ? 1 : Math.min(1, Math.max(0, nearestAltSky / 30000));
     const skyR = 0.02 * (1 - skyBlend) + 0.00 * skyBlend;
     const skyG = 0.05 * (1 - skyBlend) + 0.00 * skyBlend;
     const skyB = 0.15 * (1 - skyBlend) + 0.01 * skyBlend;
@@ -2265,6 +2266,17 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       getSurfaceRadiusAt: (body as any).getSurfaceRadiusAt?.bind(body) };
   }
 
+  private updateSurfaceView(dt: number): void {
+    this.surfaceView.update(this.state.position, this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system), this.system.bodies);
+    if (this.launchPadGroup) {
+      const earth = this.system.bodyByName('earth')!;
+      this.launchPadGroup.position.copy(this.launchPadGroup.userData.surfaceOffset)
+        .add(new THREE.Vector3(...earth.position).multiplyScalar(VISUAL_SCALE));
+      this.launchPadGroup.position.copy(magnifyPoint(this.launchPadGroup.position, this.surfaceView.pivot, this.surfaceView.scale));
+      this.launchClamps?.update(dt, this.launched && !this.grounded);
+    }
+  }
+
   private buildLaunchPad(earth: Body, up: [number, number, number], surfaceRadius: number): void {
     const pad = new THREE.Group();
     pad.name = 'earth-launch-pad';
@@ -2272,7 +2284,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const stripe = new THREE.MeshStandardMaterial({ color: 0xd59c38, metalness: 0.45, roughness: 0.45 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x18212a, metalness: 0.65, roughness: 0.5 });
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9.2, 0.32, 48), steel);
-    deck.position.y = -0.16; pad.add(deck);
+    deck.position.y = -0.08; pad.add(deck);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(7.3, 0.16, 8, 48), stripe);
     ring.rotation.x = Math.PI / 2; ring.position.y = 0; pad.add(ring);
     const trench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.08, 12), dark);
@@ -2285,6 +2297,16 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     tower.position.set(6.5, 2.9, 0); pad.add(tower);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.22), stripe);
     arm.position.set(4.9, 5.0, 0); pad.add(arm);
+    const holdHeight = Math.max(2.5, (this.rocketTopY - this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.26);
+    this.rocketGroup.updateMatrixWorld(true);
+    const holdY = this.rocketBottomY + holdHeight / ROCKET_VISUAL_SCALE;
+    const origin = new THREE.Vector3(this.rocketRadius * 2 + 0.1, holdY, 0).applyMatrix4(this.rocketGroup.matrixWorld);
+    const direction = new THREE.Vector3(-1, 0, 0).transformDirection(this.rocketGroup.matrixWorld);
+    const hit = new THREE.Raycaster(origin, direction).intersectObjects(this.structuralRoots, true)[0];
+    const contact = hit?.point.clone().applyMatrix4(this.rocketGroup.matrixWorld.clone().invert());
+    const rocketRadius = Math.max(0.5, (contact ? Math.hypot(contact.x, contact.z) : this.rocketRadius) * ROCKET_VISUAL_SCALE);
+    this.launchClamps = new LaunchClamps(rocketRadius, holdHeight);
+    pad.add(this.launchClamps);
     pad.position.set(
       earth.position[0] * VISUAL_SCALE + up[0] * surfaceRadius * VISUAL_SCALE,
       earth.position[1] * VISUAL_SCALE + up[1] * surfaceRadius * VISUAL_SCALE,
@@ -2818,7 +2840,6 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.orbitLine && (this.orbitLine.visible = false);
     // Propagation may already have occurred this frame. Render the planet at
     // that same instant before freezing so the impact cannot appear to bounce.
-    for (const planet of this.system.bodies) (planet as any).syncMesh?.();
     clearFlightSave();
     this.achievements.unlock('crash');
     this.sound.playCrash();
@@ -2840,6 +2861,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     this.state.throttle = 0;
 
     // Explosion effect
+    this.updateSurfaceView(0);
     this.spawnExplosion(
       this.state.position[0] * VISUAL_SCALE,
       this.state.position[1] * VISUAL_SCALE,
@@ -3095,6 +3117,8 @@ private positionFlameAtNozzle(): void {
     ], protectedObjects);
     this.ownedSceneObjects.forEach(obj => obj.removeFromParent());
     this.launchPadGroup = null;
+    this.launchClamps = null;
+    this.surfaceView.dispose(this.system.bodies);
     this.deployedChuteMesh?.removeFromParent();
     this.orbitLine?.removeFromParent();
     if ((window as any).__ellipse?.flight === this) delete (window as any).__ellipse;

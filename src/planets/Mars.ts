@@ -1,3 +1,4 @@
+import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
@@ -45,12 +46,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export class Mars extends Planet {
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
-    const mountains = fbm3D(nx * 4 + 10, ny * 4 + 20, nz * 4 + 30, 5);
-    const detail = fbm3D(nx * 20 + 100, ny * 20 + 200, nz * 20 + 300, 3);
-    const elev = mountains * 0.7 + detail * 0.3;
-    const maxDisp = this.visualRadius * 0.0078;
-    if (elev > 0.4) return ((elev - 0.4) / 0.6) ** 2 * maxDisp;
-    return -(0.4 - elev) / 0.4 * maxDisp * 0.1;
+    return this.visualRadius * rockyTerrain('mars', nx, ny, nz);
   }
 
   atmosphereGlow: AtmosphereGlow;
@@ -80,8 +76,9 @@ export class Mars extends Planet {
     posAttr.needsUpdate = true;
     geom.computeVertexNormals();
 
+    paintTerrain(geom, 'mars', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({
-      map: tex,
+      vertexColors: true,
       roughness: 0.85,
       metalness: 0.0,
       color: 0xffffff,
