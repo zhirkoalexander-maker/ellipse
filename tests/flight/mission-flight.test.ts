@@ -46,7 +46,8 @@ describe('automatic flight and landing', () => {
         const body = f.autopilotSurfaceBody() ?? getReferenceBody(f.state.position, f.system);
         const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
         const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
-          .addScaledVector(up, (-f.rocketBottomY + (f.rocketTopY + f.rocketBottomY) * 0.5) * ROCKET_VISUAL_SCALE);
+          .addScaledVector(up, -f.rocketBottomY * ROCKET_VISUAL_SCALE)
+          .add(new THREE.Vector3(0, (f.rocketTopY + f.rocketBottomY) * 0.5 * ROCKET_VISUAL_SCALE, 0).applyQuaternion(f.rocketGroup.quaternion));
         expect(f.sceneMgr.camera.position.distanceTo(look)).toBeCloseTo(f.chase.dist, 3);
         fastFrames++;
       }
@@ -81,6 +82,28 @@ describe('automatic flight and landing', () => {
     f.abortAutopilot('Manual control');
     f.update(1 / 30);
     expect(before.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 / 30 + 1e-6);
+  });
+
+  it('executes a map correction with finite fuel and stops at the requested delta-v', () => {
+    const f=create(),earth=f.system.bodyByName('earth');
+    f.grounded=false;f.launched=true;f.state.position=[earth.position[0],earth.position[1]+earth.radius+200000,earth.position[2]];
+    f.state.velocity=[earth.velocity[0]+15000,earth.velocity[1],earth.velocity[2]];
+    f.rocketQuat.identity(); const fuel=f.rocket.totalFuelMass();
+    expect(f.startMapBurn([0,20,0])).toContain('Aligning');
+    for(let i=0;i<1500 && f.maneuverRemaining.length()>0;i++)f.update(1/60);
+    expect(f.crashed).toBe(false);expect(f.maneuverRemaining.length()).toBe(0);
+    expect(f.rocket.totalFuelMass()).toBeLessThan(fuel);expect(f.state.throttle).toBe(0);
+  });
+
+  it('cancels a map burn before entering coast warp', () => {
+    const f=create(),earth=f.system.bodyByName('earth');
+    f.grounded=false;f.launched=true;f.state.position=[earth.position[0],earth.position[1]+earth.radius+200000,earth.position[2]];
+    f.state.velocity=[earth.velocity[0]+15000,earth.velocity[1],earth.velocity[2]];
+    f.startMapBurn([0,1000,0]);
+    f.setPlayerWarp(f.warpLevels.indexOf(100));
+    const fuel=f.rocket.totalFuelMass();f.update(1/30);
+    expect(f.maneuverRemaining.length()).toBe(0);expect(f.state.throttle).toBe(0);
+    expect(f.rocket.totalFuelMass()).toBe(fuel);
   });
 
   it('persists and resumes an in-progress automatic mission', () => {

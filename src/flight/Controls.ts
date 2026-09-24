@@ -80,7 +80,7 @@ export class Controls {
     return was;
   }
 
-  private clearInput(): void {
+  clearInput(): void {
     this.keys.clear();
     this.stagePressed = false;
     this.pauseToggle = false;

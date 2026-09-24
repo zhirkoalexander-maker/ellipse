@@ -18,7 +18,7 @@ import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE, FUEL_FLOW_MULT } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
-import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
+import { OrbitMap } from '../ui/OrbitMap';
 import { buildDeployedParachute, gltfCache } from '../parts/PartBuilder';
 import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import { gravitationalAccelerationAt, totalGravityOn } from '../physics/Gravity';
@@ -75,8 +75,11 @@ export class FlightScene {
   private launchClamps: LaunchClamps | null = null;
   private surfaceView = new SurfaceView();
   private reentryGlow: THREE.Mesh | null = null;
+  private orbitMap!: OrbitMap;
+  private maneuverRemaining = new THREE.Vector3();
   private rocketQuat = new THREE.Quaternion();
   private attitudePresentationActive = false;
+  private previousDisplayedAttitude = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
   private readonly ANGULAR_ACCEL = 2.5;
   private readonly ANGULAR_DAMPING = 3.5;
@@ -412,11 +415,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'stage') this.stageOrLaunch();
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
-      else if (action === 'map') {
-        mapActive = !mapActive;
-        if (mapActive) { mapEl.style.display = 'block'; this.lifetime.frame(() => { mapEl.style.opacity = '1'; }); this.lifetime.frame(drawMap); }
-        else { mapEl.style.opacity = '0'; this.lifetime.timeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
-      }
+      else if (action === 'map') { this.orbitMap.toggle(); }
       else if (action === 'resume') {
         this.paused = false;
         this.hud.setPaused(false);
@@ -430,476 +429,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     };
     this.hud.mount();
 
-    let mapActive = false;
-    let mapZoom = 1.0;
-    let mapPanX = 0;
-    let mapPanY = 0;
-    let mapDragStart: { x: number; y: number } | null = null;
-
-    const mapEl = document.createElement('div');
-    mapEl.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(6,8,20,0.95);display:none;opacity:0;transition:opacity 220ms ease-out;';
-    const mapCanvas = document.createElement('canvas');
-    mapCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
-    mapEl.appendChild(mapCanvas);
-    this.lifetime.append(mapEl);
-
-    // Map UI overlay
-    const mapUI = document.createElement('div');
-    mapUI.style.cssText = 'position:absolute;top:16px;left:16px;z-index:10;color:#EACD9E;font-family:monospace;font-size:12px;pointer-events:none;';
-    mapUI.innerHTML = '<div id="map-zoom">ZOOM: 1x</div><div id="map-center">CENTER: ROCKET</div><div id="map-legend" style="margin-top:8px;font-size:10px;opacity:0.7;">SCROLL: zoom | DRAG: pan | M/TAB: close</div>';
-    mapEl.appendChild(mapUI);
-
-    // Transfer planner panel (top-right of map)
-    const transferPanel = document.createElement('div');
-    transferPanel.style.cssText = 'position:absolute;top:16px;right:16px;z-index:10;background:rgba(8,10,24,0.85);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:12px;font-family:monospace;font-size:11px;color:#88ccff;min-width:200px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;';
-    transferPanel.innerHTML = `
-      <div style="color:#c89838;font-size:10px;letter-spacing:0.1em;">Transfer planner</div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="color:#889;font-size:10px;">Target</span>
-        <select id="transfer-target" style="flex:1;background:#06080f;color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;padding:3px 6px;font:400 11px monospace;cursor:pointer;"></select>
-      </div>
-      <button id="transfer-compute" style="padding:6px;background:rgba(68,136,204,0.15);color:#88ccff;border:1px solid rgba(68,136,204,0.3);border-radius:3px;font:600 10px system-ui;cursor:pointer;letter-spacing:0.05em;">Check vehicle</button>
-      <div id="transfer-result" style="font-size:10px;color:#ddd;min-height:40px;line-height:1.5;"></div>
-      <button id="transfer-go" style="padding:8px;background:rgba(124,255,178,0.12);color:#7CFFB2;border:1px solid rgba(124,255,178,0.3);border-radius:3px;font:700 11px system-ui;cursor:pointer;letter-spacing:0.08em;display:none;">▶ Start flight</button>
-    `;
-    mapEl.appendChild(transferPanel);
-    const targetSelect = transferPanel.querySelector('[id="transfer-target"]') as HTMLSelectElement;
-    const computeBtn = transferPanel.querySelector('[id="transfer-compute"]') as HTMLButtonElement;
-    const resultEl = transferPanel.querySelector('[id="transfer-result"]') as HTMLDivElement;
-    const goBtn = transferPanel.querySelector('[id="transfer-go"]') as HTMLButtonElement;
-    let lastPlan: TransferPlan | null = null;
-    // Populate target list with planets (not sun, not current ref body)
-    const planetsForTransfer = this.system.bodies.filter(b => ['moon', 'earth', 'mercury', 'venus', 'mars', 'pluto'].includes(b.name));
-    targetSelect.innerHTML = planetsForTransfer.map(b => `<option value="${b.name}">${b.name.toUpperCase()}</option>`).join('');
-    targetSelect.value = 'moon';
-    goBtn.style.display = 'block';
-    goBtn.textContent = 'Start flight';
-
-    computeBtn.textContent = 'Check vehicle';
-    this.lifetime.listen(computeBtn, 'click', () => {
-      const fuel = this.rocket.totalFuelMass();
-      const thrust = totalThrust(this.rocket.assembly.roots);
-      resultEl.textContent = `${thrust.toFixed(0)} kN thrust · ${(fuel / 1000).toFixed(1)} t fuel. Autopilot launches, transfers, brakes and lands.`;
-    });
-
-    this.lifetime.listen(goBtn, 'click', () => {
-      if (!this.startMission(targetSelect.value)) return;
-      mapActive = false; mapEl.style.opacity = '0';
-      this.lifetime.timeout(() => { mapEl.style.display = 'none'; }, 240);
-    });
-
-    // NOTE: mapCanvas + mapEl were already appended earlier (lines above).
-    // Re-appending here MOVED the canvas after the transfer panel in the DOM
-    // — removed: canvas must stay under the UI panels.
-
-    this.lifetime.listen(mapCanvas, 'wheel', (e) => {
-      mapZoom *= e.deltaY > 0 ? 0.9 : 1.1;
-      mapZoom = Math.max(0.05, Math.min(100, mapZoom));
-    });
-    this.lifetime.listen(mapCanvas, 'mousedown', (e) => {
-      mapDragStart = { x: e.clientX, y: e.clientY };
-    });
-    this.lifetime.listen(window, 'mouseup', () => { mapDragStart = null; });
-    this.lifetime.listen(window, 'mousemove', (e) => {
-      if (!mapDragStart) return;
-      mapPanX += (e.clientX - mapDragStart.x);
-      mapPanY += (e.clientY - mapDragStart.y);
-      mapDragStart = { x: e.clientX, y: e.clientY };
-    });
-    this.lifetime.listen(mapCanvas, 'touchstart', (e) => {
-      if (e.touches.length === 1) mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
-    });
-    this.lifetime.listen(mapCanvas, 'touchmove', (e) => {
-      if (!mapDragStart || e.touches.length !== 1) return;
-      mapPanX += (e.touches[0]!.clientX - mapDragStart.x);
-      mapPanY += (e.touches[0]!.clientY - mapDragStart.y);
-      mapDragStart = { x: e.touches[0]!.clientX, y: e.touches[0]!.clientY };
-    });
-    this.lifetime.listen(mapCanvas, 'touchend', () => { mapDragStart = null; });
-    this.lifetime.listen(mapCanvas, 'dblclick', (e) => {
-      e.preventDefault();
-      const rect = mapCanvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const cW = mapCanvas.clientWidth;
-      const cH = mapCanvas.clientHeight;
-      const cx2 = cW/2 + mapPanX;
-      const cy2 = cH/2 + mapPanY;
-      let maxRelD2 = 1;
-      for (const b of this.system.bodies) {
-        const dx = (b.position[0] - this.state.position[0]) * VISUAL_SCALE;
-        const dz = (b.position[2] - this.state.position[2]) * VISUAL_SCALE;
-        const d = Math.sqrt(dx * dx + dz * dz);
-        if (d > maxRelD2) maxRelD2 = d;
-      }
-      const s2 = Math.min(cW, cH) * 0.4 / maxRelD2 * mapZoom;
-      let nearest: string | null = null;
-      let nearestDist = 25;
-      for (const b of this.system.bodies) {
-        const bx = cx2 + (b.position[0] - this.state.position[0]) * s2;
-        const by = cy2 - (b.position[2] - this.state.position[2]) * s2;
-        const dr = Math.sqrt((mx-bx)**2 + (my-by)**2);
-        if (dr < nearestDist) { nearestDist = dr; nearest = b.name; }
-      }
-      if (nearest) {
-        const body = this.system.bodyByName(nearest);
-        if (body) {
-          const zoomTo = nearest === 'earth' ? 20 : nearest === 'moon' ? 50 : 3;
-          mapPanX = -(body.position[0] - this.state.position[0]) * s2;
-          mapPanY = (body.position[2] - this.state.position[2]) * s2;
-          mapZoom = zoomTo;
-          toast.show(`${nearest}: ${((body as any).mass ?? 0).toExponential(2)}kg R=${((body as any).radius ?? 0)/1000}km`);
-        }
-      }
-    });
-
-    let mapFrame = 0;
-    const drawMap = () => {
-      if (!mapActive) return;
-      mapFrame++;
-      if (mapFrame % 5 !== 0) { this.lifetime.frame(drawMap); return; }
-      const dpr = window.devicePixelRatio || 1;
-      const w = mapCanvas.clientWidth;
-      const h = mapCanvas.clientHeight;
-      mapCanvas.width = w * dpr;
-      mapCanvas.height = h * dpr;
-      const ctx = mapCanvas.getContext('2d')!;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      ctx.fillStyle = '#060814'; ctx.fillRect(0, 0, w, h);
-
-      const cx = w / 2 + mapPanX;
-      const cy = h / 2 + mapPanY;
-
-      let maxRelD = 1;
-      for (const b of this.system.bodies) {
-        const dx = (b.position[0] - this.state.position[0]) * VISUAL_SCALE;
-        const dz = (b.position[2] - this.state.position[2]) * VISUAL_SCALE;
-        const d = Math.sqrt(dx * dx + dz * dz);
-        if (d > maxRelD) maxRelD = d;
-      }
-      const s = Math.min(w, h) * 0.4 / maxRelD * mapZoom;
-
-      const colors: Record<string, string> = {
-  sun: '#ffdd44', earth: '#4fc3f7', moon: '#ccccee',
-  venus: '#e8b84c', mars: '#e88444', mercury: '#c0c0c0',
-  jupiter: '#e8b87c', saturn: '#f4e8b0', uranus: '#5fe0f0',
-  neptune: '#5b88ee', pluto: '#ddccbb', titan: '#ddaa77',
-  io: '#eeddaa', europa: '#aaccdd', ganymede: '#bbccaa',
-  phobos: '#bb9988', deimos: '#887766'
-};
-const sizes: Record<string, number> = {
-  sun: 12, earth: 7, moon: 3, venus: 5, mars: 5, mercury: 3,
-  jupiter: 10, saturn: 9, uranus: 6, neptune: 5,
-  pluto: 2
-};
-
-  // Draw planet orbit trails around sun
-const sunPos = this.system.bodyByName('sun')?.position;
-if (sunPos) {
-  for (const b of this.system.bodies) {
-    if (b.name === 'sun' || b.name === 'moon') continue;
-    const relToSun: [number, number, number] = [
-      b.position[0] - sunPos[0],
-      b.position[1] - sunPos[1],
-      b.position[2] - sunPos[2],
-    ];
-    if (b.velocity) {
-      const predOrbit = predictOrbit(relToSun, b.velocity.map((v, i) => v - this.system.bodyByName('sun')!.velocity[i]!) as Vec3, this.system.bodyByName('sun')!.mass, 5e14, 180);
-      if (predOrbit.points.length > 10) {
-        ctx.beginPath();
-        ctx.strokeStyle = colors[b.name] + '30';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 6]);
-        // Animated dash flow → orbit appears to "move"
-        ctx.lineDashOffset = -(mapFrame * 0.5) % 9;
-        const firstX = cx + (predOrbit.points[0]![0] + sunPos[0]) * s;
-        const firstY = cy - (predOrbit.points[0]![1] + sunPos[2]) * s;
-        ctx.moveTo(firstX, firstY);
-        for (let i = 1; i < predOrbit.points.length; i += 2) {
-          const px = cx + (predOrbit.points[i]![0] + sunPos[0]) * s;
-          const py = cy - (predOrbit.points[i]![1] + sunPos[2]) * s;
-          ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.lineDashOffset = 0;
-      }
-    }
-  }
-}
-
-  // Planet bodies — simple dots with labels
-for (const b of this.system.bodies) {
-  const bx = cx + (b.position[0] - this.state.position[0]) * s;
-  const by = cy - (b.position[2] - this.state.position[2]) * s;
-  const r = sizes[b.name] || 3;
-
-  ctx.beginPath();
-  ctx.arc(bx, by, r, 0, Math.PI * 2);
-  ctx.fillStyle = colors[b.name] || '#888';
-  ctx.fill();
-  ctx.font = 'bold 10px monospace';
-  ctx.fillStyle = '#F4F5F2';
-  ctx.fillText(b.name.toUpperCase(), bx + r + 5, by + 4);
-}
-
-    // Draw SOI circles for all bodies
-const sunBody = this.system.bodyByName('sun');
-for (const b of this.system.bodies) {
-  if (b.name === 'sun' || b.mass <= 0 || !sunBody || b.name === sunBody.name) continue;
-  const dx = (b.position[0] - sunBody.position[0]) * VISUAL_SCALE;
-  const dz = (b.position[2] - sunBody.position[2]) * VISUAL_SCALE;
-  const distToSun = Math.sqrt(dx * dx + dz * dz);
-  if (distToSun < 1) continue;
-  const soiR = distToSun * Math.pow(b.mass / sunBody.mass, 0.4);
-  const bx_s = cx + (b.position[0] - this.state.position[0]) * s;
-  const by_s = cy - (b.position[2] - this.state.position[2]) * s;
-  ctx.beginPath();
-  ctx.arc(bx_s, by_s, soiR * s, 0, Math.PI * 2);
-  ctx.setLineDash([4, 4]);
-  ctx.strokeStyle = (colors[b.name] || '#888') + '44';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-// Scale indicator bar
-const barWidth = 80;
-const barHeight = 3;
-const barX = w - barWidth - 15;
-const barY = h - 30;
-const realKmPerPx = (maxRelD * 2) / Math.min(w, h) * mapZoom;
-const barKm = realKmPerPx * barWidth;
-const niceKm = Math.pow(10, Math.floor(Math.log10(barKm)));
-const nicePx = barWidth * (niceKm / barKm);
-ctx.fillStyle = 'rgba(244,245,242,0.4)';
-ctx.fillRect(barX, barY, nicePx, barHeight);
-ctx.strokeStyle = 'rgba(244,245,242,0.5)';
-ctx.lineWidth = 0.5;
-ctx.strokeRect(barX, barY, nicePx, barHeight);
-ctx.fillStyle = 'rgba(244,245,242,0.4)';
-ctx.font = '8px monospace';
-ctx.fillText(`${niceKm >= 1000 ? (niceKm/1000).toFixed(0)+'Mkm' : niceKm.toFixed(0)+'km'}`, barX, barY - 2);
-
-// Compass rose
-const compassX = 30;
-const compassY = h - 35;
-const compassR = 12;
-ctx.strokeStyle = 'rgba(244,245,242,0.25)';
-ctx.lineWidth = 1;
-ctx.beginPath();
-ctx.arc(compassX, compassY, compassR, 0, Math.PI * 2);
-ctx.stroke();
-ctx.beginPath();
-ctx.moveTo(compassX, compassY - compassR - 5);
-ctx.lineTo(compassX, compassY + compassR + 5);
-ctx.moveTo(compassX - compassR - 5, compassY);
-ctx.lineTo(compassX + compassR + 5, compassY);
-ctx.stroke();
-ctx.fillStyle = 'rgba(244,245,242,0.4)';
-ctx.font = 'bold 8px monospace';
-ctx.fillText('N', compassX - 3, compassY - compassR - 7);
-ctx.fillStyle = 'rgba(244,245,242,0.2)';
-ctx.fillText('S', compassX - 3, compassY + compassR + 12);
-ctx.fillText('W', compassX - compassR - 12, compassY + 3);
-ctx.fillText('E', compassX + compassR + 7, compassY + 3);
-
-
-      // Draw rocket position on map with trajectory
-      const rocketX = cx;
-      const rocketY = cy;
-      const velX = this.state.velocity[0] || 0;
-      const velZ = this.state.velocity[2] || 0;
-      const velMag = Math.sqrt(velX * velX + velZ * velZ);
-      const velAngle = velMag > 0.1 ? Math.atan2(velZ, velX) : 0;
-
-      // Rocket icon - diamond shape in velocity direction
-      ctx.save();
-      ctx.translate(rocketX, rocketY);
-      ctx.rotate(-velAngle);
-      ctx.beginPath();
-      ctx.moveTo(8, 0);
-      ctx.lineTo(0, -4);
-      ctx.lineTo(-5, 0);
-      ctx.lineTo(0, 4);
-      ctx.closePath();
-      ctx.fillStyle = '#EACD9E';
-      ctx.fill();
-      ctx.strokeStyle = '#EACD9E';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.restore();
-
-      // Draw velocity vector arrow
-      if (velMag > 0.1) {
-        const arrowLen = Math.min(30, 10 + velMag * s * 2);
-        ctx.beginPath();
-        ctx.moveTo(rocketX, rocketY);
-        ctx.lineTo(rocketX + Math.cos(velAngle) * arrowLen, rocketY - Math.sin(velAngle) * arrowLen);
-        ctx.strokeStyle = 'rgba(234,205,158,0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        // Arrow tip
-        ctx.beginPath();
-        ctx.moveTo(rocketX + Math.cos(velAngle) * arrowLen, rocketY - Math.sin(velAngle) * arrowLen);
-        ctx.lineTo(rocketX + Math.cos(velAngle + 0.4) * (arrowLen - 5), rocketY - Math.sin(velAngle + 0.4) * (arrowLen - 5));
-        ctx.lineTo(rocketX + Math.cos(velAngle - 0.4) * (arrowLen - 5), rocketY - Math.sin(velAngle - 0.4) * (arrowLen - 5));
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(234,205,158,0.6)';
-        ctx.fill();
-      }
-
-      // Draw trajectory endpoint if prediction available
-      const refBody = getReferenceBody(this.state.position, this.system);
-      const relPos: [number, number, number] = [
-        (this.state.position[0] - refBody.position[0]) * VISUAL_SCALE,
-        (this.state.position[1] - refBody.position[1]) * VISUAL_SCALE,
-        (this.state.position[2] - refBody.position[2]) * VISUAL_SCALE,
-      ];
-
-      // Sun direction line from rocket
-      const sun = this.system.bodyByName('sun');
-      if (sun) {
-        const dx = (sun.position[0] - this.state.position[0]) * s;
-        const dz = (sun.position[2] - this.state.position[2]) * s;
-        const dSun = Math.sqrt(dx * dx + dz * dz);
-        if (dSun > 1) {
-          ctx.beginPath();
-          ctx.moveTo(rocketX + dx / dSun * 12, rocketY - dz / dSun * 12);
-          ctx.lineTo(rocketX + dx / dSun * Math.min(dSun, 60), rocketY - dz / dSun * Math.min(dSun, 60));
-          ctx.strokeStyle = 'rgba(255,220,68,0.15)';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([3, 6]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.beginPath();
-          ctx.arc(rocketX + dx / dSun * Math.min(dSun, 60), rocketY - dz / dSun * Math.min(dSun, 60), 3, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255,220,68,0.3)';
-          ctx.fill();
-        }
-      }
-
-      const prediction = predictOrbit(relPos, this.relVelocity(), refBody.mass, 5e14, 360);
-      if (prediction.points.length > 1) {
-        // Glow under line — pulsing opacity for "live" feel
-        const pulse = 0.12 + 0.06 * (0.5 + 0.5 * Math.sin(mapFrame * 0.18));
-        ctx.beginPath();
-        ctx.strokeStyle = prediction.bound ? `rgba(68,136,204,${pulse})` : `rgba(221,170,68,${pulse})`;
-        ctx.lineWidth = 8;
-        const firstX = cx + prediction.points[0]![0] * s;
-        const firstY = cy - prediction.points[0]![1] * s;
-        ctx.moveTo(firstX, firstY);
-        for (let i = 1; i < prediction.points.length; i++) {
-          const px = cx + prediction.points[i]![0] * s;
-          const py = cy - prediction.points[i]![1] * s;
-          ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-
-        // Main trajectory line with gradient (bright near rocket, fades at end)
-        const grad = ctx.createLinearGradient(firstX, firstY, 
-          cx + prediction.points[prediction.points.length-1]![0] * s,
-          cy - prediction.points[prediction.points.length-1]![1] * s);
-        const startCol = prediction.bound ? 'rgba(68,136,204,0.9)' : 'rgba(221,170,68,0.9)';
-        const endCol = prediction.bound ? 'rgba(68,136,204,0.2)' : 'rgba(221,170,68,0.2)';
-        grad.addColorStop(0, startCol);
-        grad.addColorStop(1, endCol);
-        ctx.beginPath();
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 2.5;
-        ctx.moveTo(firstX, firstY);
-        for (let i = 1; i < prediction.points.length; i++) {
-          const px = cx + prediction.points[i]![0] * s;
-          const py = cy - prediction.points[i]![1] * s;
-          ctx.lineTo(px, py);
-        }
-        ctx.stroke();
-
-        // Single direction arrow at the end of the trajectory
-        if (prediction.points.length > 4) {
-          const last2 = prediction.points[prediction.points.length - 1]!;
-          const last1 = prediction.points[prediction.points.length - 2]!;
-          const adx = last2[0] - last1[0];
-          const ady = last2[1] - last1[1];
-          const ad = Math.sqrt(adx*adx + ady*ady) || 1;
-          const arrowX = cx + last2[0] * s;
-          const arrowY = cy - last2[1] * s;
-          const aLen = 8;
-          ctx.beginPath();
-          ctx.moveTo(arrowX, arrowY);
-          ctx.lineTo(arrowX - adx/ad * aLen + ady/ad * aLen * 0.4, arrowY + ady/ad * aLen + adx/ad * aLen * 0.4);
-          ctx.lineTo(arrowX - adx/ad * aLen - ady/ad * aLen * 0.4, arrowY + ady/ad * aLen - adx/ad * aLen * 0.4);
-          ctx.closePath();
-          ctx.fillStyle = prediction.bound ? 'rgba(68,136,204,0.6)' : 'rgba(221,170,68,0.6)';
-          ctx.fill();
-        }
-
-        if (prediction.bound && isFinite(prediction.apoapsis) && isFinite(prediction.periapsis)) {
-          const apX = cx + prediction.apoapsis * s;
-          const peX = cx + prediction.periapsis * s;
-          ctx.beginPath(); ctx.arc(apX, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#FF8844'; ctx.fill();
-          ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#FF8844'; ctx.fillText('Ap', apX + 6, cy + 3);
-          ctx.beginPath(); ctx.arc(peX, cy, 4, 0, Math.PI * 2); ctx.fillStyle = '#44DD88'; ctx.fill();
-          ctx.fillStyle = '#44DD88'; ctx.fillText('Pe', peX + 6, cy + 3);
-        }
-        // Target planet label at trajectory end
-        if (prediction.points.length > 2) {
-          const last = prediction.points[prediction.points.length - 1]!;
-          const lx = cx + last[0] * s, ly = cy - last[1] * s;
-          const endWX = refBody.position[0] * VISUAL_SCALE + last[0];
-          const endWZ = refBody.position[2] * VISUAL_SCALE + last[1];
-          let nearName = '', nearD = 20;
-          for (const b of this.system.bodies) {
-            if (b.name === refBody.name || b.mass <= 0) continue;
-            const dp = Math.sqrt((endWX - b.position[0]*VISUAL_SCALE)**2 + (endWZ - b.position[2]*VISUAL_SCALE)**2);
-            if (dp < nearD) { nearD = dp; nearName = b.name; }
-          }
-          if (nearName) {
-            ctx.font = 'bold 10px monospace'; ctx.fillStyle = '#EACD9E';
-            ctx.fillText('\u2192 ' + nearName.toUpperCase(), lx + 8, ly - 4);
-          }
-        }
-
-        // Label trajectory target — which planet is closest to the endpoint
-        if (prediction.points.length > 2) {
-          const lastPt = prediction.points[prediction.points.length - 1]!;
-          const endWX = refBody.position[0] * VISUAL_SCALE + lastPt[0];
-          const endWZ = refBody.position[2] * VISUAL_SCALE + lastPt[1];
-          let nearestPlanet = '';
-          let nearestDist = 30;
-          for (const b of this.system.bodies) {
-            if (b.name === refBody.name || b.mass <= 0) continue;
-            const bx = b.position[0] * VISUAL_SCALE;
-            const bz = b.position[2] * VISUAL_SCALE;
-            const dp = Math.sqrt((endWX - bx)**2 + (endWZ - bz)**2);
-            if (dp < nearestDist) { nearestDist = dp; nearestPlanet = b.name; }
-          }
-          if (nearestPlanet) {
-            const lastX = cx + lastPt[0] * s;
-            const lastY = cy - lastPt[1] * s;
-            ctx.font = 'bold 10px monospace';
-            ctx.fillStyle = '#EACD9E';
-            ctx.fillText('→ ' + nearestPlanet.toUpperCase(), lastX + 10, lastY - 5);
-          }
-        }
-      }
-
-      ctx.fillStyle = 'rgba(244,245,242,0.3)';
-      ctx.font = '9px sans-serif';
-      ctx.fillText(`${(maxRelD / 1000).toFixed(0)} km | Zoom: ${mapZoom.toFixed(1)}x`, 10, h - 10);
-
-      this.lifetime.frame(drawMap);
-    };
-
+    this.orbitMap = new OrbitMap(() => ({
+      position: this.state.position, velocity: this.state.velocity, bodies: this.system.bodies,
+      reference: this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system),
+      grounded: this.grounded, paused: this.paused, fuel: this.rocket.totalFuelMass(), remainingBurn: this.maneuverRemaining.length(),
+    }), dv => this.startMapBurn(dv), () => this.stopMapBurn(), target => this.startMission(target), () => this.controls.clearInput());
     this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
-      if (e.repeat || this.lifetime.disposed || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
-      if (e.key === 'm' || e.key === 'Tab') {
-        mapActive = !mapActive;
-        if (mapActive) { mapEl.style.display = 'block'; this.lifetime.frame(() => { mapEl.style.opacity = '1'; }); if (mapActive) this.lifetime.frame(drawMap); }
-        else { mapEl.style.opacity = '0'; this.lifetime.timeout(() => { if (!mapActive) mapEl.style.display = 'none'; }, 240); }
-        e.preventDefault();
-      }
+      if (e.repeat || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
+      if (e.key.toLowerCase() === 'm' || e.key === 'Tab') { e.preventDefault(); this.orbitMap.toggle(); }
     });
 
     this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
@@ -1257,7 +794,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   update(_dt: number): void {
     if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
-    const displayedAttitude = this.rocketGroup.quaternion.clone();
+    this.previousDisplayedAttitude.copy(this.rocketGroup.quaternion);
     try {
       if (this.autopilotActive && this.missionGuidance && this.missionAutoWarp && !this.grounded && !this.paused && !this.crashed) {
         const ref = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
@@ -1271,26 +808,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         const total = _dt * this.missionRate;
         const count = Math.min(32, Math.max(1, Math.ceil(total / maxStep)));
         for (let i = 0; i < count; i++) {
-          this.updateInner(total / count, i === count - 1, _dt / count);
+          this.updateInner(total / count, i === count - 1, _dt / count, _dt);
           if (this.crashed || this.paused || !this.autopilotActive || this.grounded) break;
         }
         if (this.autopilotActive) this.hud.setWarp(this.missionRate);
       } else this.updateInner(_dt);
-      if (this.autopilotActive) this.attitudePresentationActive = true;
-      if (this.attitudePresentationActive && !this.grounded && !this.paused && !this.crashed) {
-        // Simulation may advance seconds per frame at warp. Present attitude
-        // corrections in wall time so guidance substeps never snap the model.
-        const angle = displayedAttitude.angleTo(this.rocketQuat);
-        const step = Math.min(angle * (1 - Math.exp(-6 * _dt)), 1.4 * _dt);
-        displayedAttitude.rotateTowards(this.rocketQuat, step);
-        this.rocketGroup.quaternion.copy(displayedAttitude);
-        if (this.deployedChuteMesh) {
-          this.deployedChuteMesh.quaternion.copy(displayedAttitude);
-          this.deployedChuteMesh.position.copy(this.rocketGroup.position).add(
-            new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(displayedAttitude));
-        }
-        if (!this.autopilotActive && angle < 0.001) this.attitudePresentationActive = false;
-      }
 
     } catch (e: any) {
       toast.show(`ERROR: ${e.message || e}`);
@@ -1298,8 +820,8 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
   }
 
-  private updateInner(_dt: number, render = true, wallDt = _dt): void {
-    const baseDt = wallDt;
+  private updateInner(_dt: number, render = true, wallDt = _dt, renderDt = wallDt): void {
+    let baseDt = wallDt;
     const simulationDt = _dt;
     // A crash is terminal: keep planet, contact point and camera in one frozen
     // frame until restart. Only the short explosion animation continues.
@@ -1349,7 +871,12 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
 
 
+    const previousThrottle = this.state.throttle;
     this.controls.update(baseDt);
+    if (this.maneuverRemaining.lengthSq() > 0 && this.state.throttle !== previousThrottle) {
+      const manualThrottle = this.state.throttle;
+      this.stopMapBurn(); this.state.throttle = manualThrottle;
+    }
     if (this.controls.getStageRequested()) this.stageOrLaunch();
     // Screen buttons throttle
     if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
@@ -1439,6 +966,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const targetDir = surfaceNormal.clone().multiplyScalar(Math.cos(this._gravityTurnBias)).addScaledVector(east, Math.sin(this._gravityTurnBias));
       aimAttitude(this.rocketQuat, targetDir, baseDt, 0.25);
     }
+    if (this.maneuverRemaining.lengthSq() > 0) {
+      if (steering || this.grounded || this.rocket.totalFuelMass() <= 0) this.stopMapBurn();
+      else {
+        aimAttitude(this.rocketQuat, this.maneuverRemaining, baseDt, 1.4);
+        const alignment = new THREE.Vector3(0,1,0).applyQuaternion(this.rocketQuat).dot(this.maneuverRemaining.clone().normalize());
+        const acceleration = totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass();
+        this.state.throttle = alignment > .999 ? Math.min(1, this.maneuverRemaining.length() / Math.max(.00001, acceleration * _dt)) : 0;
+      }
+    }
     this.rocketQuat.normalize();
     this.rocketGroup.quaternion.copy(this.rocketQuat);
     // Use the orientation that will actually be rendered this frame.
@@ -1508,8 +1044,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
       }
     }
-    if (engineFiring && (!this.grounded || canLiftOff)) {
+    if ((engineFiring || this.maneuverRemaining.lengthSq() > 0) && (!this.grounded || canLiftOff)) {
+      const beforeBurn = new THREE.Vector3(...this.state.velocity);
       applyThrust(this.state, _dt, [tx, ty, tz]);
+      if (this.maneuverRemaining.lengthSq() > 0) {
+        const delivered = new THREE.Vector3(...this.state.velocity).sub(beforeBurn);
+        this.maneuverRemaining.sub(delivered);
+        if (this.maneuverRemaining.length() < 0.05 || this.rocket.totalFuelMass() <= 0) this.stopMapBurn();
+      }
       this.sanitize(this.state.velocity);
     }
     if (engineFiring && canLiftOff && this.grounded) {
@@ -1796,6 +1338,24 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     if (!render) return;
+    baseDt = renderDt;
+      const displayedAttitude = this.previousDisplayedAttitude.clone();
+      if (this.autopilotActive) this.attitudePresentationActive = true;
+      if (this.attitudePresentationActive && !this.grounded && !this.paused && !this.crashed) {
+        // Simulation may advance seconds per frame at warp. Present attitude
+        // corrections in wall time so guidance substeps never snap the model.
+        const angle = displayedAttitude.angleTo(this.rocketQuat);
+        const step = Math.min(angle * (1 - Math.exp(-6 * renderDt)), 1.4 * renderDt);
+        displayedAttitude.rotateTowards(this.rocketQuat, step);
+        this.rocketGroup.quaternion.copy(displayedAttitude);
+        if (this.deployedChuteMesh) {
+          this.deployedChuteMesh.quaternion.copy(displayedAttitude);
+          this.deployedChuteMesh.position.copy(this.rocketGroup.position).add(
+            new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(displayedAttitude));
+        }
+        if (!this.autopilotActive && angle < 0.001) this.attitudePresentationActive = false;
+      }
+
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
     }
@@ -1961,7 +1521,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // Aim at a stable point halfway up the stack. Following the rotated
         // model centre made every autopilot attitude correction move the camera
         // target as well, which looked like a violent shake at warp.
-        const modelCenter = camUp.clone().multiplyScalar((this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5);
+        const modelCenter = new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5).applyQuaternion(this.rocketGroup.quaternion);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
         // At high coast warp keep the camera at the current craft position.
         // Zoom and orbit inputs still ease inside ChaseCamera.
@@ -1976,7 +1536,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           this.rocketGroup.position.y,
           this.rocketGroup.position.z
         );
-        this.deployedChuteMesh.position.add(new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(this.rocketQuat));
+        this.deployedChuteMesh.position.add(new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(this.rocketGroup.quaternion));
         this.deployedChuteMesh.rotation.copy(this.rocketGroup.rotation);
         // Animate deployment: ease-out with slight overshoot (back-out)
         if (this.chuteDeployProgress < 1) {
@@ -2171,25 +1731,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     this.prevVel = [this.state.velocity[0], this.state.velocity[1], this.state.velocity[2]];
 
-    // Compute G-force from velocity change (for screen shake, no HUD display)
-    const dvx = this.state.velocity[0] - this.prevVel[0];
-    const dvy = this.state.velocity[1] - this.prevVel[1];
-    const dvz = this.state.velocity[2] - this.prevVel[2];
-    const dvgf = Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
-    const gForce = baseDt > 0 ? dvgf / (baseDt * 9.80665) : 1;
-
-    // Screen shake from high G-force or mach effects
-    if (gForce > 2.5) {
-      this.screenShake = Math.min(1, (gForce - 2.5) / 5);
-    } else {
-      this.screenShake *= Math.exp(-3 * baseDt);
-    }
-    if (this.screenShake > 0.01) {
-      const shakeX = (Math.random() - 0.5) * this.screenShake * 0.01;
-      const shakeY = (Math.random() - 0.5) * this.screenShake * 0.01;
-      this.rocketGroup.position.x += shakeX;
-      this.rocketGroup.position.z += shakeY;
-    }
+    // Keep the craft attached to its physical position. Engine vibration is
+    // confined to exhaust effects; never add random offsets to the hull.
+    this.screenShake = 0;
 
     // Dynamic FOV — subtle widen at very high speed only
     const speedKms = speed / 1000;
@@ -2345,7 +1889,25 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     return this.system.bodyByName(this.autopilotTarget) ?? null;
   }
 
+  private startMapBurn(dv: Vec3): string {
+    if (this.grounded) return 'Launch before executing a burn.';
+    if (this.paused || this.crashed) return 'Resume flight before executing a burn.';
+    if (!dv.every(Number.isFinite) || Math.hypot(...dv) < 0.05) return 'Set a course correction first.';
+    if (this.rocket.totalFuelMass() <= 0 || totalThrust(this.rocket.assembly.roots) <= 0) return 'An engine and fuel are required.';
+    if (this.autopilotActive) this.abortAutopilot('Course correction');
+    this.landingAssist = false; this.manualAttitude = true; this.sasMode = 'off';
+    this.timeWarp = 1; this.warpIndex = 0; this.state.throttle = 0;
+    this.angularVel.set(0,0,0); this.maneuverRemaining.fromArray(dv);
+    return 'Aligning for burn…';
+  }
+
+  private stopMapBurn(): void {
+    this.maneuverRemaining.set(0,0,0); this.state.throttle = 0;
+    this.sasTargetQuat.copy(this.rocketQuat); this.sasMode = 'hold';
+  }
+
   private startMission(targetName: string, autoWarp = this.hud.autopilotAutoWarp): boolean {
+    this.stopMapBurn();
     if (this.paused || this.crashed || this.lifetime.disposed) return false;
     const target = this.system.bodyByName(targetName);
     const departure = getReferenceBody(this.state.position, this.system);
@@ -2610,6 +2172,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       toast.show(reason, 4500);
       return;
     }
+    if (this.maneuverRemaining.lengthSq() > 0) this.stopMapBurn();
     if (this.autopilotActive) this.abortAutopilot('Manual time warp');
     this.warpIndex = nextIndex; this.timeWarp = warp; this.hud.setWarp(warp);
     if (warp > 10) {
@@ -3123,6 +2686,7 @@ private positionFlameAtNozzle(): void {
   }
 
   dispose(): void {
+    this.orbitMap?.dispose();
     if (this.lifetime.disposed) return;
     this.persistFlight();
     this.lifetime.dispose();
