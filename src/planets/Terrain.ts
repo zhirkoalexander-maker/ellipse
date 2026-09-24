@@ -50,12 +50,16 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
   const detail = terrainNoise(x * 240 + seed, y * 240 + 17, z * 240 + 91);
   let height = (broad - 0.35) * 0.004 + Math.pow(ridges, 5) * 0.003 + (detail - 0.5) * 0.0007;
   if (name === 'earth') {
-    height = Math.max(-0.001, (broad - 0.38) * 0.003) + Math.pow(ridges, 6) * 0.004 + (detail - 0.5) * 0.0008;
+    const continent = terrainNoise(x * 3 + 11, y * 3 + 23, z * 3 + 45);
+    const land = THREE.MathUtils.smoothstep(continent, 0.48, 0.64);
+    height = (continent - 0.56) * 0.012 + land * (Math.pow(ridges, 6) * 0.004 + (detail - 0.5) * 0.0008);
     const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
     const dot = x * Math.cos(lat) * Math.cos(lon) + y * Math.sin(lat) + z * Math.cos(lat) * Math.sin(lon);
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
     const blend = Math.max(0, Math.min(1, (angle - 0.0007) / 0.004));
-    return height * blend * blend * (3 - 2 * blend);
+    // The water surface is also the collision surface. Keep the launch plateau dry.
+    const coastalHills = 0.002 * Math.exp(-((angle / 0.025) ** 2));
+    return Math.max(-0.00015, (height + coastalHills) * blend * blend * (3 - 2 * blend));
   }
   if (name === 'moon' || name === 'mercury') {
     height = (broad - 0.5) * 0.002 + (detail - 0.5) * 0.001 + smallCraters(x, y, z);
@@ -73,11 +77,15 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
 
 export function terrainColor(name: string, height: number, direction: THREE.Vector3): THREE.Color {
   const grain = terrainNoise(direction.x * 320 + 8, direction.y * 320 + 19, direction.z * 320 + 51);
-  const color = new THREE.Color(name === 'earth' ? 0x586447 : name === 'mars' ? 0xa16648 : name === 'venus' ? 0x978567 : name === 'pluto' ? 0xb4b3a8 : 0x8e9193);
+  const color = new THREE.Color(name === 'earth' ? 0x28702e : name === 'mars' ? 0xa16648 : name === 'venus' ? 0x978567 : name === 'pluto' ? 0xb4b3a8 : 0x8e9193);
   if (name === 'earth') {
-    color.lerp(new THREE.Color(0x8a8376), THREE.MathUtils.smoothstep(height, 0.0008, 0.0035));
-    color.lerp(new THREE.Color(0xcdd0cb), THREE.MathUtils.smoothstep(height, 0.0034, 0.005));
-    if (height < -0.00005) color.lerp(new THREE.Color(0x284b61), THREE.MathUtils.smoothstep(-height, 0, 0.0008));
+    if (height < -0.000145) {
+      const depth = terrainNoise(direction.x * 3 + 11, direction.y * 3 + 23, direction.z * 3 + 45);
+      return new THREE.Color(0x064477).lerp(new THREE.Color(0x168eaa), THREE.MathUtils.smoothstep(depth, 0.48, 0.55));
+    }
+    color.lerp(new THREE.Color(0xc6b777), 1 - THREE.MathUtils.smoothstep(height, -0.00014, 0.0001));
+    color.lerp(new THREE.Color(0x72523b), THREE.MathUtils.smoothstep(height, 0.0022, 0.004));
+    color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, 0.0043, 0.0058));
   }
   return color.multiplyScalar(0.82 + grain * 0.32);
 }
@@ -91,4 +99,19 @@ export function paintTerrain(geometry: THREE.BufferGeometry, name: string, radiu
     colors.push(color.r, color.g, color.b);
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+}
+
+/** Match water shading in the distant globe and the detailed surface mesh. */
+export function configureEarthMaterial(material: THREE.MeshStandardMaterial): void {
+  material.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
+      #include <roughnessmap_fragment>
+      float ocean = step(vColor.r * 2.0, vColor.b) * step(vColor.g * 1.1, vColor.b);
+      roughnessFactor = mix(roughnessFactor, 0.24, ocean);
+    `).replace('#include <emissivemap_fragment>', `
+      #include <emissivemap_fragment>
+      totalEmissiveRadiance *= 1.0 - ocean;
+    `);
+  };
+  material.customProgramCacheKey = () => 'earth-water-v1';
 }
