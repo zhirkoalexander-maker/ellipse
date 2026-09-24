@@ -9,6 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>Ellipse</title>
+    <link rel="icon" type="image/svg+xml" href="/ellipse/favicon.svg" />
     <style>
       html, body { overflow: hidden; position: fixed; width: 100%; height: 100%; margin: 0; padding: 0; }
       #rotate-hint { display: none !important; }
@@ -19,8 +20,9 @@
         flex-direction: column; gap: 16px;
       }
     </style>
-    <script type="module" crossorigin src="/ellipse/assets/index-D9eWDwbQ.js"></script>
-    <link rel="stylesheet" crossorigin href="/ellipse/assets/index-P21-68i8.css">
+    <script type="module" crossorigin src="/ellipse/assets/game-D-qaCS90.js"></script>
+    <link rel="modulepreload" crossorigin href="/ellipse/assets/PartCatalog-75HmrE5c.js">
+    <link rel="stylesheet" crossorigin href="/ellipse/assets/game-DU8pMpmr.css">
   </head>
   <body>
     <div id="loading-screen" style="display:none;"></div>
@@ -32,7 +34,7 @@
     <script>
       window.onerror = function(m) { alert('JS Error: '+m); };
       (function(){
-        var v = 'v2.3';
+        var v = 'v2.4.0';
         if (sessionStorage.getItem('ellipse_ver') && sessionStorage.getItem('ellipse_ver') !== v) {
           sessionStorage.setItem('ellipse_ver', v);
           location.reload(true);
