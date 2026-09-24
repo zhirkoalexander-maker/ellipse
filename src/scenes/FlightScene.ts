@@ -76,6 +76,7 @@ export class FlightScene {
   private surfaceView = new SurfaceView();
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
+  private attitudePresentationActive = false;
   private angularVel = new THREE.Vector3();
   private readonly ANGULAR_ACCEL = 2.5;
   private readonly ANGULAR_DAMPING = 3.5;
@@ -1256,6 +1257,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
   update(_dt: number): void {
     if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
+    const displayedAttitude = this.rocketGroup.quaternion.clone();
     try {
       if (this.autopilotActive && this.missionGuidance && this.missionAutoWarp && !this.grounded && !this.paused && !this.crashed) {
         const ref = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
@@ -1274,6 +1276,22 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         }
         if (this.autopilotActive) this.hud.setWarp(this.missionRate);
       } else this.updateInner(_dt);
+      if (this.autopilotActive) this.attitudePresentationActive = true;
+      if (this.attitudePresentationActive && !this.grounded && !this.paused && !this.crashed) {
+        // Simulation may advance seconds per frame at warp. Present attitude
+        // corrections in wall time so guidance substeps never snap the model.
+        const angle = displayedAttitude.angleTo(this.rocketQuat);
+        const step = Math.min(angle * (1 - Math.exp(-6 * _dt)), 1.4 * _dt);
+        displayedAttitude.rotateTowards(this.rocketQuat, step);
+        this.rocketGroup.quaternion.copy(displayedAttitude);
+        if (this.deployedChuteMesh) {
+          this.deployedChuteMesh.quaternion.copy(displayedAttitude);
+          this.deployedChuteMesh.position.copy(this.rocketGroup.position).add(
+            new THREE.Vector3(0, this.rocketTopY * ROCKET_VISUAL_SCALE, 0).applyQuaternion(displayedAttitude));
+        }
+        if (!this.autopilotActive && angle < 0.001) this.attitudePresentationActive = false;
+      }
+
     } catch (e: any) {
       toast.show(`ERROR: ${e.message || e}`);
       console.error('FlightScene.update error:', e);
