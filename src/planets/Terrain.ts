@@ -52,13 +52,14 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
   if (name === 'earth') {
     const continent = terrainNoise(x * 3 + 11, y * 3 + 23, z * 3 + 45);
     const land = THREE.MathUtils.smoothstep(continent, 0.48, 0.64);
-    height = (continent - 0.56) * 0.012 + land * (Math.pow(ridges, 6) * 0.004 + (detail - 0.5) * 0.0008);
+    const mountainRegion = THREE.MathUtils.smoothstep(terrainNoise(x * 7 + 41, y * 7 + 9, z * 7 + 62), 0.58, 0.78);
+    height = (continent - 0.56) * 0.004 + land * (mountainRegion * Math.pow(ridges, 4) * 0.0018 + (detail - 0.5) * 0.00006);
     const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
     const dot = x * Math.cos(lat) * Math.cos(lon) + y * Math.sin(lat) + z * Math.cos(lat) * Math.sin(lon);
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
     const blend = Math.max(0, Math.min(1, (angle - 0.0007) / 0.004));
     // The water surface is also the collision surface. Keep the launch plateau dry.
-    const coastalHills = 0.002 * Math.exp(-((angle / 0.025) ** 2));
+    const coastalHills = 0.00035 * Math.exp(-((angle / 0.025) ** 2));
     return Math.max(-0.00015, (height + coastalHills) * blend * blend * (3 - 2 * blend));
   }
   if (name === 'moon' || name === 'mercury') {

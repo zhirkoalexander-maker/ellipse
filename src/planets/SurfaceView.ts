@@ -89,6 +89,7 @@ export class SurfaceView {
     const material = (body.mesh.material as THREE.MeshStandardMaterial).clone();
     material.visible = true; material.vertexColors = true; material.roughness = 1;
     material.map = null; material.emissiveMap = null;
+    material.emissive.setHex(0x000000); material.emissiveIntensity = 0;
     material.transparent = false; material.opacity = 1;
     if (body.name === 'earth') configureEarthMaterial(material);
     this.patch = new THREE.Mesh(geometry, material); this.patch.name = 'local-terrain';

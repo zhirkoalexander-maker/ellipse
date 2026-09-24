@@ -50,3 +50,11 @@ it('keeps local terrain on the physical surface and restores the globe on exit',
   expect(body.mesh.getObjectByName('local-terrain')).toBeUndefined();
   expect(body.mesh.scale.x).toBe(1);
 });
+
+it('does not turn the close-up Earth into an emissive yellow surface', () => {
+ const earth=new Earth([0,0,0],[0,0,0]); const view=new SurfaceView();
+ view.update([0,earth.radius+100,0],earth,[earth]);
+ const patch=earth.mesh.getObjectByName('local-terrain') as THREE.Mesh;
+ expect((patch.material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(0);
+ view.dispose([earth]);
+});

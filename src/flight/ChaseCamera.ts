@@ -159,7 +159,7 @@ export class ChaseCamera {
     // Autopilot may split a large simulation step into tiny render slices.
     // Keep camera easing tied to visible time so it neither lags for seconds
     // nor appears to jitter while the physics is being accelerated.
-    const cameraDt = Math.max(0, Math.min(0.05, Math.max(dt, 1 / 120)));
+    const cameraDt = Math.max(0, Math.min(0.1, dt));
     const vx = state.position[0] * VISUAL_SCALE + (lookOffset?.x ?? 0);
     const vy = state.position[1] * VISUAL_SCALE + (lookOffset?.y ?? 0);
     const vz = state.position[2] * VISUAL_SCALE + (lookOffset?.z ?? 0);
@@ -197,17 +197,10 @@ export class ChaseCamera {
     this.surfaceFrame.premultiply(new THREE.Quaternion().setFromUnitVectors(previousUp, targetUp)).normalize();
     const targetPos = new THREE.Vector3(ox, oy, oz).applyQuaternion(this.surfaceFrame).add(targetLook);
 
-    if (!this.initialized) {
-      this.smoothPos.copy(targetPos);
-      this.initialized = true;
-    }
-
-    if (snap) {
-      this.smoothPos.copy(targetPos);
-    } else {
-      const t = Math.min(1, LERP_SPEED * cameraDt);
-      this.smoothPos.lerp(targetPos, t);
-    }
+    // Orbit and zoom are already eased above. Translational lag makes the
+    // craft bounce across the frame when its speed or warp rate changes.
+    this.smoothPos.copy(targetPos);
+    this.initialized = true;
 
     this.camera.position.copy(this.smoothPos);
     this.camera.up.copy(targetUp);
