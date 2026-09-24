@@ -1947,7 +1947,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
         // At high coast warp keep the camera at the current craft position.
         // Zoom and orbit inputs still ease inside ChaseCamera.
-        const warpSnap = warpActive && !this.autopilotActive && this.timeWarp >= 100;
+        const warpSnap = (this.autopilotActive ? this.missionRate : this.timeWarp) >= 100;
         this.chase.follow(this.state, baseDt, camUp, !this._camSnapped || warpSnap, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
       }
