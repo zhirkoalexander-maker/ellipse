@@ -3,10 +3,10 @@ import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
-import { generateJupiterTexture } from '../effects/ProceduralTextures';
+import { gasTexture } from './GasAppearance';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
-const SEGMENTS = 64;
+const SEGMENTS = 128;
 
 export class Jupiter extends Planet {
   atmosphereGlow: any;
@@ -16,7 +16,7 @@ export class Jupiter extends Planet {
 
     const visualR = this.visualRadius;
 
-    const tex = generateJupiterTexture();
+    const tex = gasTexture('jupiter');
 
     const geom = new THREE.SphereGeometry(visualR, SEGMENTS, SEGMENTS);
     // Gas cloud layers are smooth; bands belong in the texture, not terrain.
