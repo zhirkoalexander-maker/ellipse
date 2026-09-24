@@ -18,6 +18,7 @@ export class VABScene {
   private rg = new THREE.Group();
   private root!: HTMLDivElement;
   private info!: HTMLElement;
+  private partSearch!: HTMLInputElement;
   private st = 0;
   private nm: string[] = [];
   private az = 0; private po = Math.PI/2; private dt = 1.5;
@@ -104,12 +105,14 @@ export class VABScene {
     this.root.innerHTML = `
       <div style="width:clamp(148px,40vw,260px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
         <div style="padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.15);">
-          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.1em;">Assembly</div>
-          <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">select parts</div>
+          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Rocket build</div>
+          <div style="margin-top:6px;font:400 9px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Click a part to place it on top.</div>
+          <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 11px system-ui;outline:none;">
+          <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">Nothing added yet</div>
         </div>
         <div id="vl" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
         <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;gap:6px;">
-          <button id="vg" style="width:100%;padding:12px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);font:400 12px system-ui;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;">Launch</button>
+          <button id="vg" style="width:100%;padding:12px;background:#c89542;color:#111827;border:1px solid #eacb8b;font:600 12px system-ui;letter-spacing:0.04em;cursor:pointer;transition:all 0.2s;">Take to pad</button>
           <div style="display:flex;gap:4px;">
             <button id="vu" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 10px system-ui;cursor:pointer;">Undo</button>
             <button id="vc" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 10px system-ui;cursor:pointer;">Clear</button>
@@ -128,6 +131,8 @@ export class VABScene {
       <button id="vz-fit" title="Fit whole rocket" style="width:40px;height:40px;border-radius:8px;background:rgba(200,152,56,0.25);color:#EACD9E;border:1px solid rgba(200,152,56,0.45);font:600 10px system-ui;cursor:pointer;">Fit</button>
       </div>`;
     this.info = this.root.querySelector('#vi')!;
+    this.partSearch = this.root.querySelector('#vp-search')!;
+    this.partSearch.addEventListener('input', () => this.filterParts(this.partSearch.value));
     this.build();
     this.root.querySelector('#vg')!.addEventListener('click', () => {
       if(this.assembly.roots.length) {
@@ -158,11 +163,11 @@ export class VABScene {
 
     // ─── PRESETS ───
     const presetHeader = document.createElement('div');
-    presetHeader.textContent = 'PRESETS';
+    presetHeader.textContent = 'QUICK START';
     presetHeader.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
-    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Saturn V (2-stage)</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">165000kN</span>`;
+    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a Saturn V</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">2 stages</span>`;
     presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
     presetBtn.addEventListener('mouseenter', () => { presetBtn.style.background='rgba(255,255,255,0.05)'; });
     presetBtn.addEventListener('mouseleave', () => { presetBtn.style.background='transparent'; });
@@ -177,14 +182,15 @@ export class VABScene {
     }
     for (const [kind, g] of groups) {
       const h = document.createElement('div');
-      h.textContent = kind.toUpperCase();
+      const names: Record<string, string> = { capsule: 'Capsules', tank: 'Tanks', engine: 'Engines', decoupler: 'Decouplers', parachute: 'Parachutes', legs: 'Landing gear', heatshield: 'Heat shields', gltf: 'Models', fairing: 'Fairings', rcs: 'RCS', solar: 'Solar panels' };
+      h.textContent = names[kind] ?? kind;
       h.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
       el.appendChild(h);
       for (const p of g.parts) {
         const b = document.createElement('button');
         const has = p.kind==='engine'?`${Number(p.thrust!.toFixed(1))} kN · Isp ${p.isp}`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:p.kind==='rcs'?`${p.thrust}kN`:p.kind==='fairing'?'aero':'';
         const thumbnail = thumbnails.get(p);
-        b.innerHTML = `${thumbnail ? `<img src="${thumbnail}" alt="" width="44" height="44" style="width:44px;height:44px;flex:none;object-fit:contain;background:rgba(255,255,255,0.025);border-radius:5px;">` : `<span style="width:3px;height:28px;flex:none;background:${g.color};border-radius:2px;"></span>`}<span style="min-width:0;flex:1;"><span style="display:block;color:#fff;line-height:1.3;">${p.name}</span><span style="display:block;color:rgba(255,255,255,0.6);font-size:9px;margin-top:4px;">${p.size}${has ? ' · '+has : ''}</span></span>`;
+        b.innerHTML = `${thumbnail ? `<img src="${thumbnail}" alt="" width="44" height="44" style="width:44px;height:44px;flex:none;object-fit:contain;background:rgba(255,255,255,0.025);border-radius:5px;">` : `<span style="width:3px;height:28px;flex:none;background:${g.color};border-radius:2px;"></span>`}<span style="min-width:0;flex:1;"><span style="display:block;color:#fff;line-height:1.3;">${p.name}</span><span style="display:block;color:rgba(255,255,255,0.6);font-size:9px;margin-top:4px;">${p.size}${has ? ' · '+has : ''}</span></span><span style="color:#eacb8b;font-size:17px;line-height:1;">＋</span>`;
         b.title = `Add ${p.name}`;
         b.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:5px 12px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
         b.addEventListener('mouseenter', () => { b.style.background='rgba(255,255,255,0.05)'; b.style.color='#fff'; });
@@ -194,6 +200,15 @@ export class VABScene {
       }
     }
     thumbnails.dispose();
+  }
+
+  private filterParts(value: string): void {
+    const query = value.trim().toLowerCase();
+    const list = this.root.querySelector('#vl');
+    if (!list) return;
+    list.querySelectorAll<HTMLButtonElement>('button[title^="Add "]').forEach(button => {
+      button.style.display = query.length > 0 && !button.title.toLowerCase().includes(query) ? 'none' : 'flex';
+    });
   }
 
   private add(p: Part) {
@@ -242,9 +257,48 @@ export class VABScene {
     this.cam();
   }
   private up() {
-    if(!this.nm.length){this.info.innerHTML='<span style="color:rgba(255,255,255,0.5);">select parts</span>';return;}
+    if(!this.nm.length){this.info.innerHTML='<span style="color:rgba(255,255,255,0.5);">Nothing added yet</span>';return;}
     const dm=this.assembly.roots.reduce((s,n)=>s+n.part.mass,0), fl=this.assembly.roots.reduce((s,n)=>s+(n.part.fuelCapacity||0),0);
-    this.info.innerHTML=this.nm.map((n,i)=>`<span style="color:#fff;">${n}</span>`).join(' <span style="color:rgba(255,255,255,0.4);">&rarr;</span> ')+`<div style="margin-top:6px;font:400 8px system-ui;color:rgba(255,255,255,0.6);">${this.nm.length}p &middot; ${(dm/1000).toFixed(1)}t${fl?' &middot; '+(fl/1000).toFixed(0)+'t fuel':''}</div>`;
+    this.info.innerHTML = `<div style="margin-bottom:6px;">${this.nm.length} parts · ${(dm/1000).toFixed(1)} t${fl ? ' · '+(fl/1000).toFixed(1)+' t fuel' : ''}</div><div id="build-stack" style="max-height:24vh;overflow:auto;display:flex;flex-direction:column;gap:3px;"></div>`;
+    const list = this.info.querySelector('#build-stack')!;
+    // Display the physical top first, while retaining bottom-first assembly order.
+    for (let i = this.nm.length - 1; i >= 0; i--) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:3px;padding:4px;background:rgba(255,255,255,0.05);';
+      const label = document.createElement('span');
+      label.textContent = this.nm[i]!;
+      label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      row.appendChild(label);
+      for (const [action, symbol, title, disabled] of [
+        ['move-up', '↑', 'Move up', i === this.nm.length - 1],
+        ['move-down', '↓', 'Move down', i === 0],
+        ['remove', '×', 'Remove', false],
+      ] as const) {
+        const button = document.createElement('button');
+        button.textContent = symbol; button.title = `${title} ${this.nm[i]}`;
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute(`data-${action}`, String(i)); button.disabled = disabled;
+        button.style.cssText = `width:25px;height:28px;flex:none;background:#192536;border:0;color:#fff;cursor:pointer;opacity:${disabled ? 0.25 : 1};`;
+        button.onclick = () => {
+          const roots = this.assembly.roots;
+          if (action === 'remove') roots.splice(i, 1);
+          else {
+            const to = i + (action === 'move-up' ? 1 : -1);
+            [roots[i], roots[to]] = [roots[to]!, roots[i]!];
+          }
+          this.st = 0;
+          for (const node of roots) {
+            const height = PH[node.part.size] || 0.6;
+            const nextY = (this.st + height / 2) * PART_SCALE;
+            node.position[1] = nextY; this.st += height;
+          }
+          this.nm = roots.map(node => node.part.name);
+          this.rf(); this.up();
+        };
+        row.appendChild(button);
+      }
+      list.appendChild(row);
+    }
   }
   private async rf() {
     while(this.rg.children.length) this.rg.remove(this.rg.children[0]!);

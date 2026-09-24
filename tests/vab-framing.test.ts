@@ -43,6 +43,16 @@ describe('VAB camera framing', () => {
     expect(scene.tg.y).toBeLessThan(box.max.y + 0.01);
   });
 
+  it('reorders and removes individual parts without leaving gaps', () => {
+    vab = new VABScene(() => {}, () => {}); vab.mount();
+    addParts(['engine_ant', 'tank_s_lfo', 'capsule_mk1']);
+    document.querySelector<HTMLButtonElement>('[data-move-up="1"]')!.click();
+    expect(vab.assembly.roots.map(n => n.part.id)).toEqual(['engine_ant', 'capsule_mk1', 'tank_s_lfo']);
+    document.querySelector<HTMLButtonElement>('[data-remove="1"]')!.click();
+    expect(vab.assembly.roots.map(n => n.part.id)).toEqual(['engine_ant', 'tank_s_lfo']);
+    expect(vab.assembly.roots[1]!.position[1] - vab.assembly.roots[0]!.position[1]).toBeCloseTo(1.4 * PART_SCALE);
+  });
+
   it('multi-part stack: camera scales with the actual mesh, not raw stack coords', () => {
     vab = new VABScene(() => {}, () => {});
     vab.mount();

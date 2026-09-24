@@ -41,7 +41,7 @@ export class MainMenuScene {
         <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
       </svg>
       <div class="text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
-      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.15em;">SPACE FLIGHT SIMULATOR</div>
+      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.08em;">BUILD · FLY · LAND</div>
     `;
     this.root.appendChild(logo);
 
@@ -64,7 +64,7 @@ export class MainMenuScene {
     this.root.appendChild(btn('Settings', 'ghost', this.onSettings));
     this.root.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
-    version.textContent = 'v2.5.2 · Guided flight update';
+    version.textContent = 'v2.5.3';
     version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
     this.root.appendChild(version);
 

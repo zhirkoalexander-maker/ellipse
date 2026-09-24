@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Body } from '../../src/physics/Body';
-import { gravitationalForce, totalGravityOn } from '../../src/physics/Gravity';
+import { gravitationalForce, gravitationalAccelerationAt, totalGravityOn } from '../../src/physics/Gravity';
 
 describe('Gravity', () => {
   it('gravitationalForce between two bodies = G m1 m2 / r² toward source', () => {
@@ -23,5 +23,11 @@ describe('Gravity', () => {
     const f = totalGravityOn(target, [a, b]);
     // Forces cancel by symmetry → net ≈ 0
     expect(Math.abs(f[0])).toBeLessThan(1e-10);
+  });
+
+  it('returns a useful acceleration from a nearby Moon-sized body', () => {
+    const moon = new Body('moon', 2.2e23, [0, 0, 0], [0, 0, 0]);
+    const acceleration = gravitationalAccelerationAt([0, 0, 1.737e6 * 1.25], [moon]);
+    expect(acceleration[2]).toBeLessThan(-2);
   });
 });

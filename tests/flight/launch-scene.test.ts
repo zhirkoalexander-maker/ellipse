@@ -95,6 +95,19 @@ describe('FlightScene launch from KSC pad', () => {
     expect(anyFlight.rocketBottomY).toBeLessThan(0);
   });
 
+  it('builds a visible launch platform at the Earth pad', () => {
+    const flight = new FlightScene(new Renderer(), new SceneManager(), buildSystem(), buildDefaultRocket(), new Achievements(), new Missions());
+    try {
+      expect((flight as any).launchPadGroup).toBeTruthy();
+      expect((flight as any).launchPadGroup.children.length).toBeGreaterThan(2);
+      const pad = (flight as any).launchPadGroup as THREE.Group;
+      const earth = (flight as any).system.bodyByName('earth');
+      const offset = pad.position.clone().sub(new THREE.Vector3(...earth.position).multiplyScalar(VISUAL_SCALE));
+      flight.update(1);
+      expect(pad.position.clone().sub(new THREE.Vector3(...earth.position).multiplyScalar(VISUAL_SCALE)).distanceTo(offset)).toBeLessThan(1e-6);
+    } finally { flight.dispose(); }
+  });
+
   it('engine_ant TWR uses default thrust that clears the 1.0 gate (regression guard)', () => {
     const engine = PART_CATALOG.find((p) => p.id === 'engine_ant')!;
     const rocket = buildDefaultRocket();
