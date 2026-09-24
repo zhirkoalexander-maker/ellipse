@@ -393,7 +393,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     (window as any).__ellipse = { flight: this };
     this.hud.onAction = (action) => {
       if (this.lifetime.disposed || this.crashed) return;
-      if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100'].includes(action) && this.paused) return;
+      if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100', 'cameraZoomIn', 'cameraZoomOut'].includes(action) && this.paused) return;
       if (action.startsWith('autopilot') && this.paused) return;
       if (action.startsWith('autopilot:')) this.startMission(action.slice('autopilot:'.length));
       else if (action === 'autopilotCancel') this.abortAutopilot('Cancelled by user');
@@ -401,6 +401,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'warpDown') this.setPlayerWarp(this.warpIndex - 1);
       else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
       else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
+      else if (action === 'cameraZoomIn') this.chase.zoom(0.82);
+      else if (action === 'cameraZoomOut') this.chase.zoom(1.22);
       else if (action === 'stage') this.stageOrLaunch();
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
@@ -1249,7 +1251,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
     try {
       if (this.autopilotActive && this.missionGuidance && this.missionAutoWarp && !this.grounded && !this.paused && !this.crashed) {
-        const ref = getReferenceBody(this.state.position, this.system);
+        const ref = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
         const altitude = flightTelemetry(this.state.position, this.state.velocity, ref, false).altitude;
         const target = this.missionGuidance.target;
         const toTarget = Math.hypot(...this.state.position.map((v, i) => v - target.position[i]!)) - target.radius;
@@ -1373,7 +1375,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     const yawInput = warpActive ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
 
-    const rotRefBody = getReferenceBody(this.state.position, this.system);
+    const rotRefBody = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
     const surfaceNormal = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...rotRefBody.position)).normalize();
     const altM = new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...rotRefBody.position)) - ((rotRefBody as any).radius ?? 0);
     const steering = pitchInput !== 0 || yawInput !== 0 || rollInput !== 0;
@@ -1384,10 +1386,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         steerAttitude(this.rocketQuat, this.angularVel, pitchInput, yawInput, rollInput, baseDt);
         this.sasTargetQuat.copy(this.rocketQuat);
       } else if (this.landingAssist) {
-        aimAttitude(this.rocketQuat, this.landingDirection, this.autopilotActive ? simulationDt : baseDt, 1.4);
+        aimAttitude(this.rocketQuat, this.landingDirection, this.autopilotActive ? simulationDt : baseDt, 1.4, surfaceNormal);
         this.angularVel.set(0, 0, 0);
       } else if (this.autopilotActive && this.missionGuidance) {
-        aimAttitude(this.rocketQuat, this.missionDirection, simulationDt, 1.4);
+        aimAttitude(this.rocketQuat, this.missionDirection, simulationDt, 1.4, surfaceNormal);
         this.angularVel.set(0, 0, 0);
       } else if (this.sasMode === 'prograde' || this.sasMode === 'retrograde') {
         const target = new THREE.Vector3(...this.relVelocity());
@@ -1541,7 +1543,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     let nearestDist = Infinity;
     
     // Always compute nearest body for collision checks
-    const nearRef = getReferenceBody(this.state.position, this.system);
+    const nearRef = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
     // SOI change notification
     const refName = nearRef.name;
     if (this.lastRefBody && this.lastRefBody !== refName) {
@@ -1710,6 +1712,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
 
     const motionRef = nearRef;
+    // Keep an explicit segment for the selected destination as well. SOI
+    // switching is intentionally conservative, so a fast approach can still
+    // be referenced to the departure planet while already crossing the target
+    // body's surface. Without this second segment the rocket could orbit a
+    // few metres above a planet forever and never register touchdown.
+    const previousAbsolute = [...this.state.position] as Vec3;
+    const destinationBody = this.autopilotActive && this.missionGuidance
+      ? this.system.bodyByName(this.autopilotTarget) : undefined;
+    const destinationBefore = destinationBody ? [...destinationBody.position] as Vec3 : null;
     const oldRelative = this.state.position.map((x, i) => x - motionRef.position[i]!) as Vec3;
     const relativeVelocity = this.state.velocity.map((x, i) => x - motionRef.velocity[i]!) as Vec3;
     const surfaceBefore = (motionRef as any).getSurfaceRadiusAt?.(this.state.position) ?? (motionRef as any).radius ?? 0;
@@ -1723,6 +1734,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       // Account for acceleration of the reference body's heliocentric frame.
       this.state.velocity = (coast?.velocity ?? relativeVelocity).map((x, i) => x + motionRef.velocity[i]!) as Vec3;
       this.resolveSurfaceContact(motionRef, coast ? relativeEnd : oldRelative, relativeEnd, coast?.impacted ?? false);
+      if (!this.grounded && !this.crashed && destinationBody && destinationBody !== motionRef && destinationBefore) {
+        const destinationStart = previousAbsolute.map((x, i) => x - destinationBefore[i]!) as Vec3;
+        const destinationEnd = this.state.position.map((x, i) => x - destinationBody.position[i]!) as Vec3;
+        this.resolveSurfaceContact(destinationBody, destinationStart, destinationEnd, false);
+      }
       if (this.crashed) return;
     }
 
@@ -1766,7 +1782,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     // Keep the planet under the rocket fully visible. Previously every body
     // except Earth was faded to 5% opacity while landed, which made the Moon
     // look like a black void and hid the rest of the system from its surface.
-    const refVis = getReferenceBody(this.state.position, this.system);
+    const refVis = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
     const rdx = this.state.position[0] - refVis.position[0];
     const rdy = this.state.position[1] - refVis.position[1];
     const rdz = this.state.position[2] - refVis.position[2];
@@ -1843,7 +1859,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     }
     this.updateExplosion(baseDt);
 
-    const camRefBody = getReferenceBody(this.state.position, this.system);
+    const camRefBody = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
     const cdx = this.state.position[0] - camRefBody.position[0];
     const cdy = this.state.position[1] - camRefBody.position[1];
     const cdz = this.state.position[2] - camRefBody.position[2];
@@ -1868,7 +1884,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
       // Direction from reference body center to rocket (up vector = surface normal)
-      const refBodyVis = getReferenceBody(this.state.position, this.system);
+      const refBodyVis = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
       const upXv = this.state.position[0] - refBodyVis.position[0];
       const upYv = this.state.position[1] - refBodyVis.position[1];
       const upZv = this.state.position[2] - refBodyVis.position[2];
@@ -1920,9 +1936,15 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
           y: (upYv / upLenV) * visualOffset,
           z: (upZv / upLenV) * visualOffset,
         };
-        const modelCenter = new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5, 0).applyQuaternion(this.rocketQuat);
+        // Aim at a stable point halfway up the stack. Following the rotated
+        // model centre made every autopilot attitude correction move the camera
+        // target as well, which looked like a violent shake at warp.
+        const modelCenter = camUp.clone().multiplyScalar((this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
-        this.chase.follow(this.state, baseDt, camUp, warpActive || !this._camSnapped, lookOffset);
+        // A manual time warp may advance physics in large steps, but the view
+        // should continue its bounded interpolation instead of snapping away
+        // from the rocket. Only the first frame uses a hard snap.
+        this.chase.follow(this.state, baseDt, camUp, !this._camSnapped, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
       }
 
@@ -2239,6 +2261,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       getSurfaceRadiusAt: (body as any).getSurfaceRadiusAt?.bind(body) };
   }
 
+  /** During the final approach, use the selected destination as the local
+   * frame even if the SOI resolver has not switched yet. This keeps gravity,
+   * attitude, camera and collision checks on the same planet. */
+  private autopilotSurfaceBody(): Body | null {
+    if (!this.autopilotActive || !this.missionGuidance || !['arrival', 'landing'].includes(this.autopilotPhase)) return null;
+    return this.system.bodyByName(this.autopilotTarget) ?? null;
+  }
+
   private startMission(targetName: string, autoWarp = this.hud.autopilotAutoWarp): boolean {
     if (this.paused || this.crashed || this.lifetime.disposed) return false;
     const target = this.system.bodyByName(targetName);
@@ -2275,7 +2305,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
       return;
     }
     const command = this.missionGuidance.update({ position: this.state.position, velocity: this.state.velocity,
-      reference: this.navigationBody(getReferenceBody(this.state.position, this.system)),
+      reference: this.navigationBody(this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system)),
       mass: this.rocket.totalMass(), maxAcceleration: totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass(),
       dt, grounded: this.grounded, fuel: this.rocket.totalFuelMass() });
     if (command.phase === 'blocked') { this.abortAutopilot(command.status); return; }
@@ -2562,7 +2592,7 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
   }
 
   private updateLandingAssist(dt: number): void {
-    const ref = getReferenceBody(this.state.position, this.system);
+    const ref = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
     const radial = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position));
     const radius = radial.length();
     const up = radial.normalize();
@@ -2592,13 +2622,26 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (lateral.lengthSq() > 1e-8) desiredLandingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
     if (desiredLandingDirection.lengthSq() === 0) desiredLandingDirection.copy(up);
     desiredLandingDirection.normalize();
+    // Keep the landing attitude visually upright. Lateral braking can still
+    // lean the thrust vector at altitude, but the allowed lean closes smoothly
+    // to a few degrees near the surface instead of producing a tilted,
+    // oscillating rocket at touchdown.
+    const maxTilt = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(4 + altitude * 0.0015, 4, 32));
+    const tilt = Math.acos(THREE.MathUtils.clamp(up.dot(desiredLandingDirection), -1, 1));
+    if (tilt > maxTilt) {
+      const lateralDirection = desiredLandingDirection.clone().addScaledVector(up, -up.dot(desiredLandingDirection));
+      if (lateralDirection.lengthSq() > 1e-10) {
+        lateralDirection.normalize();
+        desiredLandingDirection.copy(up).multiplyScalar(Math.cos(maxTilt)).addScaledVector(lateralDirection, Math.sin(maxTilt)).normalize();
+      } else desiredLandingDirection.copy(up);
+    }
     const landingResponse = 1 - Math.exp(-6 * Math.max(0, dt));
     if (this.landingDirection.lengthSq() < 1e-8) this.landingDirection.copy(desiredLandingDirection);
     else this.landingDirection.lerp(desiredLandingDirection, landingResponse).normalize();
     const nose = new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat);
     // Point the engine in the useful direction before applying descent thrust.
     const aligned = Math.max(0, nose.dot(this.landingDirection));
-    this.state.throttle = aligned > 0.7 ? command.throttle : 0;
+    this.state.throttle = aligned > 0.55 ? command.throttle : 0;
     this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${altitude.toFixed(0)} m · DESCENT ${Math.max(0, -verticalSpeed).toFixed(1)} m/s · L: cancel`;
   }
 

@@ -93,6 +93,8 @@ export class HUD {
     bar.appendChild(addBtn('Stability', 'sas', '#8888cc'));
     bar.appendChild(addBtn('Parachute', 'parachute', '#44cc88'));
     bar.appendChild(addBtn('Landing [L]', 'landing', '#8fb6cf'));
+    bar.appendChild(addBtn('Zoom −', 'cameraZoomOut', '#9bb7cc'));
+    bar.appendChild(addBtn('Zoom +', 'cameraZoomIn', '#9bb7cc'));
     this.autopilotEntry = addBtn('Auto flight', 'autopilotOpen', '#eacd9e');
     bar.appendChild(this.autopilotEntry);
     this.createAutopilotControls();
