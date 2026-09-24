@@ -1,18 +1,12 @@
 ---
 name: rocket-ship
-description: A brief description of what this skill does
+description: Development notes for the Ellipse browser rocket simulator.
 ---
 
-# rocket-ship
+# Working on Ellipse
 
-Instructions for the agent to follow when this skill is activated.
+Use this guide when changing this repository. Start with README.md for local commands and SPECIFICATION.md for the current flight model.
 
-## When to use
+Keep physics positions in metres and convert only at the rendering boundary. Terrain rendering and collision queries must use the same surface function. Flight changes should preserve fuel consumption, manual control, and saved-flight compatibility.
 
-Describe when this skill should be used.
-
-## Instructions
-
-1. First step
-2. Second step
-3. Additional steps as needed
+Run the relevant tests during development, then `npm test` and `npm run build` before publishing. Check visible changes in a browser at desktop and narrow screen widths.

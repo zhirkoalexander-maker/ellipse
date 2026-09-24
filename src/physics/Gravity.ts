@@ -24,3 +24,21 @@ export function totalGravityOn(target: Body, sources: Body[]): Vec3 {
   }
   return [fx, fy, fz];
 }
+
+/** Gravitational acceleration at a point that is not itself a Body (for
+ * example, the rocket's FlightState). Keeping this in the gravity module makes
+ * every nearby planet contribute instead of relying on a single SOI guess. */
+export function gravitationalAccelerationAt(position: Vec3, sources: Body[]): Vec3 {
+  let ax = 0, ay = 0, az = 0;
+  for (const source of sources) {
+    if (source.mass <= 0) continue;
+    const dx = source.position[0] - position[0];
+    const dy = source.position[1] - position[1];
+    const dz = source.position[2] - position[2];
+    const r2 = dx * dx + dy * dy + dz * dz;
+    if (r2 <= 1) continue;
+    const scale = G / (r2 * Math.sqrt(r2)) * source.mass;
+    ax += dx * scale; ay += dy * scale; az += dz * scale;
+  }
+  return [ax, ay, az];
+}

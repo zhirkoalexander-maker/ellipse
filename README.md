@@ -1,54 +1,42 @@
-ELLIPSE
-v0.97
+# Ellipse
 
-ORBITAL LAUNCH SIMULATOR
-========================
+Ellipse is a small browser rocket simulator built with Three.js. Build a vehicle, launch it from the Earth pad, fly by hand, or ask the flight computer to carry out a transfer and landing.
 
-PROCESS: INITIALIZATION SEQUENCE
-STATUS: OPERATIONAL
-TESTS: 86 PASS 0 FAIL
+Play the current build at <https://zhirkoalexander-maker.github.io/ellipse/>.
 
-ENTITIES:
-  SOL
-  MERCURY VENUS EARTH LUNA MARS
-  JUPITER SATURN URANUS NEPTUNE PLUTO
+## Start locally
 
-CONTROLS:
-  W/S       THROTTLE_MODULATION
-  ARROW_KEYS ATTITUDE_ADJUSTMENT
-  C         CAMERA_MODE_TOGGLE
-  M/TAB     CARTOGRAPHY_OVERLAY
-  Q/E       TEMPORAL_ACCELERATION
-  SPACE     STAGE_SEPARATION
-  ESC       EXECUTION_HALT
+```sh
+npm install
+npm run dev
+```
 
-ASSEMBLY:
-  UNIT_CAPSULE  MASS_1200
-  UNIT_TANK_S   MASS_0200  FUEL_4500
-  UNIT_ENGINE   MASS_0050  THRUST_800000
+The production check is:
 
-PHYSICS:
-  GRAVITATIONAL_CONSTANT 6.67430e-11
-  SURFACE_GRAVITY_EARTH 42250
-  THRUST_WEIGHT_RATIO 3.2
-  ATMOSPHERE_DRAG ACTIVE
-  REENTRY_HEATING ACTIVE
+```sh
+npm test -- --run
+npm run build
+```
 
-DEPLOYMENT:
-  TARGET gh-pages
-  SOURCE main
-  BUILD npx_tsc_npx_vite_build
-  URL https://zhirkoalexander-maker.github.io/ellipse/
+## Controls
 
-ARCHITECTURE:
-  src/core/        ENGINE_INITIALIZATION
-  src/scenes/      STATE_MANAGEMENT
-  src/flight/      FLIGHT_CONTROL
-  src/physics/     ORBITAL_MECHANICS
-  src/planets/     CELESTIAL_BODIES
-  src/parts/       COMPONENT_CATALOG
-  src/rocket/      VEHICLE_ASSEMBLY
-  src/effects/     VISUAL_PROCESSING
+- `↑/↓` changes throttle; `W/S` pitches and `A/D` yaws the rocket.
+- `Space` launches on the pad and stages a live vehicle.
+- `L` toggles landing assist.
+- `Q/E` changes time warp; `100×` and `1000×` are available above 70 km with the engines off.
+- `C` switches the chase and free cameras; drag or use the camera buttons to orbit and zoom.
+- `M` or `Tab` opens the system map; `Esc` pauses.
 
-ITERATIONS: 642
-VERSION: 0.97
+Search the parts library in Vehicle Assembly and click a part to add it on top. The stack list shows the top of the rocket first; use its arrows to move parts or × to remove one. You can save and load designs.
+
+## Project layout
+
+```text
+src/core       app startup and scene routing
+src/scenes     menu, assembly, and flight scenes
+src/flight     controls, guidance, camera, and HUD
+src/physics    gravity, orbits, transfers, and collision checks
+src/planets    planet meshes, terrain, and atmospheres
+src/parts      procedural parts and thumbnails
+src/rocket     assembly and fuel state
+```

@@ -18,6 +18,35 @@ function create() {
 afterEach(() => { flight?.dispose(); flight = undefined; document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 describe('flight reliability', () => {
+  it('falls toward the Moon with engines off in its moving reference frame', () => {
+    const { f } = create(); const body = f.system.bodyByName('moon');
+    const radius = body.radius + 10000;
+    f.state.position = [body.position[0], body.position[1] + radius, body.position[2]];
+    f.state.velocity = [...body.velocity];
+    f.state.throttle = 0; f.grounded = false; f.groundedDir = null; f._spawnProtectionTimer = 0;
+    for (let i = 0; i < 60; i++) f.updateInner(1 / 60);
+    expect(f.state.velocity[1] - body.velocity[1]).toBeLessThan(-2.9);
+    expect(f.state.velocity[1] - body.velocity[1]).toBeGreaterThan(-3.2);
+    expect(Math.hypot(...f.state.position.map((v: number, i: number) => v - body.position[i]))).toBeLessThan(radius - 1);
+  });
+
+  it('holds camera distance at 1000x coast across uneven frame times', () => {
+    const { f, scene } = create(); const body = f.system.bodyByName('earth');
+    const radius = body.radius + 1000000;
+    f.state.position = [body.position[0], body.position[1] + radius, body.position[2]];
+    f.state.velocity = [body.velocity[0] + Math.sqrt(G * body.mass / radius), body.velocity[1], body.velocity[2]];
+    f.grounded = false; f.groundedDir = null; f._spawnProtectionTimer = 0;
+    f.setPlayerWarp(f.warpLevels.indexOf(1000));
+    for (const dt of [1 / 60, 1 / 30, 1 / 120, 1 / 45, 1 / 60]) {
+      f.update(dt);
+      const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
+      const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
+        .addScaledVector(up, (-f.rocketBottomY + (f.rocketTopY + f.rocketBottomY) * 0.5) * 60);
+      expect(scene.camera.position.distanceTo(look)).toBeCloseTo(f.chase.dist, 3);
+      expect(f.timeWarp).toBe(1000);
+      expect(f.crashed).toBe(false);
+    }
+  });
   it('reports physical apoapsis altitude for a circular orbit around a moving Earth', () => {
     const { f } = create(); const body = f.system.bodyByName('earth');
     const r = body.radius + 200000;

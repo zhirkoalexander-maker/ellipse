@@ -21,7 +21,7 @@ import { predictOrbit } from '../physics/OrbitPredictor';
 import { planTransfer, type TransferPlan } from '../physics/ManeuverPlanner';
 import { buildDeployedParachute, gltfCache } from '../parts/PartBuilder';
 import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
-import { totalGravityOn } from '../physics/Gravity';
+import { gravitationalAccelerationAt, totalGravityOn } from '../physics/Gravity';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 import { EngineFlame } from '../effects/EngineFlame';
@@ -69,6 +69,7 @@ export class FlightScene {
   private engineFlame: EngineFlame;
   private groundSmoke: GroundSmoke;
   private rocketShadow: THREE.Mesh | null = null;
+  private launchPadGroup: THREE.Group | null = null;
   private reentryGlow: THREE.Mesh | null = null;
   private rocketQuat = new THREE.Quaternion();
   private angularVel = new THREE.Vector3();
@@ -290,6 +291,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       if (pbody.mesh) sceneMgr.scene.add(pbody.mesh);
       if (pbody.light) sceneMgr.scene.add(pbody.light);
     }
+    this.buildLaunchPad(earth, dirNorm, surfaceR);
     const fillLight = new THREE.DirectionalLight(0x8899cc, 1.5);
     fillLight.position.set(-50, 20, -30);
     sceneMgr.scene.add(fillLight);
@@ -990,9 +992,9 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
 
     if (save) {
       this.applyFlightSave(save);
-      toast.show('Flight resumed. ↑/↓ throttle, W/S pitch, A/D yaw, Space stages.');
+      toast.show('Flight resumed');
     } else {
-      toast.show('Click Launch or press Space. W/S and A/D steer, ↑/↓ throttle, Esc pauses.');
+      toast.show('Ready to launch');
     }
     this.syncVisualTransform();
     const initialRef = getReferenceBody(this.state.position, this.system);
@@ -1588,17 +1590,14 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     if (this.liftoffFrames > 0) this.liftoffFrames = Math.max(0, this.liftoffFrames - baseDt * 60);
 
     if (!this.grounded) {
-      const dx = ndx;
-      const dy = ndy;
-      const dz = ndz;
-      const r = nearestDist;
-      const r2 = r * r;
-      if (r > 1 && r2 > 0 && this.timeWarp <= 10) {
-        const f = (G * nearRef.mass) / r2;
-        const gDelta = f * _dt;
-        this.state.velocity[0] += gDelta * dx / r;
-        this.state.velocity[1] += gDelta * dy / r;
-        this.state.velocity[2] += gDelta * dz / r;
+      if (nearestDist > 1 && this.timeWarp <= 10) {
+        const gravity = gravitationalAccelerationAt(this.state.position, this.system.bodies);
+        // Integration below already carries the craft with its accelerating
+        // reference body. Apply only relative acceleration here.
+        const frameGravity = gravitationalAccelerationAt(nearRef.position, this.system.bodies.filter(body => body !== nearRef));
+        for (const axis of [0, 1, 2] as const) {
+          this.state.velocity[axis] += (gravity[axis] - frameGravity[axis]) * _dt;
+        }
       }
       this.sanitize(this.state.velocity);
 
@@ -1778,6 +1777,11 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     for (const body of this.system.bodies) {
       (body as any).syncMesh?.();
     }
+    if (this.launchPadGroup) {
+      const earth = this.system.bodyByName('earth')!;
+      this.launchPadGroup.position.copy(this.launchPadGroup.userData.surfaceOffset)
+        .add(new THREE.Vector3(...earth.position).multiplyScalar(VISUAL_SCALE));
+    }
 
     // Keep the planet under the rocket fully visible. Previously every body
     // except Earth was faded to 5% opacity while landed, which made the Moon
@@ -1941,10 +1945,10 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
         // target as well, which looked like a violent shake at warp.
         const modelCenter = camUp.clone().multiplyScalar((this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
-        // A manual time warp may advance physics in large steps, but the view
-        // should continue its bounded interpolation instead of snapping away
-        // from the rocket. Only the first frame uses a hard snap.
-        this.chase.follow(this.state, baseDt, camUp, !this._camSnapped, lookOffset);
+        // At high coast warp keep the camera at the current craft position.
+        // Zoom and orbit inputs still ease inside ChaseCamera.
+        const warpSnap = warpActive && !this.autopilotActive && this.timeWarp >= 100;
+        this.chase.follow(this.state, baseDt, camUp, !this._camSnapped || warpSnap, lookOffset);
         if (!this._camSnapped) this._camSnapped = true;
       }
 
@@ -2259,6 +2263,38 @@ ctx.fillText('E', compassX + compassR + 7, compassY + 3);
     return { name: body.name, mass: body.mass, position: body.position, velocity: body.velocity,
       radius: (body as any).radius ?? 0,
       getSurfaceRadiusAt: (body as any).getSurfaceRadiusAt?.bind(body) };
+  }
+
+  private buildLaunchPad(earth: Body, up: [number, number, number], surfaceRadius: number): void {
+    const pad = new THREE.Group();
+    pad.name = 'earth-launch-pad';
+    const steel = new THREE.MeshStandardMaterial({ color: 0x53606a, metalness: 0.8, roughness: 0.36 });
+    const stripe = new THREE.MeshStandardMaterial({ color: 0xd59c38, metalness: 0.45, roughness: 0.45 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x18212a, metalness: 0.65, roughness: 0.5 });
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 9.2, 0.32, 48), steel);
+    deck.position.y = -0.16; pad.add(deck);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(7.3, 0.16, 8, 48), stripe);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0; pad.add(ring);
+    const trench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.08, 12), dark);
+    trench.position.set(0, -0.035, 0); pad.add(trench);
+    for (const [x, z] of [[-6.2, -4.7], [6.2, -4.7], [-6.2, 4.7], [6.2, 4.7]] as Array<[number, number]>) {
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.5, 0.65), dark);
+      foot.position.set(x, 0.38, z); pad.add(foot);
+    }
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(0.34, 5.5, 0.34), steel);
+    tower.position.set(6.5, 2.9, 0); pad.add(tower);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.22), stripe);
+    arm.position.set(4.9, 5.0, 0); pad.add(arm);
+    pad.position.set(
+      earth.position[0] * VISUAL_SCALE + up[0] * surfaceRadius * VISUAL_SCALE,
+      earth.position[1] * VISUAL_SCALE + up[1] * surfaceRadius * VISUAL_SCALE,
+      earth.position[2] * VISUAL_SCALE + up[2] * surfaceRadius * VISUAL_SCALE,
+    );
+    pad.userData.surfaceOffset = new THREE.Vector3(...up).multiplyScalar(surfaceRadius * VISUAL_SCALE);
+    pad.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...up));
+    this.sceneMgr.scene.add(pad);
+    this.launchPadGroup = pad;
+    this.ownedSceneObjects.push(pad);
   }
 
   /** During the final approach, use the selected destination as the local
@@ -3058,6 +3094,7 @@ private positionFlameAtNozzle(): void {
       ...[this.orbitLine, this.deployedChuteMesh].filter((x): x is THREE.Line | THREE.Group => x !== null),
     ], protectedObjects);
     this.ownedSceneObjects.forEach(obj => obj.removeFromParent());
+    this.launchPadGroup = null;
     this.deployedChuteMesh?.removeFromParent();
     this.orbitLine?.removeFromParent();
     if ((window as any).__ellipse?.flight === this) delete (window as any).__ellipse;

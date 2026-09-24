@@ -55,6 +55,13 @@ it('exposes explicit bounded camera zoom controls',()=>{
  button('cameraZoomOut').click();button('cameraZoomIn').click();
  expect(action.mock.calls).toEqual([['cameraZoomOut'],['cameraZoomIn']]);
 });
+it('keeps the flight bar compact and leaves the lower view clear',()=>{
+ hud=new HUD();hud.mount();
+ expect(button('throttleDown').textContent).toBe('▼');
+ expect(button('throttleUp').textContent).toBe('▲');
+    expect(document.querySelector<HTMLElement>('.flight-landing-status')?.style.opacity).toBe('0');
+ expect(document.querySelector('.hud-panel-in-right')?.textContent).not.toContain('T→Ap');
+});
 it('Escape closes the picker without reaching window flight shortcuts',()=>{
  hud=new HUD();hud.mount();button('autopilotOpen').click();
  const listener=vi.fn();window.addEventListener('keydown',listener);

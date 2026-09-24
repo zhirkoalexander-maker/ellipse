@@ -69,11 +69,13 @@ export class HUD {
     const bar = document.createElement('div');
     bar.classList.add('hud-panel-in-bottom', 'flight-actions');
     bar.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;gap:8px;pointer-events:auto;';
-    const addBtn = (label: string, action: string, color: string) => {
+    const addBtn = (label: string, action: string, color: string, title = label) => {
       const b = document.createElement('button');
       b.className = 'hud-ctrl-btn';
       b.dataset.action = action;
       b.textContent = label;
+      b.title = title;
+      b.setAttribute('aria-label', title);
       b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
       this.lifetime.listen(b, 'click', () => {
         if (action === 'autopilotOpen') this.openAutopilotPicker();
@@ -84,24 +86,24 @@ export class HUD {
       for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(event, () => { if (action === 'throttleUp') this._throttleBtn = false; if (action === 'throttleDown') this._throttleDn = false; });
       return b;
     };
-    bar.appendChild(addBtn('Throttle −', 'throttleDown', '#ff8844'));
-    bar.appendChild(addBtn('Throttle +', 'throttleUp', '#44ff88'));
+    bar.appendChild(addBtn('▼', 'throttleDown', '#ff8844', 'Lower throttle'));
+    bar.appendChild(addBtn('▲', 'throttleUp', '#44ff88', 'Raise throttle'));
     this.stageButton = addBtn('Launch', 'stage', '#ffcc44');
     bar.appendChild(this.stageButton);
     this.setGrounded(true);
     bar.appendChild(addBtn('Map', 'map', '#4488ff'));
     bar.appendChild(addBtn('Stability', 'sas', '#8888cc'));
     bar.appendChild(addBtn('Parachute', 'parachute', '#44cc88'));
-    bar.appendChild(addBtn('Landing [L]', 'landing', '#8fb6cf'));
-    bar.appendChild(addBtn('Zoom −', 'cameraZoomOut', '#9bb7cc'));
-    bar.appendChild(addBtn('Zoom +', 'cameraZoomIn', '#9bb7cc'));
-    this.autopilotEntry = addBtn('Auto flight', 'autopilotOpen', '#eacd9e');
+    bar.appendChild(addBtn('Landing', 'landing', '#8fb6cf', 'Landing assist'));
+    bar.appendChild(addBtn('−', 'cameraZoomOut', '#9bb7cc', 'Zoom out'));
+    bar.appendChild(addBtn('+', 'cameraZoomIn', '#9bb7cc', 'Zoom in'));
+    this.autopilotEntry = addBtn('Auto', 'autopilotOpen', '#eacd9e', 'Open automatic flight');
     bar.appendChild(this.autopilotEntry);
     this.createAutopilotControls();
     bar.style.flexWrap = 'wrap'; bar.style.justifyContent = 'center'; bar.style.width = 'min(96vw, 760px)';
     this.landingStatusEl.className = 'flight-landing-status';
-    this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none';
-    this.landingStatusEl.textContent = 'Click Launch or press Space · ↑/↓ throttle · W/S, A/D steer';
+    this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity 160ms ease;';
+    this.landingStatusEl.textContent = 'Ready to launch';
     this.root.appendChild(this.landingStatusEl);
     this.root.appendChild(bar);
     this._throttleBtn = false;
@@ -330,7 +332,9 @@ export class HUD {
         <span class="orbit-tta" style="color:#ddd;">—</span>
       </div>
     `;
-    this.root.appendChild(orbitPanel);
+    // Orbit readouts used to occupy the right side while showing little useful
+    // information during launch. Keep the data hooks for telemetry, but leave
+    // that part of the flight view open for the planet and navball.
     this.orbitPanel = orbitPanel;
     this.orbitAp = orbitPanel.querySelector('.orbit-ap')!;
     this.orbitPe = orbitPanel.querySelector('.orbit-pe')!;
@@ -673,6 +677,10 @@ setFreeCamera(active: boolean): void {
   setLandingStatus(text: string, active: boolean): void {
     this.landingStatusEl.textContent = text;
     this.landingStatusEl.style.borderColor = active ? '#7fafbc' : '#40515d';
+    const isHint = /^(Click Launch|W\/S and A\/D|Ready to launch)/.test(text);
+    const visible = !isHint && (active || /^(GROUND|LANDING|LOW THRUST|Landed|Impact|Insufficient)/.test(text));
+    this.landingStatusEl.style.opacity = visible ? '1' : '0';
+    this.landingStatusEl.style.visibility = visible ? 'visible' : 'hidden';
   }
 
   unmount(): void {
