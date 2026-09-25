@@ -6,3 +6,31 @@
 @media(max-width:700px){.orbit-map aside{max-height:min(350px,calc(100dvh - 260px))}body:has(.surface-readout:not([hidden])) .autopilot-mission{top:85px!important;bottom:auto!important;left:auto!important;right:8px!important;width:180px!important;max-width:calc(100vw - 160px)!important;transform:none!important}}
 @media(max-width:700px){.orbit-map aside>label:first-child{grid-column:1/2}.orbit-map #map-distance{grid-column:2/3;align-self:center}.map-advanced{grid-column:2/3;align-self:center}.map-advanced[open]{grid-column:1/-1}.map-burn-actions{flex-wrap:nowrap}.map-burn-actions button{padding:7px;font-size:11px}}
 .orbit-map footer label{display:none}.orbit-map:has(.map-advanced[open]) footer label{display:flex}@media(max-width:700px){.surface-readout{bottom:155px}.orbit-map footer button[data-map="minus"]{margin-left:auto}}
+
+/* Keep the chart clear; show burn controls only when the player needs them. */
+.map-destinations{position:absolute;left:16px;right:326px;top:116px;display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;pointer-events:auto;scrollbar-width:thin}
+.map-destinations button{flex:none;min-height:30px;padding:4px 9px;font-size:12px;border-color:#334351;background:#101a22}
+.map-destinations button::before{content:'';display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--planet-color)}
+.orbit-map aside{top:16px;background:#111a23f2;border-color:#344451;border-radius:5px}
+.map-course{border-top:1px solid #344451;padding-top:12px}
+.map-course>summary{cursor:pointer;padding:4px 0;font-size:14px;color:#e4edf3}
+.map-course[open]{display:grid;gap:12px}
+.map-course[open]>summary{margin-bottom:12px}
+.map-course>small{display:block;margin-bottom:12px}
+.map-course>.map-simple-actions,.map-course>label,.map-course>.map-advanced,.map-course>.map-burn-actions{margin-top:12px}
+.orbit-map #transfer-go{background:#244a60;border-color:#5387a2}
+.orbit-map[data-view=system] footer>span{visibility:hidden}
+.orbit-map output{min-height:0}
+.orbit-map aside>hr{display:none}
+@media(max-width:700px){
+ .map-destinations{left:10px;right:10px;top:102px}
+ .orbit-map aside{top:auto;bottom:62px;display:grid;grid-template-columns:1fr 1fr;max-height:45dvh;padding:10px;gap:8px}
+ .orbit-map aside>label:first-child{grid-column:1/2}
+ .orbit-map #map-distance{grid-column:2/3}
+ .orbit-map #transfer-go{grid-column:1/-1;min-height:34px}
+ .map-course{grid-column:1/-1;padding-top:5px}
+ .map-course>summary{font-size:13px}
+ .orbit-map output{grid-column:1/-1}
+ .map-course .map-simple-actions{grid-template-columns:1.5fr 1fr 1fr}
+ .orbit-map footer{bottom:10px}
+}
