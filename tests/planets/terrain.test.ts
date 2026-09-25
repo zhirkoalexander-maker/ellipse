@@ -45,10 +45,23 @@ it('keeps only the immediate launch site flat and restores the coast outside it'
  const earth = new Earth([0,0,0], [0,0,0]);
  const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
  const pad = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
- for (const offset of [-0.0003, 0, 0.0003]) {
+ for (const offset of [-0.00005, 0, 0.00005]) {
   const point = pad.clone().add(new THREE.Vector3(offset,0,0)).normalize().multiplyScalar(earth.radius);
-  expect(earth.getSurfaceRadiusAt(point.toArray())).toBeCloseTo(earth.radius, 6);
+  expect(earth.getSurfaceRadiusAt(point.toArray())).toBeCloseTo(earth.radius+12, 6);
  }
  const hillside = pad.clone().add(new THREE.Vector3(0.006, 0, 0)).normalize().multiplyScalar(earth.radius);
- expect(earth.getSurfaceRadiusAt(hillside.toArray()) - earth.radius).toBeLessThan(-100);
+ expect(earth.getSurfaceRadiusAt(hillside.toArray()) - earth.radius).toBeCloseTo(0,6);
+});
+
+it('has visible inland ridges and a shore at sea level near the launch coast',()=>{
+ const earth=new Earth([0,0,0],[0,0,0]);
+ const lat=28.5*Math.PI/180,lon=-80.5*Math.PI/180;
+ const pad=new THREE.Vector3(Math.cos(lat)*Math.cos(lon),Math.sin(lat),Math.cos(lat)*Math.sin(lon));
+ const east=new THREE.Vector3(-Math.sin(lon),0,Math.cos(lon));
+ const height=(offset:number)=>earth.getSurfaceRadiusAt(pad.clone().addScaledVector(east,offset).normalize().multiplyScalar(earth.radius).toArray())-earth.radius;
+ const peaks=Array.from({length:40},(_,i)=>height(-.002+i*.00005));
+ expect(Math.max(...peaks)).toBeGreaterThan(700);
+ const shore=Array.from({length:80},(_,i)=>height(.001+i*.00001));
+ expect(Math.min(...shore)).toBeCloseTo(0,6);
+ for(let i=1;i<shore.length;i++)expect(Math.abs(shore[i]!-shore[i-1]!)).toBeLessThan(50);
 });

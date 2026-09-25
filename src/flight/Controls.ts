@@ -49,6 +49,10 @@ export class Controls {
     if (down) this.state.throttle = Math.max(0, this.state.throttle - dt * 0.3);
   }
 
+  getThrottleInput(): boolean {
+    return !!(this.touch?.getThrottleUp() || this.touch?.getThrottleDown() || this.keys.has('arrowup') || this.keys.has('arrowdown'));
+  }
+
   getPitch(): number {
     let v = 0;
     if (this.keys.has('w') || this.touch?.getPitch() === 1) v = 1;

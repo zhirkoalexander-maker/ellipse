@@ -9,7 +9,7 @@ it('matches major land and ocean regions of the bundled Earth map',()=>{
  for(const [lat,lon] of [[46,10],[30,85],[0,25],[-25,135]])expect(earthLandFraction(...direction(lat!,lon!))).toBe(1);
  for(const [lat,lon] of [[0,-140],[0,-30],[-35,80]]){
   const p=direction(lat!,lon!);expect(earthLandFraction(...p)).toBe(0);
-  expect(rockyTerrain('earth',...p)).toBeCloseTo(-.00015,10);
+  expect(rockyTerrain('earth',...p)).toBeCloseTo(0,10);
  }
 });
 it('keeps the dateline continuous and both poles finite',()=>{

@@ -205,3 +205,30 @@ describe('flight reliability', () => {
     expect(f.grounded).toBe(false);
   });
 });
+
+it('accelerates into a powered nose-down dive instead of braking it away',()=>{
+ const {f}=create(),b=f.system.bodyByName('earth');
+ f.state.position=[b.position[0],b.radius+5000,b.position[2]];
+ f.state.velocity=[b.velocity[0],-800,b.velocity[2]];
+ f.grounded=false;f.launched=true;f.manualAttitude=true;f._spawnProtectionTimer=0;f.state.throttle=1;
+ f.rocketQuat.setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI);
+ for(let i=0;i<30;i++)f.updateInner(1/60);
+ expect(f.state.velocity[1]-b.velocity[1]).toBeLessThan(-820);
+ expect(f.landingAssist).toBe(false);expect(f.state.throttle).toBe(1);
+});
+it('gives manual throttle priority over landing assist',()=>{
+ const {f}=create(),b=f.system.bodyByName('earth');
+ f.state.position=[b.position[0],b.radius+5000,b.position[2]];f.state.velocity=[...b.velocity];
+ f.grounded=false;f.landingAssist=true;f.state.throttle=.2;
+ f.hud._throttleBtn=true;f.updateInner(1/60);
+ expect(f.landingAssist).toBe(false);expect(f.state.throttle).toBeGreaterThan(.2);
+});
+it.each([90,90.01])('applies the touchdown limit in displayed units at %s m/s',speed=>{
+ const {f}=create(),b=f.system.bodyByName('moon');
+ const radius=b.getSurfaceRadiusAt([b.position[0],b.radius,b.position[2]]);
+ f.grounded=false;f.launched=true;f._spawnProtectionTimer=0;f.rocketQuat.identity();
+ f.state.position=[b.position[0],radius+10,b.position[2]];
+ f.state.velocity=[b.velocity[0],b.velocity[1]-speed*4,b.velocity[2]];
+ f.resolveSurfaceContact(b,[0,radius+10,0],[0,radius,0],false);
+ expect(f.grounded).toBe(speed===90);expect(f.crashed).toBe(speed>90);
+});
