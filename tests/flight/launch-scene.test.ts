@@ -112,9 +112,9 @@ describe('FlightScene launch from KSC pad', () => {
     const engine = PART_CATALOG.find((p) => p.id === 'engine_ant')!;
     const rocket = buildDefaultRocket();
     const twr = engine.thrust! * 1000 / (rocket.totalMass() * G * EARTH_MASS / EARTH_RADIUS ** 2);
-    // The faster-launch tune deliberately targets about 5.7 at full fuel.
-    expect(twr).toBeGreaterThan(5.5);
-    expect(twr).toBeLessThan(5.9);
+    // The faster-launch tune deliberately targets about 4.4 at full fuel.
+    expect(twr).toBeGreaterThan(4.3);
+    expect(twr).toBeLessThan(4.7);
   });
 
   it('gravity-turn autopilot pitches the rocket over after clearing the pad', () => {

@@ -9,7 +9,7 @@ const SOLID = new Set(['earth', 'moon', 'mars', 'venus', 'mercury', 'pluto']);
 
 export function surfaceMagnification(altitude: number, radius: number): number {
   const t = THREE.MathUtils.clamp(Math.max(0, altitude) / Math.max(1, radius * 0.35), 0, 1);
-  return 1 + 5 * (1 - t * t * (3 - 2 * t));
+  return 1 + 9 * (1 - t * t * (3 - 2 * t));
 }
 
 export function magnifyPoint(point: THREE.Vector3, pivot: THREE.Vector3, scale: number): THREE.Vector3 {
@@ -19,6 +19,7 @@ export function magnifyPoint(point: THREE.Vector3, pivot: THREE.Vector3, scale: 
 /** Render-only close-up scale and terrain detail. Never changes physical bodies. */
 export class SurfaceView {
   scale = 1;
+  private scaleInitialized = false;
   readonly pivot = new THREE.Vector3();
   private active: Planet | null = null;
   private patch: THREE.Mesh | null = null;
@@ -26,19 +27,21 @@ export class SurfaceView {
   private readonly extent = 0.028;
   private oldVisible = true;
 
-  update(position: Vec3, reference: Body, bodies: Body[]): void {
+  update(position: Vec3, reference: Body, bodies: Body[], dt = 1/60): void {
     this.pivot.set(...position).multiplyScalar(VS);
     const planet = reference instanceof Planet ? reference : null;
     const distance = new THREE.Vector3(...position).distanceTo(new THREE.Vector3(...reference.position));
     const altitude = planet ? distance - planet.getSurfaceRadiusAt(position) : Infinity;
-    this.scale = planet ? surfaceMagnification(altitude, planet.radius) : 1;
+    const desiredScale=planet ? surfaceMagnification(altitude, planet.radius) : 1;
+    this.scale=this.scaleInitialized?this.scale+(desiredScale-this.scale)*(1-Math.exp(-Math.max(0,dt)*1.5)):desiredScale;
+    this.scaleInitialized=true;
     for (const body of bodies) {
       const mesh = (body as Body & { mesh?: THREE.Object3D }).mesh;
       if (!mesh) continue;
       mesh.position.copy(magnifyPoint(new THREE.Vector3(...body.position).multiplyScalar(VS), this.pivot, this.scale));
       mesh.scale.setScalar(this.scale);
     }
-    const detailed = planet && SOLID.has(planet.name) && altitude < planet.radius * 0.045 ? planet : null;
+    const detailed = planet && SOLID.has(planet.name) && altitude < planet.radius * 0.012 ? planet : null;
     if (detailed !== this.active) { this.clearDetail(); if (detailed) this.attachDetail(detailed); }
     if (detailed) {
       const direction = new THREE.Vector3(...position).sub(new THREE.Vector3(...detailed.position)).normalize();
@@ -106,7 +109,7 @@ export class SurfaceView {
   }
 
   dispose(bodies: Body[]): void {
-    this.clearDetail();
+    this.clearDetail(); this.scaleInitialized=false;
     for (const body of bodies) {
       const mesh = (body as Body & { mesh?: THREE.Object3D }).mesh;
       if (mesh) { mesh.scale.setScalar(1); mesh.position.set(...body.position).multiplyScalar(VS); }

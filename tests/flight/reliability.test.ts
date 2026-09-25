@@ -39,7 +39,7 @@ describe('flight reliability', () => {
     f.setPlayerWarp(f.warpLevels.indexOf(1000));
     for (const dt of [1 / 60, 1 / 30, 1 / 120, 1 / 45, 1 / 60]) {
       f.update(dt);
-      const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
+      const up = f.presentationUp;
       const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
         .addScaledVector(up, -f.rocketBottomY * 60)
         .add(new THREE.Vector3(0, (f.rocketTopY + f.rocketBottomY) * 30, 0).applyQuaternion(f.rocketGroup.quaternion));

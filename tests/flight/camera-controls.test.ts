@@ -64,3 +64,11 @@ it('keeps manual zoom inside a bounded range', () => {
  chase.zoom(1000); chase.follow(state(), 1, undefined, true);
  expect(camera.position.length()).toBeLessThanOrEqual(80 + 1e-6);
 });
+it('eases a change of planetary up without rolling the craft view in one frame',()=>{
+ const camera=new THREE.PerspectiveCamera(), chase=new ChaseCamera(camera);owned.push(chase);
+ chase.initialiseAt(state(),new THREE.Quaternion(),new THREE.Vector3(0,1,0));
+ const before=camera.quaternion.clone();
+ chase.follow(state(),1/60,new THREE.Vector3(0,-1,0),true);
+ expect(camera.quaternion.angleTo(before)).toBeLessThan(.012);
+ expect(camera.up.y).toBeGreaterThan(.99);
+});
