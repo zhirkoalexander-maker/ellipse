@@ -388,7 +388,9 @@ setFreeCamera(active: boolean): void {
 
   setWarp(value: number): void {
     if (this.warpLabel) {
-      this.warpLabel.textContent = `x${value}`;
+      const label=`x${value<10?Number(value.toFixed(1)):Math.round(value)}`;
+      if(this.warpLabel.textContent===label)return;
+      this.warpLabel.textContent = label;
       // Brief pulse on change
       this.warpLabel.classList.remove('warp-pulse');
       void this.warpLabel.offsetWidth; // reflow to restart animation

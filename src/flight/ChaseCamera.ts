@@ -194,6 +194,11 @@ export class ChaseCamera {
       ? upDir.clone().normalize() : new THREE.Vector3(0, 1, 0);
     // Transport the tangent frame as surface normal changes, avoiding pole flips.
     const previousUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.surfaceFrame);
+    if (this.initialized) {
+      const turn = new THREE.Quaternion().setFromUnitVectors(previousUp,targetUp);
+      const eased = new THREE.Quaternion().rotateTowards(turn, cameraDt * 0.65);
+      targetUp.copy(previousUp).applyQuaternion(eased).normalize();
+    }
     this.surfaceFrame.premultiply(new THREE.Quaternion().setFromUnitVectors(previousUp, targetUp)).normalize();
     const targetPos = new THREE.Vector3(ox, oy, oz).applyQuaternion(this.surfaceFrame).add(targetLook);
 

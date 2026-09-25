@@ -53,7 +53,12 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
     const continent = terrainNoise(x * 3 + 11, y * 3 + 23, z * 3 + 45);
     const land = THREE.MathUtils.smoothstep(continent, 0.48, 0.64);
     const mountainRegion = THREE.MathUtils.smoothstep(terrainNoise(x * 7 + 41, y * 7 + 9, z * 7 + 62), 0.58, 0.78);
-    height = (continent - 0.56) * 0.004 + land * (mountainRegion * Math.pow(ridges, 4) * 0.0018 + (detail - 0.5) * 0.00006);
+    // Broad lowlands, folded ranges and smaller foothills; avoid isolated giant spikes.
+    const fold=terrainNoise(x*18+detail*1.5+71,y*18+13,z*18+29);
+    const ridgeDetail=1-Math.abs(terrainNoise(x*130+fold*2,y*130+31,z*130+11)*2-1);
+    const ranges=mountainRegion*Math.pow(ridges,3)*(.0005+ridgeDetail*.00025);
+    const foothills=(detail-.5)*.000045*(.25+mountainRegion);
+    height = (continent - 0.56) * 0.0013 + land * (ranges + foothills);
     const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
     const dot = x * Math.cos(lat) * Math.cos(lon) + y * Math.sin(lat) + z * Math.cos(lat) * Math.sin(lon);
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
@@ -78,15 +83,18 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
 
 export function terrainColor(name: string, height: number, direction: THREE.Vector3): THREE.Color {
   const grain = terrainNoise(direction.x * 320 + 8, direction.y * 320 + 19, direction.z * 320 + 51);
-  const color = new THREE.Color(name === 'earth' ? 0x28702e : name === 'mars' ? 0xa16648 : name === 'venus' ? 0x978567 : name === 'pluto' ? 0xb4b3a8 : 0x8e9193);
+  const color = new THREE.Color(name === 'earth' ? 0x456b43 : name === 'mars' ? 0xa16648 : name === 'venus' ? 0x978567 : name === 'pluto' ? 0xb4b3a8 : 0x8e9193);
   if (name === 'earth') {
     if (height < -0.000145) {
       const depth = terrainNoise(direction.x * 3 + 11, direction.y * 3 + 23, direction.z * 3 + 45);
       return new THREE.Color(0x064477).lerp(new THREE.Color(0x168eaa), THREE.MathUtils.smoothstep(depth, 0.48, 0.55));
     }
-    color.lerp(new THREE.Color(0xc6b777), 1 - THREE.MathUtils.smoothstep(height, -0.00014, 0.0001));
-    color.lerp(new THREE.Color(0x72523b), THREE.MathUtils.smoothstep(height, 0.0022, 0.004));
-    color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, 0.0043, 0.0058));
+    const moisture=terrainNoise(direction.x*24+51,direction.y*24+8,direction.z*24+16);
+    color.lerp(new THREE.Color(0x75834b),THREE.MathUtils.smoothstep(moisture,.35,.8)*.6);
+    color.lerp(new THREE.Color(0xb9ad7c), 1 - THREE.MathUtils.smoothstep(height, -0.00014, -0.00009));
+    color.lerp(new THREE.Color(0x80766a), THREE.MathUtils.smoothstep(height, 0.0004, 0.00085));
+    const snowLine=.0009-Math.abs(direction.y)*.0005;
+    color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, snowLine, snowLine+.00035));
   }
   return color.multiplyScalar(0.82 + grain * 0.32);
 }
@@ -105,7 +113,30 @@ export function paintTerrain(geometry: THREE.BufferGeometry, name: string, radiu
 /** Match water shading in the distant globe and the detailed surface mesh. */
 export function configureEarthMaterial(material: THREE.MeshStandardMaterial): void {
   material.onBeforeCompile = shader => {
-    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `
+    shader.vertexShader=shader.vertexShader.replace('#include <common>',`#include <common>
+      varying vec3 terrainDirection;
+    `).replace('#include <begin_vertex>',`#include <begin_vertex>
+      terrainDirection=normalize(position);
+    `);
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+      varying vec3 terrainDirection;
+      float groundHash(vec3 p){p=fract(p*.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
+      float groundNoise(vec3 p){
+        vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(mix(groundHash(i),groundHash(i+vec3(1,0,0)),f.x),
+          mix(groundHash(i+vec3(0,1,0)),groundHash(i+vec3(1,1,0)),f.x),f.y),
+          mix(mix(groundHash(i+vec3(0,0,1)),groundHash(i+vec3(1,0,1)),f.x),
+          mix(groundHash(i+vec3(0,1,1)),groundHash(i+vec3(1,1,1)),f.x),f.y),f.z);
+      }
+    `).replace('#include <color_fragment>',`#include <color_fragment>
+      vec3 groundPoint=normalize(terrainDirection);
+      float landMask=1.0-step(vColor.r*2.0,vColor.b)*step(vColor.g*1.1,vColor.b);
+      float footprint=length(fwidth(groundPoint));
+      float grain=(groundNoise(groundPoint*1800.0)-.5)*.55*(1.0-smoothstep(.2,.7,footprint*1800.0));
+      grain+=(groundNoise(groundPoint*6000.0)-.5)*.3*(1.0-smoothstep(.2,.7,footprint*6000.0));
+      grain+=(groundNoise(groundPoint*18000.0)-.5)*.15*(1.0-smoothstep(.2,.7,footprint*18000.0));
+      diffuseColor.rgb*=1.0+landMask*grain*.5;
+    `).replace('#include <roughnessmap_fragment>', `
       #include <roughnessmap_fragment>
       float ocean = step(vColor.r * 2.0, vColor.b) * step(vColor.g * 1.1, vColor.b);
       roughnessFactor = mix(roughnessFactor, 0.24, ocean);
@@ -114,5 +145,5 @@ export function configureEarthMaterial(material: THREE.MeshStandardMaterial): vo
       totalEmissiveRadiance *= 1.0 - ocean;
     `);
   };
-  material.customProgramCacheKey = () => 'earth-water-v1';
+  material.customProgramCacheKey = () => 'earth-ground-v2';
 }

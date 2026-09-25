@@ -3,12 +3,13 @@ import * as THREE from 'three';
 import { surfaceMagnification, magnifyPoint, SurfaceView } from '../../src/planets/SurfaceView';
 import { LaunchClamps } from '../../src/flight/LaunchClamps';
 import { Earth } from '../../src/planets/Earth';
+import { Planet } from '../../src/planets/Planet';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../../src/config/constants';
 
 it('makes close planets huge and reduces all bodies by the same continuous factor on ascent', () => {
-  expect(surfaceMagnification(0, 1000)).toBe(6);
+  expect(surfaceMagnification(0, 1000)).toBe(10);
   expect(surfaceMagnification(1000, 1000)).toBe(1);
-  let previous = 6;
+  let previous = 10;
   for (let altitude = 0; altitude <= 1000; altitude += 10) {
     const scale = surfaceMagnification(altitude, 1000);
     expect(scale).toBeLessThanOrEqual(previous); previous = scale;
@@ -57,4 +58,12 @@ it('does not turn the close-up Earth into an emissive yellow surface', () => {
  const patch=earth.mesh.getObjectByName('local-terrain') as THREE.Mesh;
  expect((patch.material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(0);
  view.dispose([earth]);
+});
+it('eases the scene scale across a change of reference instead of jumping',()=>{
+ const body=new Planet('test',1e20,[0,0,0],[0,0,0],1000),view=new SurfaceView();
+ view.update([0,1000,0],body,[body]);expect(view.scale).toBe(10);
+ view.update([0,10000,0],body,[body],1/60);
+ expect(view.scale).toBeGreaterThan(9.7);expect(view.scale).toBeLessThan(10);
+ for(let i=0;i<600;i++)view.update([0,10000,0],body,[body],1/60);
+ expect(view.scale).toBeCloseTo(1,4);view.dispose([body]);
 });

@@ -8,7 +8,6 @@ import { Mars } from '../../src/planets/Mars';
 import { buildDefaultRocket, buildSystem } from './fixtures';
 import { clearFlightSave, loadFlightState } from '../../src/storage/SaveLoad';
 import * as THREE from 'three';
-import { getReferenceBody } from '../../src/physics/SoiResolver';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT, ROCKET_VISUAL_SCALE } from '../../src/config/constants';
 
 let flight: FlightScene | undefined;
@@ -38,13 +37,13 @@ describe('automatic flight and landing', () => {
     let fastFrames = 0;
     for (let i = 0; i < 30000 && !f.crashed && f.autopilotActive; i++) {
       const beforeAttitude = f.rocketGroup.quaternion.clone();
-      f.update(1 / 30);
+      const frameDt=target==='moon'?[1/60,1/30,1/20,.08][i%4]!:1/30;
+      f.update(frameDt);
       if (f.autopilotActive && !f.grounded) {
-        expect(beforeAttitude.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 / 30 + 1e-6);
+        expect(beforeAttitude.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 * frameDt + 1e-6);
       }
       if (f.autopilotActive && f.missionRate >= 100) {
-        const body = f.autopilotSurfaceBody() ?? getReferenceBody(f.state.position, f.system);
-        const up = new THREE.Vector3(...f.state.position).sub(new THREE.Vector3(...body.position)).normalize();
+        const up = f.presentationUp;
         const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
           .addScaledVector(up, -f.rocketBottomY * ROCKET_VISUAL_SCALE)
           .add(new THREE.Vector3(0, (f.rocketTopY + f.rocketBottomY) * 0.5 * ROCKET_VISUAL_SCALE, 0).applyQuaternion(f.rocketGroup.quaternion));
@@ -59,7 +58,7 @@ describe('automatic flight and landing', () => {
     const distance = Math.hypot(...f.state.position.map((x: number, i: number) => x - body.position[i]));
     expect(distance - body.getSurfaceRadiusAt(f.state.position)).toBeCloseTo(FlightScene.SPAWN_OFFSET_M, 1);
     expect(f.rocket.totalFuelMass()).toBeLessThan(before);
-    expect(f.rocket.totalFuelMass()).toBeGreaterThan(0);
+    expect(f.rocket.totalFuelMass()).toBeGreaterThan(500);
     expect(f.state.throttle).toBe(0);
   }, 120000);
 

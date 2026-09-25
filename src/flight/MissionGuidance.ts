@@ -33,7 +33,7 @@ export class MissionGuidance {
     if(altitude<15000 && norm(relativeTargetVelocity)<60 && !s.grounded) {
       return {direction:unit(sub(s.position,this.target.position)),throttle:0,phase:'landing',status:'Arrival complete — controlled descent',readyToLand:true,targetSpeed:0};
     }
-    const clearance=Math.max(100000,this.departure.radius*0.15);
+    const clearance=Math.max(100000,this.departure.radius*0.03);
     const shell=this.departure.radius+clearance;
     // A direct route is safe only if its complete segment clears the launch planet.
     const lineLength=norm(toTarget), line=unit(toTarget);
@@ -44,15 +44,15 @@ export class MissionGuidance {
     const accel=Math.max(0.1,s.maxAcceleration);
     if(!this.departed) {
       const altitudeError=shell-radius;
-      const radialSpeed=Math.sign(altitudeError)*Math.min(2500,Math.sqrt(2*accel*0.3*Math.abs(altitudeError)));
+      const radialSpeed=Math.sign(altitudeError)*Math.min(1600,Math.sqrt(2*accel*0.3*Math.abs(altitudeError)));
       let tangent=sub(line,mul(up,dot(line,up)));
       if(norm(tangent)<1e-5) tangent=Math.abs(up[1])<0.9 ? [-up[2],0,up[0]] : [0,-up[2],up[1]];
-      const lateralSpeed=radius<shell*0.97 ? 0 : Math.min(3500,Math.sqrt(accel*0.2*shell));
+      const lateralSpeed=radius<this.departure.radius+clearance*.85 ? 0 : Math.min(6000,Math.sqrt(accel*0.2*shell));
       desired=add(this.departure.velocity,add(mul(up,radialSpeed),mul(unit(tangent),lateralSpeed)));
       phase=lateralSpeed>0?'departure':'ascent';targetSpeed=norm(sub(desired,this.departure.velocity));
     } else {
       const remaining=Math.max(0,altitude-10000);
-      targetSpeed=Math.min(10000,Math.sqrt(2*accel*0.2*remaining),remaining*0.1);
+      targetSpeed=Math.min(6000,Math.sqrt(2*accel*0.2*remaining),remaining*0.1);
       desired=add(this.target.velocity,mul(line,targetSpeed));
       phase=remaining<Math.max(500000,norm(relativeTargetVelocity)**2/(accel*0.4))?'arrival':'cruise';
     }

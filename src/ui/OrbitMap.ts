@@ -32,6 +32,7 @@ export class OrbitMap {
  private previousTime=0;
  private drawing=false;
  private messageUntil=0;
+ private viewFrame:{basis:[Vector3,Vector3];anchor:string;offset:Vec3;span:number}|null=null;
  constructor(private snapshot:()=>MapSnapshot, private burn:(dv:Vec3)=>string, private cancel:()=>void, private fly:(target:string)=>boolean, private opened:()=>void = ()=>{}) {
   this.root.className='orbit-map';this.root.hidden=true;this.canvas.className='orbit-map-canvas';
   this.root.append(this.canvas);
@@ -55,7 +56,7 @@ export class OrbitMap {
   for(const b of snapshot().bodies.filter(b=>b.name!=='sun')) {const o=document.createElement('option');o.value=b.name;o.textContent=b.name[0]!.toUpperCase()+b.name.slice(1);select.add(o);}
   select.value=this.target;
   this.life.listen(select,'change',()=>{this.target=select.value;this.fit('target');});
-  this.life.listen(this.root.querySelector('#map-plane') as HTMLSelectElement,'change',e=>{this.plane=(e.target as HTMLSelectElement).value as typeof this.plane;this.pan=[0,0];});
+  this.life.listen(this.root.querySelector('#map-plane') as HTMLSelectElement,'change',e=>{this.plane=(e.target as HTMLSelectElement).value as typeof this.plane;this.pan=[0,0];this.viewFrame=null;});
   ['prograde','radial','normal'].forEach((name,i)=>this.life.listen(this.root.querySelector('#map-'+name) as HTMLInputElement,'input',e=>{
    this.correction='advanced';
    const input=e.target as HTMLInputElement;this.dv[i]=Math.max(-50000,Math.min(50000,Number(input.value)||0));
@@ -101,7 +102,7 @@ export class OrbitMap {
   return simpleCorrection(s.position,v,destination,this.correction,this.strength);
  }
  private status(text:string,hold=false){if(hold)this.messageUntil=Date.now()+4000;if(hold||Date.now()>=this.messageUntil)this.root.querySelector('#map-status')!.textContent=text;}
- private fit(mode:typeof this.mode){this.mode=mode;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;}
+ private fit(mode:typeof this.mode){this.mode=mode;this.viewFrame=null;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;}
  toggle(){if(this.active)this.close();else{this.active=true;this.opened();this.root.hidden=false;this.fit('target');this.previousTime=0;if(!this.drawing){this.drawing=true;this.life.frame(this.draw);}}}
  close(){this.active=false;this.root.hidden=true;this.pointers.clear();}
  dispose(){this.close();this.life.dispose();}
@@ -112,10 +113,21 @@ export class OrbitMap {
   if(this.canvas.width!==w*dpr||this.canvas.height!==h*dpr){this.canvas.width=w*dpr;this.canvas.height=h*dpr;}
   const ctx=this.canvas.getContext('2d')!;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#020305';ctx.fillRect(0,0,w,h);
   const r=s.position.map((v,i)=>v-ref.position[i]!) as Vec3, v=s.velocity.map((v,i)=>v-ref.velocity[i]!) as Vec3;
-  const basis=this.plane==='destination'&&target?destinationBasis(s.position,target.position):mapBasis(r,v,this.plane==='destination'?'xz':this.plane), origin:Vec3=[...ref.position];
+  const targetParent=s.bodies.find(b=>b.name===(target?.name==='moon'?'earth':'sun'));
+  const transverse=target?.velocity.map((x,i)=>x-(targetParent?.velocity[i]||0)) as Vec3|undefined;
+  let basis=this.plane==='destination'&&target?destinationBasis(s.position,target.position,transverse):mapBasis(r,v,this.plane==='destination'?'xz':this.plane);
+  const origin:Vec3=[...ref.position];
   let span=Math.max((ref.radius||1)*2.8,new Vector3(...r).length()*2.5);
   if(this.mode==='target'&&target){for(let i=0;i<3;i++)origin[i]=(s.position[i]!+target.position[i]!)/2;span=Math.max(new Vector3(...s.position).distanceTo(new Vector3(...target.position))*1.5,(target.radius||1)*4);}
   if(this.mode==='system'){origin.splice(0,3,...(s.bodies.find(b=>b.name==='sun')?.position||[0,0,0]));span=Math.max(...s.bodies.map(b=>new Vector3(...b.position).distanceTo(new Vector3(...origin))))*2.4;}
+  // Fit once. Follow the anchor's translation, never the craft's changing heading or SOI.
+  if(!this.viewFrame){
+   const anchor=this.mode==='system'?(s.bodies.find(b=>b.name==='sun')||ref):ref;
+   this.viewFrame={basis,anchor:anchor.name,offset:origin.map((x,i)=>x-anchor.position[i]!) as Vec3,span};
+  }
+  const frame=this.viewFrame,anchor=s.bodies.find(b=>b.name===frame.anchor)||ref;
+  basis=frame.basis;span=frame.span;
+  for(let i=0;i<3;i++)origin[i]=anchor.position[i]!+frame.offset[i]!;
   const availableW=w>700?w-310:w,availableH=w>700?h-140:h-450;
   const scale=span/Math.max(100,Math.min(availableW,availableH))/this.zoom;
   const center:[number,number]=[availableW/2+this.pan[0],70+Math.max(100,availableH)/2+this.pan[1]];
@@ -136,7 +148,7 @@ export class OrbitMap {
   const delta=this.plannedDelta(s);
   if(!s.grounded&&new Vector3(...delta).length()>.01)path(mapTrajectory(r,v.map((x,i)=>x+delta[i]!) as Vec3,ref.mass,ref.radius||1),ref.position,'#f4bb55',true);
   this.hits=[];
-  for(const b of s.bodies as MapBody[]){if(this.mode==='orbit'&&b!==ref||this.mode==='target'&&b!==ref&&b!==target)continue;const [x,y]=project(b.position);if(x<-80||y<-80||x>w+80||y>h+80)continue;const radius=Math.max(b===target?8:b===ref?6:3,Math.min(2000,(b.radius||1)/scale));
+  for(const b of s.bodies as MapBody[]){if(this.mode==='orbit'&&b!==ref&&b!==anchor||this.mode==='target'&&b!==ref&&b!==target&&b!==anchor)continue;const [x,y]=project(b.position);if(x<-80||y<-80||x>w+80||y>h+80)continue;const radius=Math.max(b===target?8:b===ref?6:3,Math.min(2000,(b.radius||1)/scale));
    const col=colors[b.name]||'#b9c1cb';const gradient=ctx.createRadialGradient(x-radius*.3,y-radius*.3,0,x,y,radius);gradient.addColorStop(0,col);gradient.addColorStop(1,'#14202d');
    ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();
    if(b.name===this.target){ctx.strokeStyle='#58baff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,radius+6,0,Math.PI*2);ctx.stroke();}
