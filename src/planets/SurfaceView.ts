@@ -17,6 +17,15 @@ export function magnifyPoint(point: THREE.Vector3, pivot: THREE.Vector3, scale: 
   return point.clone().sub(pivot).multiplyScalar(scale).add(pivot);
 }
 
+/** Compressed travel distances should not turn remote planets into giant sky discs. */
+export function skyScale(name: string, radius: number, distance: number): number {
+  if (radius <= 0 || distance <= radius * 4) return 1;
+  const angularRadius = name === 'moon' || name === 'sun' ? .006 : name === 'earth' ? .014 : .0008;
+  const distant = Math.min(1, angularRadius * distance / radius);
+  const t = THREE.MathUtils.smoothstep(distance / radius, 4, 12);
+  return THREE.MathUtils.lerp(1, distant, t);
+}
+
 /** Render-only close-up scale and terrain detail. Never changes physical bodies. */
 export class SurfaceView {
   scale = 1;
@@ -40,7 +49,9 @@ export class SurfaceView {
       const mesh = (body as Body & { mesh?: THREE.Object3D }).mesh;
       if (!mesh) continue;
       mesh.position.copy(magnifyPoint(new THREE.Vector3(...body.position).multiplyScalar(VS), this.pivot, this.scale));
-      mesh.scale.setScalar(this.scale);
+      const radius = (body as Body & { radius?: number }).radius || 0;
+      const separation = new THREE.Vector3(...position).distanceTo(new THREE.Vector3(...body.position));
+      mesh.scale.setScalar(this.scale * skyScale(body.name, radius, separation));
     }
     const detailed = planet && SOLID.has(planet.name) && altitude < planet.radius * 0.012 ? planet : null;
     if (detailed !== this.active) { this.clearDetail(); if (detailed) this.attachDetail(detailed); }

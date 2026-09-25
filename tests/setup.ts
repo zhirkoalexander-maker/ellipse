@@ -67,6 +67,9 @@ function create2DShim(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
       if (prop === 'createRadialGradient' || prop === 'createLinearGradient') {
         return () => ({ addColorStop: () => undefined });
       }
+      if (prop === 'measureText') {
+        return (text: string) => ({ width: text.length * 6 });
+      }
       if (prop === 'getImageData') {
         return (_x: number, _y: number, w: number, h: number) => {
           const data = new Uint8ClampedArray(w * h * 4);
