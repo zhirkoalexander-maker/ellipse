@@ -26,6 +26,9 @@ export class OrbitMap {
  private strength=100;
  private zoom=1;
  private pan:[number,number]=[0,0];
+ private displayZoom=1;
+ private displayPan:[number,number]=[0,0];
+ private viewAnimation:Animation|undefined;
  private dv:Vec3=[0,0,0];
  private hits:{name:string;x:number;y:number}[]=[];
  private pointers=new Map<number,[number,number]>();
@@ -60,7 +63,7 @@ export class OrbitMap {
   const course=this.root.querySelector<HTMLDetailsElement>('.map-course')!;
   this.life.listen(course,'toggle',()=>{if(course.open)this.fit('orbit');});
   this.life.listen(select,'change',()=>{this.target=select.value;this.fit('target');});
-  this.life.listen(this.root.querySelector('#map-plane') as HTMLSelectElement,'change',e=>{this.plane=(e.target as HTMLSelectElement).value as typeof this.plane;this.pan=[0,0];this.viewFrame=null;});
+  this.life.listen(this.root.querySelector('#map-plane') as HTMLSelectElement,'change',e=>{this.plane=(e.target as HTMLSelectElement).value as typeof this.plane;this.pan=[0,0];this.displayPan=[0,0];this.viewFrame=null;this.fadeView();});
   ['prograde','radial','normal'].forEach((name,i)=>this.life.listen(this.root.querySelector('#map-'+name) as HTMLInputElement,'input',e=>{
    if(this.mode==='system')this.fit('orbit');
    this.correction='advanced';
@@ -84,11 +87,12 @@ export class OrbitMap {
    } else if(button.id==='transfer-go'&&this.fly(this.target))this.close();
   });
   this.life.listen(this.canvas,'wheel',e=>{e.preventDefault();this.zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));},{passive:false});
-  this.life.listen(this.canvas,'pointerdown',e=>{this.canvas.setPointerCapture(e.pointerId);this.pointers.set(e.pointerId,[e.clientX,e.clientY]);this.moved=false;});
+  this.life.listen(this.canvas,'pointerdown',e=>{this.zoom=this.displayZoom;this.pan=[...this.displayPan];this.canvas.setPointerCapture(e.pointerId);this.pointers.set(e.pointerId,[e.clientX,e.clientY]);this.moved=false;});
   this.life.listen(this.canvas,'pointermove',e=>{
    const old=this.pointers.get(e.pointerId);if(!old)return;
    if(this.pointers.size===2){const other=[...this.pointers.entries()].find(([id])=>id!==e.pointerId)![1];const before=Math.hypot(old[0]-other[0],old[1]-other[1]);const after=Math.hypot(e.clientX-other[0],e.clientY-other[1]);if(before>1)this.zoomAt((e.clientX+other[0])/2,(e.clientY+other[1])/2,after/before);}
    else {this.pan[0]+=e.clientX-old[0];this.pan[1]+=e.clientY-old[1];}
+   this.displayZoom=this.zoom;this.displayPan=[...this.pan];
    if(Math.hypot(e.clientX-old[0],e.clientY-old[1])>1)this.moved=true;
    this.pointers.set(e.pointerId,[e.clientX,e.clientY]);
   });
@@ -108,10 +112,15 @@ export class OrbitMap {
   return simpleCorrection(s.position,v,destination,this.correction,simulationMetres(this.strength));
  }
  private status(text:string,hold=false){if(hold)this.messageUntil=Date.now()+4000;if(hold||Date.now()>=this.messageUntil)this.root.querySelector('#map-status')!.textContent=text;}
- private fit(mode:typeof this.mode){this.mode=mode;this.root.dataset.view=mode;if(mode==='system')(this.root.querySelector('.map-course') as HTMLDetailsElement).open=false;this.viewFrame=null;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;}
+ private fit(mode:typeof this.mode){this.mode=mode;this.root.dataset.view=mode;if(mode==='system')(this.root.querySelector('.map-course') as HTMLDetailsElement).open=false;this.viewFrame=null;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;this.displayPan=[0,0];this.displayZoom=1;this.fadeView();}
  toggle(){if(this.active)this.close();else{this.active=true;this.opened();this.root.hidden=false;this.fit('system');this.previousTime=0;if(!this.drawing){this.drawing=true;this.life.frame(this.draw);}}}
- close(){this.active=false;this.root.hidden=true;this.pointers.clear();}
+ close(){this.viewAnimation?.cancel();this.active=false;this.root.hidden=true;this.pointers.clear();}
  dispose(){this.close();this.life.dispose();}
+ private fadeView():void {
+  this.viewAnimation?.cancel();
+  if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+   this.viewAnimation=this.canvas.animate?.([{opacity:.35},{opacity:1}],{duration:180,easing:'ease-out'});
+ }
  private viewport(w:number,h:number):[number,number] {
   const top=this.root.querySelector('aside')!.getBoundingClientRect().top;
   return [w>700?w-310:w,Math.max(100,(w>700?h-70:top>160?top-12:h-270)-160)];
@@ -124,9 +133,9 @@ export class OrbitMap {
   this.pan=[x-cx-(x-cx-this.pan[0])*ratio,y-cy-(y-cy-this.pan[1])*ratio];this.zoom=next;
  }
  private drawOverview(ctx:CanvasRenderingContext2D,s:MapSnapshot,w:number,h:number):void {
-  const [vw,vh]=this.viewport(w,h),cx=vw/2+this.pan[0],cy=160+vh/2+this.pan[1];
+  const [vw,vh]=this.viewport(w,h),cx=vw/2+this.displayPan[0],cy=160+vh/2+this.displayPan[1];
   const bodies=s.bodies.filter(b=>b.name!=='moon'&&b.name!=='sun');
-  const size=Math.max(60,Math.min(vw/2-65,vh/2-35))*this.zoom;
+  const size=Math.max(60,Math.min(vw/2-65,vh/2-35))*this.displayZoom;
   this.hits=[];ctx.font='12px system-ui';
   const labels:{name:string;x:number;y:number;radius:number}[]=[];
   const point=(name:string,x:number,y:number,radius:number)=>{
@@ -155,7 +164,12 @@ export class OrbitMap {
   ctx.fillText('Overview · positions simplified',20,160+vh-5);
  }
  private draw=(time:number)=>{
-  if(!this.active){this.drawing=false;return;}this.life.frame(this.draw);if(time-this.previousTime<60)return;this.previousTime=time;
+  if(!this.active){this.drawing=false;return;}this.life.frame(this.draw);
+  const dt=this.previousTime ? Math.max(0,Math.min(.05,(time-this.previousTime)/1000)) : 1/60;
+  this.previousTime=time;
+  const blend=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 1 : 1-Math.exp(-dt*18);
+  this.displayZoom+=(this.zoom-this.displayZoom)*blend;
+  for(let i=0;i<2;i++)this.displayPan[i]!+=(this.pan[i]!-this.displayPan[i]!)*blend;
   const s=this.snapshot(),ref=s.reference,target=s.bodies.find(b=>b.name===this.target) as MapBody|undefined;
   const w=window.innerWidth,h=window.innerHeight,dpr=Math.min(2,window.devicePixelRatio||1);
   if(this.canvas.width!==w*dpr||this.canvas.height!==h*dpr){this.canvas.width=w*dpr;this.canvas.height=h*dpr;}
@@ -193,8 +207,8 @@ export class OrbitMap {
   basis=frame.basis;span=frame.span;
   for(let i=0;i<3;i++)origin[i]=anchor.position[i]!+frame.offset[i]!;
   const [availableW,availableH]=this.viewport(w,h);
-  const scale=span/Math.max(100,Math.min(availableW,availableH))/this.zoom;
-  const center:[number,number]=[availableW/2+this.pan[0],160+Math.max(100,availableH)/2+this.pan[1]];
+  const scale=span/Math.max(100,Math.min(availableW,availableH))/this.displayZoom;
+  const center:[number,number]=[availableW/2+this.displayPan[0],160+Math.max(100,availableH)/2+this.displayPan[1]];
   const project=(p:Vec3)=>projectMap(p,origin,basis,scale,center);
   const path=(points:Vec3[],base:Vec3,color:string,dashed=false)=>{
    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=dashed?1.5:1.3;ctx.setLineDash(dashed?[6,5]:[]);
