@@ -1,4 +1,5 @@
-import { rockyTerrain, paintTerrain, configureEarthMaterial } from './Terrain';
+import { configureSurfaceMaterial } from './SurfaceMaterial';
+import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
@@ -70,7 +71,7 @@ function makeNightTexture(): THREE.CanvasTexture {
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
   return t;
 }
 
@@ -123,15 +124,16 @@ export class Earth extends Planet {
 
     paintTerrain(geom, 'earth', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({
+      map: new THREE.TextureLoader().load(assetUrl('/textures/earth_daymap.jpg'),t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=THREE.RepeatWrapping;t.anisotropy=8;}),
       roughness: 0.85,
       metalness: 0.05,
       vertexColors: true,
       emissiveMap: makeNightTexture(),
       emissive: new THREE.Color(0xffdd66),
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0,
     });
 
-    configureEarthMaterial(mat);
+    configureSurfaceMaterial(mat, 'earth', this.visualRadius);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 
@@ -180,7 +182,7 @@ export class Earth extends Planet {
     this.cloudMesh.rotation.y += dt * 0.01;
     if (sunPosWC) {
       const mat = this.mesh.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = 0.15;
+      mat.emissiveIntensity = 0;
     }
   }
 }

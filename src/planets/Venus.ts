@@ -1,3 +1,5 @@
+import { gasTexture } from './GasAppearance';
+import { configureSurfaceMaterial } from './SurfaceMaterial';
 import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
@@ -84,8 +86,13 @@ export class Venus extends Planet {
       color: 0xffffff,
     });
 
+    configureSurfaceMaterial(mat, 'venus', this.visualRadius);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
+
+    const clouds=new THREE.Mesh(new THREE.SphereGeometry(visualR*1.012,128,64),
+      new THREE.MeshStandardMaterial({map:gasTexture('venus'),roughness:1}));
+    clouds.name='clouds';this.mesh.add(clouds);
 
     this.atmosphereGlow = new AtmosphereGlow(visualR, 0xe8a84c, 0.4);
     this.mesh.add(this.atmosphereGlow.getMesh());

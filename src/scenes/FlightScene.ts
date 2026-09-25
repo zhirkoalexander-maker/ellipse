@@ -1368,23 +1368,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     this.updateSurfaceView(baseDt);
 
-    // Keep the planet under the rocket fully visible. Previously every body
-    // except Earth was faded to 5% opacity while landed, which made the Moon
-    // look like a black void and hid the rest of the system from its surface.
-    const refVis = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
-    const rdx = this.state.position[0] - refVis.position[0];
-    const rdy = this.state.position[1] - refVis.position[1];
-    const rdz = this.state.position[2] - refVis.position[2];
-    const altAboveSurface = Math.sqrt(rdx*rdx + rdy*rdy + rdz*rdz) - ((refVis as any).radius ?? 6371000);
-    const planetAlpha = Math.max(0.72, Math.min(1, 0.72 + altAboveSurface / 200000));
+    // Planet surfaces occlude one another; only clouds and atmospheric shells blend.
     for (const body of this.system.bodies) {
-      const b = body as any;
-      if (!b.mesh || b.name === 'sun') continue;
-      const opacity = b.name === refVis.name ? 1 : planetAlpha;
-      if (b.mesh.material) {
-        const mats = Array.isArray(b.mesh.material) ? b.mesh.material : [b.mesh.material];
-        for (const m of mats) {
-          if (m.transparent !== undefined) { m.transparent = opacity < 1; m.opacity = opacity; m.needsUpdate = true; }
+      const mesh=(body as Body & {mesh?:THREE.Mesh}).mesh;
+      if(!mesh || body.name==='sun')continue;
+      const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+      for(const material of materials){
+        if(material.transparent || material.opacity!==1){
+          material.transparent=false;material.opacity=1;material.needsUpdate=true;
         }
       }
     }

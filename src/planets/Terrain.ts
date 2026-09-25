@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { earthLandFraction } from './EarthGeography';
 
 /** Continuous 3D value noise: no longitude seam or pole singularity. */
 export function terrainNoise(x: number, y: number, z: number): number {
@@ -21,6 +22,21 @@ const craters = Array.from({ length: 80 }, (_, i) => {
   const r = Math.sqrt(1 - y * y);
   return { x: Math.cos(angle) * r, y, z: Math.sin(angle) * r, size: 0.065 + (i % 7) * 0.017 };
 });
+
+// Broad mountain belts; finer ridges remain continuous procedural terrain.
+const earthRanges=[
+  [45,-112,19,7],[-20,-70,30,4],[30,85,5,24],[46,10,3,10],
+  [42,44,3,10],[9,39,12,5],[-5,138,4,13],[-43,171,6,3],
+];
+function earthMountainMask(x:number,y:number,z:number):number {
+ const lat=Math.asin(Math.max(-1,Math.min(1,y)))*180/Math.PI,lon=Math.atan2(z,x)*180/Math.PI;
+ let mask=0;
+ for(const [a,b,latWidth,lonWidth] of earthRanges){
+  const dy=(lat-a!)/latWidth!,dx=(((lon-b!+540)%360)-180)/lonWidth!;
+  mask=Math.max(mask,Math.exp(-(dx*dx+dy*dy)*2));
+ }
+ return mask;
+}
 
 function smallCraters(x: number, y: number, z: number): number {
   x *= 65; y *= 65; z *= 65;
@@ -50,22 +66,21 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
   const detail = terrainNoise(x * 240 + seed, y * 240 + 17, z * 240 + 91);
   let height = (broad - 0.35) * 0.004 + Math.pow(ridges, 5) * 0.003 + (detail - 0.5) * 0.0007;
   if (name === 'earth') {
-    const continent = terrainNoise(x * 3 + 11, y * 3 + 23, z * 3 + 45);
-    const land = THREE.MathUtils.smoothstep(continent, 0.48, 0.64);
-    const mountainRegion = THREE.MathUtils.smoothstep(terrainNoise(x * 7 + 41, y * 7 + 9, z * 7 + 62), 0.58, 0.78);
+    const land = earthLandFraction(x,y,z);
+    const mountainRegion = earthMountainMask(x,y,z);
     // Broad lowlands, folded ranges and smaller foothills; avoid isolated giant spikes.
     const fold=terrainNoise(x*18+detail*1.5+71,y*18+13,z*18+29);
     const ridgeDetail=1-Math.abs(terrainNoise(x*130+fold*2,y*130+31,z*130+11)*2-1);
-    const ranges=mountainRegion*Math.pow(ridges,3)*(.0005+ridgeDetail*.00025);
+    const ranges=mountainRegion*Math.pow(ridges,2.5)*(.0008+ridgeDetail*.0004);
     const foothills=(detail-.5)*.000045*(.25+mountainRegion);
-    height = (continent - 0.56) * 0.0013 + land * (ranges + foothills);
+    height = -.00015 + THREE.MathUtils.smoothstep(land,.2,.8)*(.00018+broad*.00012+ranges+foothills);
     const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
     const dot = x * Math.cos(lat) * Math.cos(lon) + y * Math.sin(lat) + z * Math.cos(lat) * Math.sin(lon);
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
     const blend = Math.max(0, Math.min(1, (angle - 0.0007) / 0.004));
     // The water surface is also the collision surface. Keep the launch plateau dry.
-    const coastalHills = 0.00035 * Math.exp(-((angle / 0.025) ** 2));
-    return Math.max(-0.00015, (height + coastalHills) * blend * blend * (3 - 2 * blend));
+    const coastalHills = 0.00015 * Math.exp(-((angle / 0.025) ** 2));
+    return Math.max(-0.00015, (height + coastalHills*land) * blend * blend * (3 - 2 * blend));
   }
   if (name === 'moon' || name === 'mercury') {
     height = (broad - 0.5) * 0.002 + (detail - 0.5) * 0.001 + smallCraters(x, y, z);
@@ -90,13 +105,21 @@ export function terrainColor(name: string, height: number, direction: THREE.Vect
       return new THREE.Color(0x064477).lerp(new THREE.Color(0x168eaa), THREE.MathUtils.smoothstep(depth, 0.48, 0.55));
     }
     const moisture=terrainNoise(direction.x*24+51,direction.y*24+8,direction.z*24+16);
-    color.lerp(new THREE.Color(0x75834b),THREE.MathUtils.smoothstep(moisture,.35,.8)*.6);
-    color.lerp(new THREE.Color(0xb9ad7c), 1 - THREE.MathUtils.smoothstep(height, -0.00014, -0.00009));
-    color.lerp(new THREE.Color(0x80766a), THREE.MathUtils.smoothstep(height, 0.0004, 0.00085));
+    color.lerp(new THREE.Color(0x9b9857),THREE.MathUtils.smoothstep(moisture,.48,.52)*.8);
+    color.lerp(new THREE.Color(0xb9ad7c), 1 - THREE.MathUtils.smoothstep(height, -0.000137, -0.000127));
+    color.lerp(new THREE.Color(0x80766a), THREE.MathUtils.smoothstep(height, 0.00044, 0.00049));
     const snowLine=.0009-Math.abs(direction.y)*.0005;
-    color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, snowLine, snowLine+.00035));
+    color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, snowLine, snowLine+.000035));
   }
-  return color.multiplyScalar(0.82 + grain * 0.32);
+  if(name!=='earth') {
+    const region=terrainNoise(direction.x*9+3,direction.y*9+8,direction.z*9+21);
+    const mask=THREE.MathUtils.smoothstep(region,.46,.5);
+    const palettes:Record<string,[number,number]>={moon:[0x41454b,0xb7b4aa],mercury:[0x575047,0xb9ae97],mars:[0x493d36,0xc87543],venus:[0x615143,0xd0a15f],pluto:[0x714e3e,0xe1d9c9]};
+    const palette=palettes[name]||palettes.moon!;
+    color.setHex(palette[0]).lerp(new THREE.Color(palette[1]),mask);
+    if(name==='mars')color.lerp(new THREE.Color(0xe8e5d9),THREE.MathUtils.smoothstep(Math.abs(direction.y),.93,.945));
+  }
+  return color.multiplyScalar(0.76 + grain * 0.42);
 }
 
 export function paintTerrain(geometry: THREE.BufferGeometry, name: string, radius: number): void {
@@ -108,42 +131,4 @@ export function paintTerrain(geometry: THREE.BufferGeometry, name: string, radiu
     colors.push(color.r, color.g, color.b);
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-}
-
-/** Match water shading in the distant globe and the detailed surface mesh. */
-export function configureEarthMaterial(material: THREE.MeshStandardMaterial): void {
-  material.onBeforeCompile = shader => {
-    shader.vertexShader=shader.vertexShader.replace('#include <common>',`#include <common>
-      varying vec3 terrainDirection;
-    `).replace('#include <begin_vertex>',`#include <begin_vertex>
-      terrainDirection=normalize(position);
-    `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
-      varying vec3 terrainDirection;
-      float groundHash(vec3 p){p=fract(p*.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
-      float groundNoise(vec3 p){
-        vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
-        return mix(mix(mix(groundHash(i),groundHash(i+vec3(1,0,0)),f.x),
-          mix(groundHash(i+vec3(0,1,0)),groundHash(i+vec3(1,1,0)),f.x),f.y),
-          mix(mix(groundHash(i+vec3(0,0,1)),groundHash(i+vec3(1,0,1)),f.x),
-          mix(groundHash(i+vec3(0,1,1)),groundHash(i+vec3(1,1,1)),f.x),f.y),f.z);
-      }
-    `).replace('#include <color_fragment>',`#include <color_fragment>
-      vec3 groundPoint=normalize(terrainDirection);
-      float landMask=1.0-step(vColor.r*2.0,vColor.b)*step(vColor.g*1.1,vColor.b);
-      float footprint=length(fwidth(groundPoint));
-      float grain=(groundNoise(groundPoint*1800.0)-.5)*.55*(1.0-smoothstep(.2,.7,footprint*1800.0));
-      grain+=(groundNoise(groundPoint*6000.0)-.5)*.3*(1.0-smoothstep(.2,.7,footprint*6000.0));
-      grain+=(groundNoise(groundPoint*18000.0)-.5)*.15*(1.0-smoothstep(.2,.7,footprint*18000.0));
-      diffuseColor.rgb*=1.0+landMask*grain*.5;
-    `).replace('#include <roughnessmap_fragment>', `
-      #include <roughnessmap_fragment>
-      float ocean = step(vColor.r * 2.0, vColor.b) * step(vColor.g * 1.1, vColor.b);
-      roughnessFactor = mix(roughnessFactor, 0.24, ocean);
-    `).replace('#include <emissivemap_fragment>', `
-      #include <emissivemap_fragment>
-      totalEmissiveRadiance *= 1.0 - ocean;
-    `);
-  };
-  material.customProgramCacheKey = () => 'earth-ground-v2';
 }
