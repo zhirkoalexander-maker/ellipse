@@ -1,22 +1,33 @@
-# Development notes
+# Changes
 
-## 2.5.4
+## 2.5.14
 
-- Four fitted launch restraints open as the rocket lifts off.
-- Nearby planets render up to six times larger, with the same multiplier across the system. The multiplier falls smoothly during ascent.
-- Rocky planets use shared terrain geometry and surface colors. A denser globe mesh around the craft shows close-up slopes and crater rims without separate patch seams.
-- The flat area at the launch site is much smaller. Airless bodies have a dark sky.
+- Fixed keyboard and touch takeover from autopilot, and conflicts between landing assist and course corrections.
+- Restart keeps the original rocket after saving and continuing a staged flight.
+- Fixed rocket names in the Load dialog, storage-error handling and double-click framing in assembly.
+- Auto-save and sound settings now work. Removed settings that had no effect.
+- Fixed the 7000 m/s mission reward and menu overlay cleanup.
+- Rewrote the guide and README. Removed repeated source snapshots and outdated work plans from the docs.
 
-## 2.5.3
+## 2.5.13
 
-- High coast warp keeps the camera with the rocket while preserving zoom and orbit controls.
-- Powered flight includes gravity from the system's bodies, measured relative to the moving reference planet.
-- The Earth launch site has a deck, markings, and service tower that travel with Earth.
-- VAB has part search and controls for moving or removing individual parts.
-- Flight controls use shorter labels. Routine hints and the right-hand orbit panel no longer cover the view.
+- Reduced displayed distances and speeds while increasing visual motion near the surface.
+- Fixed excessive atmospheric braking and manual-throttle takeover from landing assist.
+- Rebuilt the launch coastline at sea level, with a beach and visible inland ridges.
 
-## 2.5.2
+## 2.5.12
 
-Fixed destination surface contact during automatic flights and limited camera zoom. Moon and Mars missions are covered by complete flight simulation tests.
+- Smaller distant planet discs.
+- A system overview, direct destination selection and collapsible course controls on the map.
 
-Earlier changes are recorded in Git history. Some older design documents describe experiments that are no longer used by the current build.
+## 2.5.11
+
+- Detailed surface maps for Earth, the Moon, Mars and Mercury.
+- Updated gas planets and rings; fixed planets showing through each other.
+
+## 2.5.10
+
+- Upright touchdowns up to 90 m/s.
+- Disabled engine audio and fitted the full lunar orbit in the map view.
+
+Earlier changes are in Git history.

@@ -1,3 +1,4 @@
+import { loadSettings } from '../ui/Settings';
 export class SoundManager {
   private ctx: AudioContext | null = null;
   private engineOsc: OscillatorNode | null = null;
@@ -11,8 +12,8 @@ export class SoundManager {
   }
 
   private ensureCtx(): AudioContext | null {
-    if (!this.ctx) return null;
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.ctx || loadSettings().sfxVolume===0) return null;
+    if (this.ctx.state === 'suspended') void this.ctx.resume().catch(()=>{});
     return this.ctx;
   }
 
@@ -155,6 +156,6 @@ export class SoundManager {
 
   dispose(): void {
     this.stopEngine();
-    if (this.ctx) { this.ctx.close(); this.ctx = null; }
+    if (this.ctx) { void this.ctx.close().catch(()=>{}); this.ctx = null; }
   }
 }
