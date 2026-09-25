@@ -1,3 +1,4 @@
+import { configureSurfaceMaterial } from './SurfaceMaterial';
 import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
@@ -55,7 +56,7 @@ export class Mercury extends Planet {
 
     const loader = new THREE.TextureLoader();
     const tex = loader.load(assetUrl('/textures/mercury.jpg'), (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
+      t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
       t.anisotropy = 4;
     });
 
@@ -75,12 +76,14 @@ export class Mercury extends Planet {
 
     paintTerrain(geom, 'mercury', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({
+      map: tex,
       vertexColors: true,
       roughness: 0.9,
       metalness: 0.0,
       color: 0xffffff,
     });
 
+    configureSurfaceMaterial(mat, 'mercury', this.visualRadius);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
   }

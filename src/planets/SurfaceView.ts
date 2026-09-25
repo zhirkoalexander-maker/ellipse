@@ -1,7 +1,8 @@
+import { configureSurfaceMaterial } from './SurfaceMaterial';
 import * as THREE from 'three';
 import type { Body, Vec3 } from '../physics/Body';
 import { Planet } from './Planet';
-import { terrainColor, configureEarthMaterial } from './Terrain';
+import { terrainColor } from './Terrain';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
@@ -91,10 +92,10 @@ export class SurfaceView {
     geometry.setIndex(indices); geometry.computeVertexNormals();
     const material = (body.mesh.material as THREE.MeshStandardMaterial).clone();
     material.visible = true; material.vertexColors = true; material.roughness = 1;
-    material.map = null; material.emissiveMap = null;
+    material.emissiveMap = null;
     material.emissive.setHex(0x000000); material.emissiveIntensity = 0;
     material.transparent = false; material.opacity = 1;
-    if (body.name === 'earth') configureEarthMaterial(material);
+    configureSurfaceMaterial(material,body.name,body.visualRadius);
     this.patch = new THREE.Mesh(geometry, material); this.patch.name = 'local-terrain';
     body.mesh.add(this.patch);
   }

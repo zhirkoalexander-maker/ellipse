@@ -3,7 +3,7 @@ import { Planet } from './Planet';
 import type { Vec3 } from '../physics/Body';
 import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 import { AtmosphereGlow } from '../effects/AtmosphereGlow';
-import { generateNeptuneTexture } from '../effects/ProceduralTextures';
+import { gasTexture } from './GasAppearance';
 
 const VS = ORBIT_SCALE * VISUAL_PLANET_MULT;
 const SEGMENTS = 64;
@@ -16,7 +16,7 @@ export class Neptune extends Planet {
 
     const visualR = this.visualRadius;
 
-    const tex = generateNeptuneTexture();
+    const tex = gasTexture('neptune');
 
     const geom = new THREE.SphereGeometry(visualR, 64, 32);
     // Gas cloud layers are smooth; bands belong in the texture, not terrain.

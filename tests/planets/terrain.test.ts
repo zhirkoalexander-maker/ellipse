@@ -41,7 +41,7 @@ it('gives Pluto continuous raised ridges rather than a smooth sphere', () => {
  const adjacent = direction.clone().add(new THREE.Vector3(1e-5,0,0)).normalize().multiplyScalar(planet.radius);
  expect(Math.abs(planet.getSurfaceRadiusAt(adjacent.toArray()) - planet.getSurfaceRadiusAt(point.toArray())) / planet.radius).toBeLessThan(1e-5);
 });
-it('keeps only the immediate launch site flat with hills outside it', () => {
+it('keeps only the immediate launch site flat and restores the coast outside it', () => {
  const earth = new Earth([0,0,0], [0,0,0]);
  const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
  const pad = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
@@ -50,5 +50,5 @@ it('keeps only the immediate launch site flat with hills outside it', () => {
   expect(earth.getSurfaceRadiusAt(point.toArray())).toBeCloseTo(earth.radius, 6);
  }
  const hillside = pad.clone().add(new THREE.Vector3(0.006, 0, 0)).normalize().multiplyScalar(earth.radius);
- expect(earth.getSurfaceRadiusAt(hillside.toArray()) - earth.radius).toBeGreaterThan(1000);
+ expect(earth.getSurfaceRadiusAt(hillside.toArray()) - earth.radius).toBeLessThan(-100);
 });

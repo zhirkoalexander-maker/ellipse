@@ -1,3 +1,4 @@
+import { configureSurfaceMaterial } from './SurfaceMaterial';
 import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import { Planet } from './Planet';
@@ -58,7 +59,7 @@ export class Mars extends Planet {
 
     const loader = new THREE.TextureLoader();
     const tex = loader.load(assetUrl('/textures/mars.jpg'), (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
+      t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
       t.anisotropy = 4;
     });
 
@@ -78,12 +79,14 @@ export class Mars extends Planet {
 
     paintTerrain(geom, 'mars', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({
+      map: tex,
       vertexColors: true,
       roughness: 0.85,
       metalness: 0.0,
       color: 0xffffff,
     });
 
+    configureSurfaceMaterial(mat, 'mars', this.visualRadius);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
 

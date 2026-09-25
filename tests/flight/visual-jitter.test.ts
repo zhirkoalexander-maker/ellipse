@@ -15,5 +15,9 @@ it('keeps the displayed rocket attached to its physical position even during lau
   const up=new Vector3(...f.state.position).sub(new Vector3(...ref.position)).normalize();
   const expected=new Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE*VISUAL_PLANET_MULT).addScaledVector(up,-f.rocketBottomY*ROCKET_VISUAL_SCALE);
   expect(f.rocketGroup.position.distanceTo(expected)).toBeLessThan(1e-9);
+  for(const name of ['earth','moon']){
+    const material=f.system.bodyByName(name).mesh.material;
+    expect(material.transparent).toBe(false);expect(material.opacity).toBe(1);
+  }
  } finally {f.dispose();}
 });
