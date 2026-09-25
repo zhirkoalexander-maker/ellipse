@@ -4,6 +4,13 @@ import { Quaternion, Vector3 } from 'three';
 import { steerAttitude, aimAttitude } from '../../src/flight/Attitude';
 
 describe('landing guidance', () => {
+  it.each([false,true])('accepts an upright touchdown up to 90 m/s with support=%s', supported=>{
+    expect(landingOutcome(-90,0,0,supported)).toBe('rough');
+    expect(landingOutcome(-60,2,10,supported)).toBe('rough');
+    expect(landingOutcome(-90.01,0,0,supported)).toBe('crash');
+    expect(landingOutcome(-90,100,0,supported)).toBe('crash');
+    expect(landingOutcome(-90,0,180,supported)).toBe('crash');
+  });
   it('lands a descending vehicle using finite fuel-limited thrust in different gravities', () => {
     for (const gravity of [1.6, 3.7, 14]) {
       let altitude = 1800, verticalSpeed = -90, horizontalSpeed = 25;

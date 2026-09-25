@@ -1079,14 +1079,12 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.state.velocity[1] += liftoffVel[1];
       this.state.velocity[2] += liftoffVel[2];
       this.achievements.unlock('first_launch');
-      this.sound.startEngine();
       // Brief camera shake on liftoff
       this.screenShake = 0.8;
     }
 
-    // Flame and sound show only while fuel remains (engineFiring)
+    // Flame shows only while fuel remains (engineFiring).
     if (engineFiring) {
-      this.sound.setThrottle(this.state.throttle);
       this.engineFlame.setThrottle(this.state.throttle);
       this.engineFlame.start();
       // Vacuum mode above 50km
