@@ -1,3 +1,4 @@
+import { gameMetres, simulationMetres } from '../flight/GameUnits';
 import { Vector3 } from 'three';
 import { G } from '../config/constants';
 import { Lifetime } from '../core/Lifetime';
@@ -12,7 +13,7 @@ export interface MapSnapshot {
 }
 const colors:Record<string,string>={sun:'#ffe4a0',earth:'#439edf',moon:'#c8ccd3',mars:'#cf7955',venus:'#d6b87e',mercury:'#9ea2aa',jupiter:'#caa581',saturn:'#d5c59a',uranus:'#8ccbd7',neptune:'#557dc1',pluto:'#b7b0a6'};
 const landingTargets=new Set(['earth','moon','mars','venus','mercury','pluto']);
-const distanceText=(m:number)=>m>=1e9?`${(m/1e9).toFixed(2)} M km`:`${(m/1000).toLocaleString('en',{maximumFractionDigits:0})} km`;
+const distanceText=(physical:number)=>{const m=gameMetres(physical);return m>=1e9?`${(m/1e9).toFixed(2)} M km`:`${(m/1000).toLocaleString('en',{maximumFractionDigits:0})} km`;};
 export class OrbitMap {
  private life=new Lifetime();
  readonly root=document.createElement('div');
@@ -102,9 +103,9 @@ export class OrbitMap {
  private plannedDelta(s:MapSnapshot):Vec3 {
   const r=s.position.map((v,i)=>v-s.reference.position[i]!) as Vec3;
   const v=s.velocity.map((v,i)=>v-s.reference.velocity[i]!) as Vec3;
-  if(this.correction==='advanced')return maneuverVector(r,v,this.dv);
+  if(this.correction==='advanced')return maneuverVector(r,v,this.dv.map(simulationMetres) as Vec3);
   const destination=s.bodies.find(b=>b.name===this.target)?.position||s.position;
-  return simpleCorrection(s.position,v,destination,this.correction,this.strength);
+  return simpleCorrection(s.position,v,destination,this.correction,simulationMetres(this.strength));
  }
  private status(text:string,hold=false){if(hold)this.messageUntil=Date.now()+4000;if(hold||Date.now()>=this.messageUntil)this.root.querySelector('#map-status')!.textContent=text;}
  private fit(mode:typeof this.mode){this.mode=mode;this.root.dataset.view=mode;if(mode==='system')(this.root.querySelector('.map-course') as HTMLDetailsElement).open=false;this.viewFrame=null;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;}
@@ -164,10 +165,10 @@ export class OrbitMap {
   this.root.querySelector('#map-distance')!.textContent=target?`${distanceText(new Vector3(...s.position).distanceTo(new Vector3(...target.position)))} to ${target.name}`:'';
   (this.root.querySelector('#transfer-go') as HTMLButtonElement).disabled=!landingTargets.has(this.target)||this.target===ref.name&&s.grounded;
   (this.root.querySelector('[data-map="burn"]') as HTMLButtonElement).disabled=s.grounded||s.paused||s.fuel<=0||new Vector3(...delta).length()<.01||s.remainingBurn>0;
-  if(s.remainingBurn>0)this.status(`Burning · ${s.remainingBurn.toFixed(1)} m/s remaining`);
+  if(s.remainingBurn>0)this.status(`Burning · ${gameMetres(s.remainingBurn).toFixed(1)} m/s remaining`);
   else if(s.grounded)this.status('Launch to adjust your orbit.');
   else if(s.paused)this.status('Resume flight to execute a burn.');
-  else this.status(`Δv ${new Vector3(...delta).length().toFixed(0)} m/s · ${(s.fuel/1000).toFixed(1)} t fuel`);
+  else this.status(`Δv ${gameMetres(new Vector3(...delta).length()).toFixed(0)} m/s · ${(s.fuel/1000).toFixed(1)} t fuel`);
   this.root.querySelectorAll<HTMLButtonElement>('[data-correction]').forEach(b=>b.classList.toggle('selected',b.dataset.correction===this.correction));
   this.root.querySelectorAll<HTMLButtonElement>('nav button[data-map]').forEach(b=>b.classList.toggle('selected',b.dataset.map===this.mode));
   this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach(b=>b.classList.toggle('selected',b.dataset.destination===this.target));

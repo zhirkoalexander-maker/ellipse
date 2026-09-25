@@ -114,7 +114,7 @@ describe('launch through player input', () => {
     expect(button).not.toBeNull();
     button!.click();
     expect(f.timeWarp).toBe(1);
-    expect(document.querySelector('.flight-landing-status')?.textContent).toContain('70 km');
+    expect(document.querySelector('.flight-landing-status')?.textContent).toContain('17.5 km');
     f.paused = true;
     document.querySelector<HTMLButtonElement>('[data-action="warpUp"]')!.click();
     expect(f.timeWarp).toBe(1);

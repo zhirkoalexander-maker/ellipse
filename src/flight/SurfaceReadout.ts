@@ -1,5 +1,7 @@
+import { gameMetres } from './GameUnits';
 export function surfaceReadout(altitude: number, verticalSpeed: number, grounded: boolean) {
- const height=Math.max(0,altitude);
+ const height=Math.max(0,gameMetres(altitude));
+ verticalSpeed=gameMetres(verticalSpeed);
  const visible=!grounded && height<20000 && verticalSpeed<-.1;
  return {visible,height:height<1000?`${Math.round(height)} m`:`${(height/1000).toFixed(1)} km`,
   descent:`↓ ${Math.max(0,-verticalSpeed).toFixed(1)} m/s`,

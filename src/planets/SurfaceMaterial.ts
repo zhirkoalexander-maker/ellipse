@@ -1,3 +1,4 @@
+import { earthLaunchFrame } from './EarthGeography';
 import * as THREE from 'three';
 
 const rgb=(hex:number)=>`vec3(${new THREE.Color(hex).toArray().map(v=>v.toFixed(6)).join(',')})`;
@@ -83,9 +84,21 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
         uvDx.x-=floor(uvDx.x+.5);uvDy.x-=floor(uvDy.x+.5);
         color=${sample}.rgb;
         ${name==='earth'?`waterMask=step(color.r*1.35,color.b)*step(color.g*1.1,color.b);
-        color=mix(color,${rgb(0x0a3b60)},waterMask*.35);
-        float pad=1.0-smoothstep(.0007,.004,acos(clamp(dot(p,normalize(vec3(.144379,.477159,-.866989))),-1.0,1.0)));
-        color=mix(color,${rgb(0x52643a)},pad*waterMask);waterMask*=1.0-pad;`:''}
+        float angle=acos(clamp(dot(p,normalize(vec3(${earthLaunchFrame.up.join(',')}))),-1.0,1.0));
+        float east=dot(p,vec3(${earthLaunchFrame.east.map(v=>v.toFixed(12)).join(',')}));
+        float north=dot(p,vec3(${earthLaunchFrame.north.join(',')}));
+        float local=1.0-smoothstep(.008,.012,angle);
+        float coast=.0014-east+.00022*sin(north*1300.0)+.00008*sin(north*3700.0);
+        float land=smoothstep(-.00012,.00012,coast);
+        waterMask=mix(waterMask,1.0-smoothstep(.02,.06,land),local);
+        vec3 grass=mix(${rgb(0x52643a)},${rgb(0x304b2b)},groundFbm(p*2800.0));
+        color=mix(color,grass,local*(1.0-waterMask));
+        float beach=mix(1.0-smoothstep(.00000025,.00000075,h),1.0-smoothstep(.07,.6,land),local);
+        color=mix(color,${rgb(0xbca77b)},beach*(1.0-waterMask));
+        float localRock=smoothstep(.00008,.00016,h)*local;
+        color=mix(color,${rgb(0x7a7569)},localRock*.8);
+        vec3 sea=mix(${rgb(0x083b61)},${rgb(0x238d94)},local*smoothstep(-.0008,0.0,coast));
+        color=mix(color,sea,waterMask);`:''}
       #endif
       float grain=filteredGrain(p,1800.0,footprint)*.55+filteredGrain(p,6000.0,footprint)*.3+filteredGrain(p,18000.0,footprint)*.15;
       diffuseColor.rgb=color*(1.0+(1.0-waterMask)*grain*.8);
@@ -103,5 +116,5 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
       totalEmissiveRadiance*=1.0-waterMask;
     `);
   };
-  material.customProgramCacheKey=()=>`surface-${name}-v3`;
+  material.customProgramCacheKey=()=>`surface-${name}-v4`;
 }

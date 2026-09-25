@@ -7,3 +7,10 @@ export function earthLandFraction(x:number,y:number,z:number):number {
  const sample=(a:number,b:number)=>{const i=Math.max(0,Math.min(511,b))*1024+((a%1024)+1024)%1024;return (data[i>>3]!>>(i&7))&1;};
  return (sample(ix,iy)*(1-fx)+sample(ix+1,iy)*fx)*(1-fy)+(sample(ix,iy+1)*(1-fx)+sample(ix+1,iy+1)*fx)*fy;
 }
+
+const launchLat=28.5*Math.PI/180,launchLon=-80.5*Math.PI/180;
+export const earthLaunchFrame={
+ up:[Math.cos(launchLat)*Math.cos(launchLon),Math.sin(launchLat),Math.cos(launchLat)*Math.sin(launchLon)],
+ east:[-Math.sin(launchLon),0,Math.cos(launchLon)],
+ north:[-Math.sin(launchLat)*Math.cos(launchLon),Math.cos(launchLat),-Math.sin(launchLat)*Math.sin(launchLon)],
+};
