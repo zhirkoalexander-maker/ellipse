@@ -70,3 +70,24 @@ it('leaves the schematic when course controls open so burns have a real preview'
   expect((map as any).mode).toBe('orbit');
  }finally{map.dispose();}
 });
+
+it('animates zoom on consecutive display frames without moving its cursor anchor',()=>{
+ const earth=Object.assign(new Body('earth',5e24,[0,0,0],[0,0,0]),{radius:6e6});
+ const moon=Object.assign(new Body('moon',7e22,[6e7,0,0],[0,0,2400]),{radius:2e6});
+ const map=new OrbitMap(()=>({position:[-6e6,0,0],velocity:[0,0,0],reference:earth,bodies:[earth,moon],grounded:true,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
+ const view=map as any;
+ try {
+  map.toggle();view.draw(100);
+  const before={...view.hits.find((h:any)=>h.name==='earth')};
+  view.zoomAt(200,300,2);
+  view.draw(116);
+  const first={...view.hits.find((h:any)=>h.name==='earth')};
+  const endX=200+(before.x-200)*2;
+  expect(Math.abs(first.x-before.x)).toBeGreaterThan(0);
+  expect(Math.abs(first.x-before.x)).toBeLessThan(Math.abs(endX-before.x));
+  view.draw(132);
+  expect(view.hits.find((h:any)=>h.name==='earth').x).not.toBe(first.x);
+  for(let t=148;t<1200;t+=16)view.draw(t);
+  expect(view.hits.find((h:any)=>h.name==='earth').x).toBeCloseTo(endX,1);
+ } finally {map.dispose();}
+});
