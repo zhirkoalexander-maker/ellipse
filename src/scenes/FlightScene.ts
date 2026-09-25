@@ -1,3 +1,5 @@
+import { dragArea, dragRetention } from '../flight/Aerodynamics';
+import { gameMetres } from '../flight/GameUnits';
 import { automaticWarp } from '../flight/AutomaticWarp';
 import * as THREE from 'three';
 import type { Renderer } from '../core/Renderer';
@@ -890,6 +892,13 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Screen buttons throttle
     if (this.hud.throttleUpBtn) this.state.throttle = Math.min(1, this.state.throttle + baseDt * 0.5);
     if (this.hud.throttleDownBtn) this.state.throttle = Math.max(0, this.state.throttle - baseDt * 0.3);
+    if (this.controls.getThrottleInput() || this.state.throttle !== previousThrottle || this.hud.throttleUpBtn || this.hud.throttleDownBtn) {
+      const manualThrottle = this.state.throttle;
+      if (this.autopilotActive) this.abortAutopilot('Manual throttle');
+      if (this.maneuverRemaining.lengthSq() > 0) this.stopMapBurn();
+      this.landingAssist = false;
+      this.state.throttle = manualThrottle;
+    }
     // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
     this.updateAutopilot(simulationDt);
     this.updateLandingAssist(simulationDt);
@@ -1175,24 +1184,15 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 // Aerodynamic drag — RELATIVE speed (atmosphere co-moves with the planet)
        const speed = this.relSpeed();
        const mass = this.state.rocket.totalMass();
-       let CdA = mass * 0.001 + 0.2;
-       if (this.parachuteDeployed) CdA = Math.max(50, mass * 6);
-       else if (this.gearDeployed) CdA *= 2.5;
+       const relativeDirection = new THREE.Vector3(...this.relVelocity()).normalize();
+       const CdA = dragArea(this.rocket.assembly.roots, fwd.dot(relativeDirection), this.gearDeployed, this.parachuteDeployed);
        if (nearestBody && (nearestBody as any).radius && speed > 0.05 && speed < 1e6) {
          const alt = nearestDist - (nearestBody as any).radius;
          // Only apply drag if the body has an atmosphere
          const atmoScale = this.atmosphereScale((nearestBody as any).name);
          if (atmoScale > 0 && alt > 0 && alt < 300000) {
            const rho = 1.225 * Math.exp(-alt / 8500) * atmoScale;
-           const q = 0.5 * rho * speed * speed;
-           const dragForce = q * CdA;
-           const dragAccel = dragForce / mass;
-           const dragDelta = dragAccel * _dt;
-            // Never kill more than 90% of RELATIVE speed in one frame — the
-            // old full-stop (velocity = 0) at high time warp halted rockets
-            // mid-air. Applied to the RELATIVE velocity (planet's orbital
-            // component must pass through untouched).
-            const f = Math.max(0.1, 1 - dragDelta / speed);
+            const f = dragRetention(speed, rho, CdA, mass, _dt);
             const rv = this.relVelocity();
             this.state.velocity[0] = rv[0] * f + (this.state.velocity[0] - rv[0]);
             this.state.velocity[1] = rv[1] * f + (this.state.velocity[1] - rv[1]);
@@ -1636,16 +1636,16 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const orbitRefBodyForMission = getReferenceBody(this.state.position, this.system);
     this.missions.evaluate({
       launched: this.launched,
-      altitude: nearestAlt,
-      maxAltitude: this.maxAlt,
-      speed,
-      maxSpeed: this.maxSpeed,
+      altitude: gameMetres(nearestAlt),
+      maxAltitude: gameMetres(this.maxAlt),
+      speed: gameMetres(speed),
+      maxSpeed: gameMetres(this.maxSpeed),
       grounded: this.grounded,
       nearestBody: nearRef.name,
       refBody: orbitRefBodyForMission.name,
       bound: ape !== undefined && pe !== undefined,
-      apoapsis: ape ?? -1,
-      periapsis: pe ?? -1,
+      apoapsis: gameMetres(ape ?? -4),
+      periapsis: gameMetres(pe ?? -4),
       stageSeparations: this.stageSeparations,
       softLanded: false,
     });
@@ -1692,8 +1692,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Altitude milestone notifications
     const milestones = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000];
     for (const m of milestones) {
-      if (nearestAlt >= m && this.lastAltMilestone < m) {
-        this.lastAltMilestone = m;
+      if (gameMetres(nearestAlt) >= m && gameMetres(this.lastAltMilestone) < m) {
+        this.lastAltMilestone = m * 4;
         toast.show(`Altitude: ${m >= 1000 ? (m/1000)+'km' : m+'m'}`);
         break;
       }
@@ -2157,7 +2157,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const surface = (body as any).getSurfaceRadiusAt?.(this.state.position) ?? (body as any).radius ?? 0;
     const altitude = new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...body.position)) - surface;
     if (warp > 10 && (this.grounded || altitude < 70000 || this.landingAssist)) {
-      const reason = this.landingAssist ? 'Disable landing assist before using high time warp.' : '100× and higher warp is available above 70 km. Use up to 10× near the surface.';
+      const reason = this.landingAssist ? 'Disable landing assist before using high time warp.' : '100× and higher warp is available above 17.5 km. Use up to 10× near the surface.';
       this.landingStatus = reason;
       this.hud.setLandingStatus(reason, false);
       toast.show(reason, 4500);
@@ -2237,7 +2237,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     if (!this.landingAssist || this.grounded) {
       if (!this.grounded && altitude < 20000 && verticalSpeed < 0) {
-        this.landingStatus = `GROUND ${altitude.toFixed(0)} m · DESCENT ${(-verticalSpeed).toFixed(1)} m/s · DRIFT ${lateral.length().toFixed(1)} m/s · L: assist`;
+        this.landingStatus = `GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(-verticalSpeed).toFixed(1)} m/s · DRIFT ${gameMetres(lateral.length()).toFixed(1)} m/s · L: assist`;
       }
       return;
     }
@@ -2272,7 +2272,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Point the engine in the useful direction before applying descent thrust.
     const aligned = Math.max(0, nose.dot(this.landingDirection));
     this.state.throttle = aligned > 0.55 ? command.throttle : 0;
-    this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${altitude.toFixed(0)} m · DESCENT ${Math.max(0, -verticalSpeed).toFixed(1)} m/s · L: cancel`;
+    this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(Math.max(0, -verticalSpeed)).toFixed(1)} m/s · L: cancel`;
   }
 
   /** Test the travelled segment, not only the next endpoint: fast falls must not tunnel. */
@@ -2302,9 +2302,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (vertical >= 0 && start.length() >= contactRadius - 1) return;
     const lateral = velocity.clone().addScaledVector(normal, -vertical).length();
     const tilt = THREE.MathUtils.radToDeg(new THREE.Vector3(0, 1, 0).applyQuaternion(this.rocketQuat).angleTo(normal));
-    const outcome = landingOutcome(vertical, lateral, tilt, this.parachuteDeployed || (this.gearDeployed && this.hasLandingLegs()));
+    const outcome = landingOutcome(gameMetres(vertical), gameMetres(lateral), tilt, this.parachuteDeployed || (this.gearDeployed && this.hasLandingLegs()));
     if (outcome === 'crash') {
-      this.doCrash(`Impact: ${Math.abs(vertical).toFixed(0)} m/s descent, ${lateral.toFixed(0)} m/s drift, ${tilt.toFixed(0)}° tilt`, body, normal.x, normal.y, normal.z, 1, surface);
+      this.doCrash(`Impact: ${gameMetres(Math.abs(vertical)).toFixed(0)} m/s descent, ${gameMetres(lateral).toFixed(0)} m/s drift, ${tilt.toFixed(0)}° tilt`, body, normal.x, normal.y, normal.z, 1, surface);
       this.persistFlight();
       return;
     }

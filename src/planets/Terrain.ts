@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { earthLandFraction } from './EarthGeography';
+import { earthLandFraction, earthLaunchFrame } from './EarthGeography';
 
 /** Continuous 3D value noise: no longitude seam or pole singularity. */
 export function terrainNoise(x: number, y: number, z: number): number {
@@ -66,21 +66,31 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
   const detail = terrainNoise(x * 240 + seed, y * 240 + 17, z * 240 + 91);
   let height = (broad - 0.35) * 0.004 + Math.pow(ridges, 5) * 0.003 + (detail - 0.5) * 0.0007;
   if (name === 'earth') {
-    const land = earthLandFraction(x,y,z);
+    let land = earthLandFraction(x,y,z);
     const mountainRegion = earthMountainMask(x,y,z);
     // Broad lowlands, folded ranges and smaller foothills; avoid isolated giant spikes.
     const fold=terrainNoise(x*18+detail*1.5+71,y*18+13,z*18+29);
     const ridgeDetail=1-Math.abs(terrainNoise(x*130+fold*2,y*130+31,z*130+11)*2-1);
-    const ranges=mountainRegion*Math.pow(ridges,2.5)*(.0008+ridgeDetail*.0004);
+    const ranges=mountainRegion*Math.pow(ridges,2.5)*(.0012+ridgeDetail*.0006);
     const foothills=(detail-.5)*.000045*(.25+mountainRegion);
-    height = -.00015 + THREE.MathUtils.smoothstep(land,.2,.8)*(.00018+broad*.00012+ranges+foothills);
-    const lat = 28.5 * Math.PI / 180, lon = -80.5 * Math.PI / 180;
-    const dot = x * Math.cos(lat) * Math.cos(lon) + y * Math.sin(lat) + z * Math.cos(lat) * Math.sin(lon);
+    const dotFrame=(v:number[])=>x*v[0]!+y*v[1]!+z*v[2]!;
+    const dot = dotFrame(earthLaunchFrame.up);
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-    const blend = Math.max(0, Math.min(1, (angle - 0.0007) / 0.004));
-    // The water surface is also the collision surface. Keep the launch plateau dry.
-    const coastalHills = 0.00015 * Math.exp(-((angle / 0.025) ** 2));
-    return Math.max(-0.00015, (height + coastalHills*land) * blend * blend * (3 - 2 * blend));
+    const east=dotFrame(earthLaunchFrame.east);
+    const north=dotFrame(earthLaunchFrame.north);
+    const local=1-THREE.MathUtils.smoothstep(angle,.008,.012);
+    // A continuous coastal plain: launch site inland, open sea to the east.
+    const coast=.0014-east+.00022*Math.sin(north*1300)+.00008*Math.sin(north*3700);
+    const localLand=THREE.MathUtils.smoothstep(coast,-.00012,.00012);
+    land=THREE.MathUtils.lerp(land,localLand,local);
+    const inland=Math.exp(-(((east+.0012)/.00065)**2)-((north-.0004)/.0015)**2);
+    const folds=1-Math.abs(terrainNoise(x*1800+41,y*1800+19,z*1800)*2-1);
+    const coastalHeight=.000004+inland*(.00005+Math.pow(folds,3)*.0002);
+    const continentalHeight=.00004+broad*.00006+ranges+foothills;
+    height=THREE.MathUtils.smoothstep(land,.02,.85)*THREE.MathUtils.lerp(continentalHeight,coastalHeight,local);
+    const pad=1-THREE.MathUtils.smoothstep(angle,.00015,.0005);
+    return THREE.MathUtils.lerp(Math.max(0,height),12/(6.371e6*2.5),pad);
+
   }
   if (name === 'moon' || name === 'mercury') {
     height = (broad - 0.5) * 0.002 + (detail - 0.5) * 0.001 + smallCraters(x, y, z);
@@ -100,13 +110,13 @@ export function terrainColor(name: string, height: number, direction: THREE.Vect
   const grain = terrainNoise(direction.x * 320 + 8, direction.y * 320 + 19, direction.z * 320 + 51);
   const color = new THREE.Color(name === 'earth' ? 0x456b43 : name === 'mars' ? 0xa16648 : name === 'venus' ? 0x978567 : name === 'pluto' ? 0xb4b3a8 : 0x8e9193);
   if (name === 'earth') {
-    if (height < -0.000145) {
+    if (height < 0.0000001) {
       const depth = terrainNoise(direction.x * 3 + 11, direction.y * 3 + 23, direction.z * 3 + 45);
       return new THREE.Color(0x064477).lerp(new THREE.Color(0x168eaa), THREE.MathUtils.smoothstep(depth, 0.48, 0.55));
     }
     const moisture=terrainNoise(direction.x*24+51,direction.y*24+8,direction.z*24+16);
     color.lerp(new THREE.Color(0x9b9857),THREE.MathUtils.smoothstep(moisture,.48,.52)*.8);
-    color.lerp(new THREE.Color(0xb9ad7c), 1 - THREE.MathUtils.smoothstep(height, -0.000137, -0.000127));
+    color.lerp(new THREE.Color(0xb9ad7c), 1 - THREE.MathUtils.smoothstep(height, 0.00000025, 0.00000075));
     color.lerp(new THREE.Color(0x80766a), THREE.MathUtils.smoothstep(height, 0.00044, 0.00049));
     const snowLine=.0009-Math.abs(direction.y)*.0005;
     color.lerp(new THREE.Color(0xe3e9ec), THREE.MathUtils.smoothstep(height, snowLine, snowLine+.000035));

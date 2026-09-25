@@ -10,7 +10,7 @@ const SOLID = new Set(['earth', 'moon', 'mars', 'venus', 'mercury', 'pluto']);
 
 export function surfaceMagnification(altitude: number, radius: number): number {
   const t = THREE.MathUtils.clamp(Math.max(0, altitude) / Math.max(1, radius * 0.35), 0, 1);
-  return 1 + 9 * (1 - t * t * (3 - 2 * t));
+  return 1 + 15 * (1 - t * t * (3 - 2 * t));
 }
 
 export function magnifyPoint(point: THREE.Vector3, pivot: THREE.Vector3, scale: number): THREE.Vector3 {

@@ -1,3 +1,4 @@
+import { gameMetres } from './GameUnits';
 import { surfaceReadout } from './SurfaceReadout';
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
@@ -426,6 +427,7 @@ setFreeCamera(active: boolean): void {
 
   setDeltaV(dv: number): void {
     if (!this.dvVal) return;
+    dv = gameMetres(dv);
     if (dv >= 10000) this.dvVal.textContent = `${(dv / 1000).toFixed(1)} km/s`;
     else this.dvVal.textContent = `${dv.toFixed(0)} m/s`;
     this.dvVal.style.color = dv > 3000 ? '#44ff88' : dv > 1000 ? '#ffcc44' : '#ff6644';
@@ -446,7 +448,7 @@ setFreeCamera(active: boolean): void {
       return;
     }
     const fmt = (m: number) => {
-      const km = m / 1000;
+      const km = gameMetres(m) / 1000;
       return km > 1000 ? `${(km/1000).toFixed(1)} Mm` : `${km.toFixed(0)} km`;
     };
     const fmtT = (s?: number) => {
@@ -657,8 +659,8 @@ setFreeCamera(active: boolean): void {
   update(state: FlightState, system: System, heat: number = 0, throttle: number = 0, telemetry?: Pick<FlightTelemetry, 'speed' | 'verticalSpeed' | 'altitude'>): void {
     const reference = system.bodyByName('sun') ? getReferenceBody(state.position, system) : system.bodies[0];
     const values = telemetry ?? flightTelemetry(state.position, state.velocity, reference, false);
-    const speed = values.speed;
-    const nearestAlt = values.altitude;
+    const speed = gameMetres(values.speed);
+    const nearestAlt = gameMetres(values.altitude);
 
     const heatPct = Math.min(100, (heat / 300000) * 100);
 
@@ -666,7 +668,7 @@ setFreeCamera(active: boolean): void {
     this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
     const nearestAltKm = nearestAlt / 1000; this.altVal.textContent = nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0);
     // Vertical speed
-    const vs = values.verticalSpeed;
+    const vs = gameMetres(values.verticalSpeed);
     this.vsVal.textContent = vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0);
     this.vsVal.style.color = vs > 0 ? '#88ff88' : vs < 0 ? '#ff6644' : '#88ccff';
     const fuelKg = state.rocket.totalFuelMass();
