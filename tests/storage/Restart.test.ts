@@ -25,3 +25,11 @@ describe('restart', () => {
 });
 
 afterAll(() => { vi.doUnmock('../../src/scenes/FlightScene'); vi.resetModules(); });
+it('keeps the original blueprint when restarting a resumed staged flight',async()=>{
+ const {serializeAssembly}=await import('../../src/storage/SaveLoad');
+ const game=Object.create(Game.prototype) as any;game.transitionTo=(swap:()=>void)=>swap();game.unmountCurrent=()=>{};
+ const original=new Assembly();for(const id of ['engine_ant','tank_s_lfo','capsule_mk1'])original.addRoot({part:findPart(id)!,position:[0,0,0],rotation:0,children:[]});
+ const staged=new Assembly();staged.addRoot(original.roots[2]!);
+ await game.showFlight(new Rocket(staged),{launchAssembly:serializeAssembly(original)});
+ flights.at(-1).onCrashAction('restart');expect(flights.at(-1).rocket.assembly.roots).toHaveLength(3);
+});

@@ -5,7 +5,8 @@ export class Achievements {
   private callbacks: Array<(id: string) => void> = [];
 
   constructor() {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch {}
     if (raw) {
       try { JSON.parse(raw).forEach((id: string) => this.unlocked.add(id)); } catch {}
     }
@@ -14,7 +15,7 @@ export class Achievements {
   unlock(id: string): void {
     if (this.unlocked.has(id)) return;
     this.unlocked.add(id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.unlocked]));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.unlocked])); } catch {}
     this.callbacks.forEach((cb) => cb(id));
   }
 

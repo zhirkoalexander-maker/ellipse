@@ -1,9 +1,12 @@
+import { Lifetime } from '../core/Lifetime';
 import { version as appVersion } from '../../package.json';
 import { MISSIONS } from '../core/MissionData';
 import type { Missions } from '../core/Missions';
 
 export class MainMenuScene {
   private root: HTMLDivElement;
+  private life=new Lifetime();
+  private unsubscribeScore?:()=>void;
   private helpOverlay: HTMLDivElement | null = null;
   private onPlay: () => void;
   private onVab: () => void;
@@ -19,6 +22,7 @@ export class MainMenuScene {
     this.onSettings = onSettings;
     this.onContinue = onContinue ?? null;
     this.missions = missions ?? null;
+    this.life.listen(window,'keydown',e=>{if(e.key==='Escape'){this.helpOverlay?.remove();this.helpOverlay=null;this.missionsOverlay?.remove();this.missionsOverlay=null;}});
 
     this.root = document.createElement('div');
     this.root.className = 'panel';
@@ -42,7 +46,7 @@ export class MainMenuScene {
         <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
       </svg>
       <div class="text-display" style="font-size:52px;letter-spacing:0.1em;color:var(--accent-gold);">ELLIPSE</div>
-      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.08em;">BUILD · FLY · LAND</div>
+      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.08em;">Rocket simulator</div>
     `;
     this.root.appendChild(logo);
 
@@ -76,7 +80,7 @@ export class MainMenuScene {
       score.textContent = `★ ${this.missions.totalScore}`;
       this.root.appendChild(score);
       this.scoreEl = score;
-      this.missions.onScore((s) => { if (this.scoreEl) this.scoreEl.textContent = `★ ${s}`; });
+      this.unsubscribeScore=this.missions.onScore((s) => { if (this.scoreEl) this.scoreEl.textContent = `★ ${s}`; });
     } else {
       this.scoreEl = document.createElement('div');
     }
@@ -96,7 +100,7 @@ export class MainMenuScene {
     for (const m of MISSIONS) totalReward += m.reward;
     for (const m of MISSIONS) if (completed.has(m.id)) earnedReward += m.reward;
     card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;">
-        <div style="color:#c89838;font-size:18px;letter-spacing:0.05em;">★ MISSIONS</div>
+        <div style="color:#c89838;font-size:18px;letter-spacing:0.05em;">Missions</div>
         <div style="color:#c89838;font-size:12px;">${earnedReward} / ${totalReward} pts</div>
       </div>`;
     const list = document.createElement('div');
@@ -117,7 +121,7 @@ export class MainMenuScene {
     const close = document.createElement('button');
     close.className = 'btn btn--primary';
     close.style.cssText = 'margin-top:18px;width:100%;padding:10px;font-size:12px;';
-    close.textContent = 'CLOSE';
+    close.textContent = 'Close';
     close.addEventListener('click', () => { overlay.remove(); this.missionsOverlay = null; });
     card.appendChild(close);
     overlay.appendChild(card);
@@ -133,37 +137,22 @@ export class MainMenuScene {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,8,20,0.95);';
     const card = document.createElement('div');
     card.className = 'guide-card';
-    card.style.cssText = 'max-width:560px;padding:32px;font-family:sans-serif;line-height:1.6;color:#ddd;';
-    card.innerHTML =
-      `<h2 style="color:#c89838;font-size:22px;margin-bottom:14px;letter-spacing:0.05em;">🎮 How to build and launch</h2>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">1. Open <b style="color:#c89838;">Vehicle assembly</b> and build your rocket</p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">2. Stack from bottom to top: <b>engine</b> → <b>fuel tank</b> → <b>capsule</b></p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:6px;">3. (optional) Add <b>decoupler</b> between stages, <b>parachute</b> + <b>legs</b> for landing</p>` +
-      `<p style="font-size:13px;color:#a9b;margin-bottom:14px;">4. Enter flight, then click <b style="color:#c89838;">Launch</b> or press <b>Space</b> for a full-throttle countdown</p>` +
-      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">💡 Flight tips</h2>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>TWR ≥ 1.0</b> required to lift off — check the gauge on HUD (green = go)</p>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Tilt east (<b>A</b>) at ~10km to build horizontal speed for orbit</p>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Watch the <b style="color:#88ccff;">ORBIT panel</b> (top-right): Ap/Pe show your orbit shape</p>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• Press <b>T</b> to cycle SAS — holds attitude / prograde / retrograde</p>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:4px;">• <b>Space</b> drops empty stages — watch the stage panel</p>` +
-      `<p style="font-size:12px;color:#889;margin-bottom:14px;">• Land slow (< 5 m/s). Deploy <b>parachute</b> in atmosphere, extend <b>legs</b></p>` +
-      `<h2 style="color:#c89838;font-size:18px;margin:10px 0 8px;letter-spacing:0.05em;">⌨ Rocket controls</h2>` +
-      `<table style="width:100%;font-size:13px;border-collapse:collapse;">` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">↑ / ↓</td><td>Engine Power (throttle)</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">W / S</td><td>Pitch — Tilt Up / Down</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">A / D</td><td>Yaw — Turn Left / Right</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Space</td><td>Launch on the pad / separate a stage in flight</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">J / K</td><td>Roll</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">L</td><td>Landing assist — brakes using engine fuel</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;width:80px;">T</td><td>SAS — cycle OFF / HOLD / PROGRADE / RETROGRADE</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">P</td><td>Deploy Parachute</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">M / Tab</td><td>Map / Orbit view</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">[ / ]</td><td>Time Warp slower / faster</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">C</td><td>Free Camera</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">F</td><td>Reset Camera</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Mouse</td><td>Orbit / Zoom camera</td></tr>` +
-      `<tr><td style="color:#889;padding:3px 12px 3px 0;">Esc</td><td>Pause / Menu</td></tr>` +
-      `</table><button class="btn btn--primary" style="margin-top:20px;width:100%;padding:12px;" id="help-close">CLOSE</button>`;
+    card.style.cssText = 'width:min(560px,calc(100vw - 24px));box-sizing:border-box;max-height:90dvh;overflow:auto;padding:24px;font:14px/1.6 system-ui;color:#ddd;';
+    card.innerHTML = `<h2>Getting started</h2>
+      <p><b>Flight</b> puts a ready-made rocket on the pad. Press <b>Launch</b> or <b>Space</b> and wait for the countdown.</p>
+      <p>To build your own, open <b>Vehicle assembly</b>. Add an engine, fuel tanks, then a capsule. Use the arrows in the stack list to move parts. Put a decoupler between stages. <b>Take to pad</b> starts the flight.</p>
+      <h3>Going somewhere</h3>
+      <p>Open <b>Map</b> and choose a planet. <b>Autopilot to destination</b> handles the launch, transfer and landing using your fuel. Steering or changing throttle takes back control.</p>
+      <p>For a manual flight, open <b>Adjust course</b>. Choose a change, check the yellow path and press <b>Apply correction</b>. The preview covers the current planet's gravity; it is not a guaranteed landing route.</p>
+      <h3>Coming down</h3>
+      <p>Watch <b>Above surface</b> and keep fuel for braking. <b>L</b> turns on landing assist. Parachutes need an atmosphere. An upright touchdown can survive up to <b>90 m/s</b>, but sideways motion or a bad angle can still wreck the rocket.</p>
+      <details><summary>Keyboard controls</summary><table>
+      <tr><td>↑ / ↓</td><td>Throttle</td></tr><tr><td>W / S · A / D</td><td>Steer</td></tr><tr><td>J / K</td><td>Roll</td></tr>
+      <tr><td>Space</td><td>Launch or separate a stage</td></tr><tr><td>L · T</td><td>Landing assist · stability mode</td></tr>
+      <tr><td>P · G</td><td>Parachute · landing gear</td></tr><tr><td>M / Tab</td><td>Open map</td></tr><tr><td>Q / E or [ / ]</td><td>Time warp</td></tr>
+      <tr><td>C · F</td><td>Free camera · reset view</td></tr><tr><td>Esc</td><td>Close map or pause</td></tr></table></details>
+      <p>Drag to orbit the camera; scroll or pinch to zoom. High warp needs engines off and at least <b>17.5 km</b> altitude. Save data stays in this browser.</p>
+      <button class="btn btn--primary" style="margin-top:12px;width:100%;padding:12px" id="help-close">Close</button>`;
     const closeBtn = card.querySelector('#help-close') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => { overlay.remove(); this.helpOverlay = null; });
     overlay.appendChild(card);
@@ -172,5 +161,5 @@ export class MainMenuScene {
   }
 
   mount(parent: HTMLElement = document.body): void { parent.appendChild(this.root); }
-  unmount(): void { this.root.remove(); this.helpOverlay?.remove(); }
+  unmount(): void { this.root.remove(); this.helpOverlay?.remove(); this.missionsOverlay?.remove(); this.unsubscribeScore?.(); this.life.dispose(); }
 }

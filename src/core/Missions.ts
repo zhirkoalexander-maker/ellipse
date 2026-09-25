@@ -29,15 +29,20 @@ export class Missions {
   private onScoreChange: Array<(s: number) => void> = [];
 
   constructor() {
-    const raw = localStorage.getItem(COMPLETED_KEY);
-    if (raw) { try { JSON.parse(raw).forEach((id: string) => this.completed.add(id)); } catch {} }
-    this.score = parseInt(localStorage.getItem(SCORE_KEY) ?? '0', 10) || 0;
+    try {
+      const saved=JSON.parse(localStorage.getItem(COMPLETED_KEY) ?? '[]');
+      if(Array.isArray(saved))for(const raw of saved){
+        const id=raw==='ev astronaut'?'ev_astronaut':raw;
+        if(MISSIONS.some(m=>m.id===id))this.completed.add(id);
+      }
+    } catch { /* Progress still works for this session without storage. */ }
+    this.score=MISSIONS.filter(m=>this.completed.has(m.id)).reduce((sum,m)=>sum+m.reward,0);
   }
 
   get totalScore(): number { return this.score; }
   getCompleted(): string[] { return [...this.completed]; }
   isCompleted(id: string): boolean { return this.completed.has(id); }
-  onScore(cb: (s: number) => void): void { this.onScoreChange.push(cb); }
+  onScore(cb: (s: number) => void): () => void { this.onScoreChange.push(cb); return () => { this.onScoreChange=this.onScoreChange.filter(fn=>fn!==cb); }; }
 
   /** Call when a stage separation happens during flight. */
   recordStageSeparation(): void {
@@ -75,11 +80,11 @@ export class Missions {
     if (!condition) return;
     if (this.completed.has(id)) return;
     this.completed.add(id);
-    localStorage.setItem(COMPLETED_KEY, JSON.stringify([...this.completed]));
+    try { localStorage.setItem(COMPLETED_KEY, JSON.stringify([...this.completed])); } catch {}
     const def = MISSIONS.find(m => m.id === id);
     if (def) {
       this.score += def.reward;
-      localStorage.setItem(SCORE_KEY, String(this.score));
+      try { localStorage.setItem(SCORE_KEY, String(this.score)); } catch {}
       this.onScoreChange.forEach(cb => cb(this.score));
       toast.show(`☑ ${def.name} (+${def.reward})`, 3200);
     }

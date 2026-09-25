@@ -24,3 +24,12 @@ describe('main menu continuation', () => {
     menu.unmount();
   });
 });
+
+it('removes mission overlays and score subscriptions when leaving the menu',async()=>{
+ const {Missions}=await import('../../src/core/Missions');const missions=new Missions();
+ const menu=new MainMenuScene(vi.fn(),vi.fn(),vi.fn(),undefined,missions);menu.mount();
+ [...document.querySelectorAll('button')].find(b=>b.textContent==='Missions')!.click();
+ expect(document.querySelector('.guide-overlay')).not.toBeNull();
+ menu.unmount();expect(document.querySelector('.guide-overlay')).toBeNull();
+ expect((missions as any).onScoreChange).toHaveLength(0);
+});

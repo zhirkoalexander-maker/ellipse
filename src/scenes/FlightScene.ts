@@ -1,3 +1,4 @@
+import { loadSettings } from '../ui/Settings';
 import { dragArea, dragRetention } from '../flight/Aerodynamics';
 import { gameMetres } from '../flight/GameUnits';
 import { automaticWarp } from '../flight/AutomaticWarp';
@@ -53,6 +54,7 @@ export class FlightScene {
   private saveTimer = 0;
   private stageSeparations = 0;
   private landingAssist = false;
+  private launchAssembly: any[];
   private landingDirection = new THREE.Vector3();
   private landingStatus = 'Click Launch or press Space · ↑/↓ throttle · W/S, A/D steer';
   private renderer: Renderer;
@@ -219,6 +221,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
 
   constructor(renderer: Renderer, sceneMgr: SceneManager, system: System, rocket: Rocket, achievements: Achievements, missions: Missions, save?: FlightSave) {
+    this.launchAssembly = save?.launchAssembly ?? serializeAssembly(rocket.assembly);
     const existingSceneObjects = new Set(sceneMgr.scene.children);
     this.renderer = renderer;
     this.sceneMgr = sceneMgr;
@@ -447,7 +450,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.lifetime.listen(window, 'keydown', (e: KeyboardEvent) => {
       if (this.lifetime.disposed || e.repeat || (e.target instanceof HTMLElement && e.target.closest('input, select, textarea'))) return;
       if (this.paused || this.crashed) return;
-      if (this.autopilotActive && ['w', 's', 'a', 'd', 'j', 'k', 'arrowup', 'arrowdown'].includes(e.key.toLowerCase())) this.abortAutopilot('Manual control');
+      if (this.autopilotActive && ['w', 's', 'a', 'd', 'j', 'k'].includes(e.key.toLowerCase())) this.abortAutopilot('Manual control');
       if (e.key.toLowerCase() === 'l') { this.toggleLandingAssist(); e.preventDefault(); return; }
       if (e.key === 'q' || e.key === '[') {
         if (this.paused) return;
@@ -900,6 +903,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.state.throttle = manualThrottle;
     }
     // Autopilot: override throttle/SAS/warp BEFORE warp checks so it takes effect
+    if (this.autopilotActive && (this.controls.getPitch() || this.controls.getYaw() || this.controls.getRoll())) this.abortAutopilot('Manual control');
     this.updateAutopilot(simulationDt);
     this.updateLandingAssist(simulationDt);
     _dt = simulationDt * this.timeWarp;
@@ -1898,7 +1902,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
   }
 
   private startMission(targetName: string, autoWarp = this.hud.autopilotAutoWarp): boolean {
-    this.stopMapBurn();
     if (this.paused || this.crashed || this.lifetime.disposed) return false;
     const target = this.system.bodyByName(targetName);
     const departure = getReferenceBody(this.state.position, this.system);
@@ -1908,6 +1911,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       : this.rocket.totalFuelMass() < 1 ? 'No fuel available for an automatic mission.'
       : totalThrust(this.rocket.assembly.roots) <= 0 ? 'Add an engine before starting a mission.' : '';
     if (error) { toast.show(error, 4500); return false; }
+    this.stopMapBurn();
     if (this.grounded) { this.stageOrLaunch(); if (this.state.throttle === 0) return false; }
     this.autopilotActive = true; this.autopilotTarget = targetName;
     this.autopilotPhase = this.grounded ? 'ascent' : 'cruise';
@@ -2207,6 +2211,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.grounded || this.crashed) { toast.show('Landing assist is available in flight.'); return; }
     const enable = !this.landingAssist;
     if (enable) {
+      this.stopMapBurn();
       this.abortAutopilot('Landing control');
       // abortAutopilot clears all automatic descent state; restore the
       // explicitly requested manual landing assist after cancelling it.
@@ -2654,6 +2659,7 @@ private positionFlameAtNozzle(): void {
   private persistFlight(): void {
     if (this.lifetime.disposed) return;
     if (this.crashed) { clearFlightSave(); return; }
+    if (!loadSettings().autoSave) return;
     saveFlightState({
       version: 3,
       mission: this.autopilotActive && this.missionGuidance ? {
@@ -2662,7 +2668,7 @@ private positionFlameAtNozzle(): void {
         autoWarp: this.missionAutoWarp,
         ...(this.autopilotPhase === 'landing' ? { phase: 'landing' as const } : {}),
       } : undefined,
-      assembly: serializeAssembly(this.rocket.assembly),
+      assembly: serializeAssembly(this.rocket.assembly), launchAssembly: this.launchAssembly,
       fuel: this.rocket.assembly.roots.map(n => this.rocket.fuelTanks.find(t => t.node === n)?.remaining ?? 0),
       fuelByPath: captureFuel(this.rocket),
       bodyRadii: Object.fromEntries(this.system.bodies.map(b => [b.name, (b as any).radius ?? 0])),

@@ -132,3 +132,22 @@ describe('automatic flight and landing', () => {
     expect(f.state.throttle).toBe(0);
   });
 });
+
+it('keeps keyboard throttle when taking over an automatic burn',()=>{
+ const f=create();f.startMission('moon');f.state.throttle=.8;
+ window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp'}));
+ f.update(1/60);window.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowUp'}));
+ expect(f.autopilotActive).toBe(false);expect(f.state.throttle).toBeGreaterThan(.8);
+});
+it('cancels automatic flight when steering through the touch controller',()=>{
+ const f=create();f.startMission('moon');f.controls.touch={getStageRequested:()=>false,getPitch:()=>1,getYaw:()=>0,getRoll:()=>0,getThrottleUp:()=>false,getThrottleDown:()=>false,dispose:()=>{},clear:()=>{}};
+ f.update(1/60);f.controls.touch=null;expect(f.autopilotActive).toBe(false);expect(f.missionRate).toBe(1);
+});
+it('stops course correction when landing assist is selected',()=>{
+ const f=create();f.grounded=false;f.maneuverRemaining.set(100,0,0);
+ f.toggleLandingAssist();expect(f.landingAssist).toBe(true);expect(f.maneuverRemaining.length()).toBe(0);
+});
+it('does not change a paused maneuver when an autopilot request is rejected',()=>{
+ const f=create();f.paused=true;f.maneuverRemaining.set(100,0,0);f.state.throttle=.7;
+ expect(f.startMission('moon')).toBe(false);expect(f.maneuverRemaining.x).toBe(100);expect(f.state.throttle).toBe(.7);
+});

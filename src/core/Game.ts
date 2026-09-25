@@ -216,8 +216,9 @@ if (!rocket) {
         a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
       }
       // Keep an immutable launch blueprint: staging mutates the live assembly.
-      const launchBlueprint = serializeAssembly(a);
-      const r = new Rocket(deserializeAssembly(launchBlueprint)!);
+      const currentAssembly = serializeAssembly(a);
+      const launchBlueprint = save?.launchAssembly ?? currentAssembly;
+      const r = new Rocket(deserializeAssembly(currentAssembly)!);
       this.flight = new FlightScene(this.renderer, this.sceneMgr, this.system, r, this.achievements, this.missions, save);
       this.flight.onCrashAction = (action) => { if (action === 'menu') this.showMainMenu(); else this.showFlight(new Rocket(deserializeAssembly(launchBlueprint)!)); };
     });
