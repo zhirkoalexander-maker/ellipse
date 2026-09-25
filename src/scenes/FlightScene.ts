@@ -1,3 +1,4 @@
+import { automaticWarp } from '../flight/AutomaticWarp';
 import * as THREE from 'three';
 import type { Renderer } from '../core/Renderer';
 import type { SceneManager } from '../core/SceneManager';
@@ -140,6 +141,7 @@ private hudVisible = true;
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
   private _camSnapped = false;
+  private presentationUp = new THREE.Vector3(0,1,0);
   private _gravityTurnBias = 0;
   private manualAttitude = false;
   private _gravityTurnAltThreshold = 800;
@@ -802,15 +804,21 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         const altitude = flightTelemetry(this.state.position, this.state.velocity, ref, false).altitude;
         const target = this.missionGuidance.target;
         const toTarget = Math.hypot(...this.state.position.map((v, i) => v - target.position[i]!)) - target.radius;
-        let rate = altitude < 1000 ? 5 : altitude < 70000 ? 10 : toTarget < 1000000 ? 100 : 1000;
-        if (this.autopilotPhase === 'landing') rate = altitude < 100 ? 1 : altitude < 1000 ? 5 : 10;
-        const maxStep = altitude < 20000 ? 0.1 : Math.min(2, Math.max(0.25, toTarget / 1e6));
+        const relativeSpeed = Math.hypot(...this.state.velocity.map((v,i) => v-target.velocity[i]!));
+        const journey = new THREE.Vector3(...target.position).distanceTo(new THREE.Vector3(...this.missionGuidance.departure.position));
+        const requestedRate = automaticWarp(altitude,toTarget,relativeSpeed,journey);
+        // Acceleration ramps up; braking the simulation rate takes effect immediately.
+        const rate = Math.min(requestedRate, this.missionRate + Math.max(1,this.missionRate)*_dt*.7);
+        const maxStep = altitude < 20000 ? 0.1 : Math.min(1, Math.max(0.25, toTarget / 1e6));
         this.missionRate = Math.min(rate, maxStep * 32 / _dt);
         const total = _dt * this.missionRate;
         const count = Math.min(32, Math.max(1, Math.ceil(total / maxStep)));
         for (let i = 0; i < count; i++) {
           this.updateInner(total / count, i === count - 1, _dt / count, _dt);
-          if (this.crashed || this.paused || !this.autopilotActive || this.grounded) break;
+          if (this.crashed || this.paused || !this.autopilotActive || this.grounded) {
+            if (i < count - 1 && !this.crashed && !this.paused) this.updateInner(0, true, 0, _dt);
+            break;
+          }
         }
         if (this.autopilotActive) this.hud.setWarp(this.missionRate);
       } else this.updateInner(_dt);
@@ -1312,9 +1320,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       const bodyR = (refBody as any).radius ?? 6.371e6;
       // Use groundedDir direction (not stale this.state.position) for terrain height lookup
       const surfPos: [number, number, number] = [
-        refBody.position[0] + this.groundedDir[0],
-        refBody.position[1] + this.groundedDir[1],
-        refBody.position[2] + this.groundedDir[2],
+        refBody.position[0] + this.groundedDir[0] * bodyR,
+        refBody.position[1] + this.groundedDir[1] * bodyR,
+        refBody.position[2] + this.groundedDir[2] * bodyR,
       ];
       const surfaceR = (refBody as any).getSurfaceRadiusAt?.(surfPos) ?? bodyR;
       const targetDist = surfaceR + FlightScene.SPAWN_OFFSET_M;
@@ -1448,6 +1456,12 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const cdz = this.state.position[2] - camRefBody.position[2];
     const cd = Math.sqrt(cdx*cdx + cdy*cdy + cdz*cdz) || 1;
     const camUp = new THREE.Vector3(cdx / cd, cdy / cd, cdz / cd);
+    if(!this._camSnapped || this.grounded)this.presentationUp.copy(camUp);
+    else {
+      const turn=new THREE.Quaternion().setFromUnitVectors(this.presentationUp,camUp);
+      this.presentationUp.applyQuaternion(new THREE.Quaternion().rotateTowards(turn,Math.min(.1,baseDt)*.65)).normalize();
+    }
+    camUp.copy(this.presentationUp);
 
     if (this.rocketShadow) {
       this.rocketShadow.visible = false;
@@ -1466,18 +1480,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       // Physics pos already accounts for terrain (getSurfaceRadiusAt at spawn).
       const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
-      // Direction from reference body center to rocket (up vector = surface normal)
-      const refBodyVis = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
-      const upXv = this.state.position[0] - refBodyVis.position[0];
-      const upYv = this.state.position[1] - refBodyVis.position[1];
-      const upZv = this.state.position[2] - refBodyVis.position[2];
-      const upLenV = Math.sqrt(upXv*upXv + upYv*upYv + upZv*upZv) || 1;
-
-      this.rocketGroup.position.set(
-        this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
-        this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
-        this.state.position[2] * VISUAL_SCALE + (upZv / upLenV) * visualOffset
-      );
+      this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE)
+        .addScaledVector(this.presentationUp,visualOffset);
 
       // Stage separation pulse: scale overshoot then settle
       if (this.stagePulseTimer > 0) {
@@ -1499,11 +1503,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
         if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
 
-        const rocketWorld = new THREE.Vector3(
-          this.state.position[0] * VISUAL_SCALE + (upXv / upLenV) * visualOffset,
-          this.state.position[1] * VISUAL_SCALE + (upYv / upLenV) * visualOffset,
-          this.state.position[2] * VISUAL_SCALE + (upZv / upLenV) * visualOffset
-        );
+        const rocketWorld = this.rocketGroup.position.clone();
         const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
         const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
         const oz = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.sin(this.freeCamAzimuth);
@@ -1514,14 +1514,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.sceneMgr.camera.up.copy(upVec);
         this.sceneMgr.camera.lookAt(rocketWorld);
       } else {
-        const lookOffset = {
-          x: (upXv / upLenV) * visualOffset,
-          y: (upYv / upLenV) * visualOffset,
-          z: (upZv / upLenV) * visualOffset,
-        };
-        // Aim at a stable point halfway up the stack. Following the rotated
-        // model centre made every autopilot attitude correction move the camera
-        // target as well, which looked like a violent shake at warp.
+        const lookOffset = this.presentationUp.clone().multiplyScalar(visualOffset);
+        // Follow the centre of the displayed, eased attitude to keep the craft framed.
         const modelCenter = new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5).applyQuaternion(this.rocketGroup.quaternion);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
         // At high coast warp keep the camera at the current craft position.
@@ -1832,7 +1826,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
   }
 
   private updateSurfaceView(dt: number): void {
-    this.surfaceView.update(this.state.position, this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system), this.system.bodies);
+    this.surfaceView.update(this.state.position, this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system), this.system.bodies, dt);
     if (this.launchPadGroup) {
       const earth = this.system.bodyByName('earth')!;
       this.launchPadGroup.position.copy(this.launchPadGroup.userData.surfaceOffset)
@@ -1888,8 +1882,13 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
    * frame even if the SOI resolver has not switched yet. This keeps gravity,
    * attitude, camera and collision checks on the same planet. */
   private autopilotSurfaceBody(): Body | null {
-    if (!this.autopilotActive || !this.missionGuidance || !['arrival', 'landing'].includes(this.autopilotPhase)) return null;
-    return this.system.bodyByName(this.autopilotTarget) ?? null;
+    if (!this.autopilotActive || !this.missionGuidance) return null;
+    const target=this.system.bodyByName(this.autopilotTarget) as (Body & {radius:number}) | undefined;
+    if(!target)return null;
+    const distance=new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...target.position));
+    // Guidance phase can alternate while braking. Only proximity selects the
+    // destination's surface frame, so distant braking never moves the scenery.
+    return distance < target.radius + Math.max(500000,target.radius*.15) ? target : null;
   }
 
   private startMapBurn(dv: Vec3): string {

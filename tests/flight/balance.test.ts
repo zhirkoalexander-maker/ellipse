@@ -18,13 +18,13 @@ it.each([
   assembly.addRoot({ part: findPart(id)!, position: [0, 0, 0], rotation: 0, children: [] });
  }
  const twr = findPart(engine)!.thrust! * 1000 / (new Rocket(assembly).totalMass() * g);
- expect(twr).toBeGreaterThan(3);
- expect(twr).toBeLessThan(5.9);
+ expect(twr).toBeGreaterThan(2.9);
+ expect(twr).toBeLessThan(4.7);
 });
 it.each([['engine_sparkler', 'tank_s_lfo'], ['engine_poodle', 'tank_l_lfo']])('%s has controllable thrust for orbital landing', (engine, tank) => {
  const e = findPart(engine!)!, t = findPart(tank!)!;
  const twr = e.thrust! * 1000 / ((1200 + e.mass + t.mass + t.fuelCapacity!) * g);
- expect(twr).toBeGreaterThan(1.1);
+ expect(twr).toBeGreaterThan(1.05);
  expect(twr).toBeLessThan(2);
 });
 it('gives the two-tank starter a substantially quicker liftoff without changing its mass', () => {
@@ -32,11 +32,11 @@ it('gives the two-tank starter a substantially quicker liftoff without changing 
  const mass = findPart('capsule_mk1')!.mass + engine.mass + 2 * (tank.mass + tank.fuelCapacity!);
  expect(mass).toBe(11650);
  const twr = engine.thrust! * 1000 / (mass * g);
- expect(twr).toBeGreaterThan(5.5);
- expect(twr).toBeLessThan(5.9);
+ expect(twr).toBeGreaterThan(4.3);
+ expect(twr).toBeLessThan(4.7);
  // Net acceleration is substantially higher than the previous ascent setting.
  const previousAcceleration = 453600 / mass - g;
  const acceleration = engine.thrust! * 1000 / mass - g;
- expect(acceleration / previousAcceleration).toBeGreaterThan(2.5);
- expect(acceleration / previousAcceleration).toBeLessThan(2.8);
+ expect(acceleration / previousAcceleration).toBeGreaterThan(2.9);
+ expect(acceleration / previousAcceleration).toBeLessThan(3.1);
 });

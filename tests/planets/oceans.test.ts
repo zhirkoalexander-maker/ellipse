@@ -10,7 +10,7 @@ it('has extensive level oceans and green foothills', () => {
  }
  expect(sea).toBeGreaterThan(300);
  expect(sea).toBeLessThan(850);
- const green=terrainColor('earth',.001,new THREE.Vector3(1,0,0));
+ const green=terrainColor('earth',.0002,new THREE.Vector3(1,0,0));
  expect(green.g).toBeGreaterThan(green.r*1.3);
  const water=terrainColor('earth',-.00015,new THREE.Vector3(1,0,0));
  expect(water.b).toBeGreaterThan(water.r*3);

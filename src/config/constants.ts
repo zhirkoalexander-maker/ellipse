@@ -13,14 +13,13 @@ export const FIXED_DT = 1 / 60;
 /** Standard gravity (m/s²) — used for Isp mass flow calc */
 export const G0 = 9.80665;
 
-/** Fuel burn rate multiplier (game balance).
- * Retains the existing extended burn time; Δv uses the same multiplier.
- * Lower surface gravity now allows controlled low-throttle descents. */
-export const FUEL_FLOW_MULT = 1 / 15;
+/** Extended burn time for powered transfers against the stronger Earth gravity.
+ * Fuel consumption and displayed delta-v use this same multiplier. */
+export const FUEL_FLOW_MULT = 1 / 20;
 
-/** Playable Earth radius and mass: 25% larger, 14 m/s² at sea level. */
+/** Playable Earth radius and mass: 2.5× radius, 18 m/s² at sea level. */
 export const EARTH_RADIUS = 6.371e6 * 2.5;
-export const EARTH_MASS = 14 * EARTH_RADIUS ** 2 / G;
+export const EARTH_MASS = 18 * EARTH_RADIUS ** 2 / G;
 
 /** Visual part scale factor (rocket size relative to planets) */
 export const PART_SCALE = 0.05;

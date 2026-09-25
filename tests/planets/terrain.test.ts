@@ -24,7 +24,7 @@ it('uses gentle terrain and identical mesh vertex and physical surface heights',
     expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.0001);
     if (planet instanceof Earth) {
       expect(planet.radius).toBe(6.371e6 * 2.5);
-      expect(G * planet.mass / planet.radius ** 2).toBeCloseTo(14, 5);
+      expect(G * planet.mass / planet.radius ** 2).toBeCloseTo(18, 5);
       const rotation = planet.mesh.quaternion.clone();
       planet.updateClouds(10, [1,0,0]);
       expect(planet.mesh.quaternion.equals(rotation)).toBe(true);

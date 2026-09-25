@@ -17,6 +17,15 @@ it('draws a finite radial trajectory beginning at the craft',()=>{
  expect(points[0]).toEqual([7e6,0,0]);expect(points.length).toBeGreaterThan(2);
  expect(points.every(p=>p.every(Number.isFinite))).toBe(true);
 });
+it('starts an inclined descent at the craft and ends at impact instead of drawing through the planet',()=>{
+ const position:[number,number,number]=[7e6,0,0];
+ const points=mapTrajectory(position,[-1200,1800,700],5.97e24,6.4e6);
+ expect(points[0]).toEqual(position);
+ expect(points.length).toBeGreaterThan(2);
+ expect(Math.hypot(...points.at(-1)!)).toBeCloseTo(6.4e6,3);
+ expect(points.every(p=>Math.hypot(...p)>=6.4e6-.001)).toBe(true);
+ expect(points[1]![0]).toBeLessThan(position[0]);
+});
 
 import { simpleCorrection, destinationBasis } from '../../src/flight/MapNavigation';
 it('provides predictable plain-language course corrections',()=>{
