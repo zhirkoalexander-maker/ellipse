@@ -33,6 +33,8 @@ The map opens on your selected destination. Choose another planet from Destinati
 
 Automatic time acceleration ramps up after launch and slows before arrival. Lunar flights use up to 100×; longer transfers can reach 1000×.
 
+Upright touchdowns allow up to 90 m/s of descent; sideways and inverted impacts can still crash. Engine audio is disabled.
+
 While descending below 20 km, Above surface shows terrain clearance and descent speed. Look down points the camera toward the ground without changing zoom.
 
 ## Project layout

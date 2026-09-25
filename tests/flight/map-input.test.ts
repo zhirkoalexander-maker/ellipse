@@ -1,6 +1,7 @@
 import { it, expect } from 'vitest';
 import { OrbitMap } from '../../src/ui/OrbitMap';
 import { Body } from '../../src/physics/Body';
+import { projectMap } from '../../src/flight/MapNavigation';
 it('keeps map form keys away from flight controls and allows Tab navigation',()=>{
  const earth=new Body('earth',5e24,[0,0,0],[0,0,0]);
  const map=new OrbitMap(()=>({position:[1e7,0,0],velocity:[0,100,0],reference:earth,bodies:[earth],grounded:false,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
@@ -13,6 +14,22 @@ it('keeps map form keys away from flight controls and allows Tab navigation',()=
   }
   expect(leaked).toBe(0);
  } finally {window.removeEventListener('keydown',listener);map.dispose();}
+});
+it('fits the complete lunar orbit when opening the destination view',()=>{
+ const earth=Object.assign(new Body('earth',5e24,[0,0,0],[0,0,0]),{radius:6e6});
+ const moon=Object.assign(new Body('moon',7e22,[6e7,0,0],[0,0,2400]),{radius:2e6});
+ const map=new OrbitMap(()=>({position:[-6e6,0,0],velocity:[0,0,0],reference:earth,bodies:[earth,moon],grounded:true,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
+ try{
+  map.toggle();(map as any).draw(100);
+  const frame=(map as any).viewFrame,w=window.innerWidth-310,h=window.innerHeight-140;
+  const scale=frame.span/Math.min(w,h);
+  for(let i=0;i<36;i++){
+   const a=i*Math.PI/18;
+   const [x,y]=projectMap([6e7*Math.cos(a),0,6e7*Math.sin(a)],frame.offset,frame.basis,scale,[w/2,70+h/2]);
+   expect(x).toBeGreaterThan(0);expect(x).toBeLessThan(w);
+   expect(y).toBeGreaterThan(100);expect(y).toBeLessThan(window.innerHeight-60);
+  }
+ }finally{map.dispose();}
 });
 it('keeps map orientation, scale and the departure planet when the reference body changes',()=>{
  const earth=Object.assign(new Body('earth',5e24,[0,0,0],[0,0,0]),{radius:6e6});
