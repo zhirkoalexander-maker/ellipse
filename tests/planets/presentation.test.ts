@@ -67,3 +67,17 @@ it('eases the scene scale across a change of reference instead of jumping',()=>{
  for(let i=0;i<600;i++)view.update([0,10000,0],body,[body],1/60);
  expect(view.scale).toBeCloseTo(1,4);view.dispose([body]);
 });
+
+it('keeps distant planets small in the sky and restores their full size before approach',()=>{
+ const earth=new Planet('earth',1e24,[0,0,0],[0,0,0],1.6e7);
+ const moon=new Planet('moon',1e22,[0,0,6e7],[0,0,0],2.2e6);
+ const jupiter=new Planet('jupiter',1e27,[2e9,0,0],[0,0,0],8.7e7);
+ const view=new SurfaceView();
+ view.update([0,earth.radius*1.02,0],earth,[earth,moon,jupiter]);
+ const pivot=view.pivot;
+ expect(moon.visualRadius*moon.mesh.scale.x/moon.mesh.position.distanceTo(pivot)).toBeLessThan(.007);
+ expect(jupiter.visualRadius*jupiter.mesh.scale.x/jupiter.mesh.position.distanceTo(pivot)).toBeLessThan(.001);
+ view.update([0,0,6e7+moon.radius*2],moon,[earth,moon,jupiter]);
+ expect(moon.mesh.scale.x).toBeCloseTo(view.scale);
+ expect(moon.radius).toBe(2.2e6);view.dispose([earth,moon,jupiter]);
+});

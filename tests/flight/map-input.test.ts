@@ -7,7 +7,7 @@ it('keeps map form keys away from flight controls and allows Tab navigation',()=
  const map=new OrbitMap(()=>({position:[1e7,0,0],velocity:[0,100,0],reference:earth,bodies:[earth],grounded:false,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
  let leaked=0;const listener=()=>leaked++;window.addEventListener('keydown',listener);
  try {
-  map.toggle();expect((map as any).mode).toBe('target');const input=map.root.querySelector('input')!;
+  map.toggle();expect((map as any).mode).toBe('system');const input=map.root.querySelector('input')!;
   for(const key of ['ArrowUp',' ','w','Tab']){
    const event=new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true});input.dispatchEvent(event);
    expect(event.defaultPrevented).toBe(false);expect(map.active).toBe(true);
@@ -20,12 +20,12 @@ it('fits the complete lunar orbit when opening the destination view',()=>{
  const moon=Object.assign(new Body('moon',7e22,[6e7,0,0],[0,0,2400]),{radius:2e6});
  const map=new OrbitMap(()=>({position:[-6e6,0,0],velocity:[0,0,0],reference:earth,bodies:[earth,moon],grounded:true,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
  try{
-  map.toggle();(map as any).draw(100);
-  const frame=(map as any).viewFrame,w=window.innerWidth-310,h=window.innerHeight-140;
+  map.toggle();map.root.querySelector<HTMLButtonElement>('[data-map=target]')!.click();(map as any).draw(100);
+  const frame=(map as any).viewFrame,w=window.innerWidth-310,h=window.innerHeight-230;
   const scale=frame.span/Math.min(w,h);
   for(let i=0;i<36;i++){
    const a=i*Math.PI/18;
-   const [x,y]=projectMap([6e7*Math.cos(a),0,6e7*Math.sin(a)],frame.offset,frame.basis,scale,[w/2,70+h/2]);
+   const [x,y]=projectMap([6e7*Math.cos(a),0,6e7*Math.sin(a)],frame.offset,frame.basis,scale,[w/2,160+h/2]);
    expect(x).toBeGreaterThan(0);expect(x).toBeLessThan(w);
    expect(y).toBeGreaterThan(100);expect(y).toBeLessThan(window.innerHeight-60);
   }
@@ -37,7 +37,7 @@ it('keeps map orientation, scale and the departure planet when the reference bod
  const snapshot={position:[1e7,0,0] as [number,number,number],velocity:[0,100,0] as [number,number,number],reference:earth,bodies:[earth,moon],grounded:false,paused:false,fuel:100,remainingBurn:0};
  const map=new OrbitMap(()=>snapshot,()=>'',()=>{},()=>false);
  try{
-  map.toggle();(map as any).draw(100);
+  map.toggle();map.root.querySelector<HTMLButtonElement>('[data-map=target]')!.click();(map as any).draw(100);
   const frame=(map as any).viewFrame;
   const earthHit={...(map as any).hits.find((h:any)=>h.name==='earth')};
   snapshot.position=[5.7e7,1e6,0];snapshot.velocity=[-100,0,100];snapshot.reference=moon;
@@ -45,5 +45,28 @@ it('keeps map orientation, scale and the departure planet when the reference bod
   expect((map as any).viewFrame).toBe(frame);
   expect((map as any).hits.find((h:any)=>h.name==='earth')).toEqual(earthHit);
   expect((map as any).hits.some((h:any)=>h.name==='moon')).toBe(true);
+ }finally{map.dispose();}
+});
+
+it('opens with every destination visible and selects a route from the planet list',()=>{
+ const names=['sun','mercury','venus','earth','moon','mars','jupiter','saturn','uranus','neptune','pluto'];
+ const bodies=names.map((name,i)=>Object.assign(new Body(name,1e24,[i*i*1e9,0,0],[0,0,100]),{radius:1e6}));
+ const map=new OrbitMap(()=>({position:[9e9,1e6,0],velocity:[0,0,100],reference:bodies[3]!,bodies,grounded:true,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
+ try{
+  map.toggle();(map as any).draw(100);
+  expect((map as any).hits.map((h:any)=>h.name).sort()).toEqual([...names].sort());
+  map.root.querySelector<HTMLButtonElement>('[data-destination=mars]')!.click();
+  expect(map.target).toBe('mars');expect((map as any).mode).toBe('target');
+  expect(map.root.querySelector<HTMLDetailsElement>('.map-course')!.open).toBe(false);
+ }finally{map.dispose();}
+});
+
+it('leaves the schematic when course controls open so burns have a real preview',()=>{
+ const earth=Object.assign(new Body('earth',5e24,[0,0,0],[0,0,0]),{radius:6e6});
+ const map=new OrbitMap(()=>({position:[7e6,0,0],velocity:[0,9000,0],reference:earth,bodies:[earth],grounded:false,paused:false,fuel:100,remainingBurn:0}),()=>'',()=>{},()=>false);
+ try{
+  map.toggle();const course=map.root.querySelector<HTMLDetailsElement>('.map-course')!;
+  course.open=true;course.dispatchEvent(new Event('toggle'));
+  expect((map as any).mode).toBe('orbit');
  }finally{map.dispose();}
 });
