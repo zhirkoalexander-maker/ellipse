@@ -35,13 +35,13 @@ export function deserializeAssembly(data: any[]): Assembly | null {
   return any ? a : null;
 }
 
-export function saveAssembly(name: string, assembly: Assembly): void {
-  localStorage.setItem(KEY_PREFIX + name, JSON.stringify(serializeAssembly(assembly)));
-  const idx = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
-  if (!idx.includes(name)) {
-    idx.push(name);
-    localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
-  }
+export function saveAssembly(name: string, assembly: Assembly): boolean {
+  try {
+    const idx = listAssemblies();
+    localStorage.setItem(KEY_PREFIX + name, JSON.stringify(serializeAssembly(assembly)));
+    if (!idx.includes(name)) localStorage.setItem(INDEX_KEY, JSON.stringify([...idx, name]));
+    return true;
+  } catch { return false; }
 }
 
 export function loadAssembly(name: string): Assembly | null {
@@ -52,19 +52,20 @@ export function loadAssembly(name: string): Assembly | null {
 }
 
 export function listAssemblies(): string[] {
-  return JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
+  try { const value=JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]'); return Array.isArray(value) ? [...new Set(value.filter((n:unknown):n is string=>typeof n==='string'))] : []; } catch { return []; }
 }
 
-export function deleteAssembly(name: string): void {
-  localStorage.removeItem(KEY_PREFIX + name);
-  const idx = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as string[];
-  const next = idx.filter(n => n !== name);
-  localStorage.setItem(INDEX_KEY, JSON.stringify(next));
+export function deleteAssembly(name: string): boolean {
+  try {
+    localStorage.setItem(INDEX_KEY, JSON.stringify(listAssemblies().filter(n=>n!==name)));
+    localStorage.removeItem(KEY_PREFIX + name);
+    return true;
+  } catch { return false; }
 }
 
 /** Persist the most recent build so "Continue" can resume it. */
-export function saveLastAssembly(assembly: Assembly): void {
-  saveAssembly(LAST_KEY, assembly);
+export function saveLastAssembly(assembly: Assembly): boolean {
+  return saveAssembly(LAST_KEY, assembly);
 }
 
 export function loadLastAssembly(): Assembly | null {
@@ -72,7 +73,7 @@ export function loadLastAssembly(): Assembly | null {
 }
 
 export function hasLastAssembly(): boolean {
-  return localStorage.getItem(KEY_PREFIX + LAST_KEY) !== null;
+  return loadLastAssembly() !== null;
 }
 
 // ─── Full flight-state save: CONTINUE resumes WHERE YOU LEFT OFF ───
@@ -91,6 +92,7 @@ export interface FlightSave {
   maxSpeed?: number;
   stageSeparations?: number;
   assembly: any[];
+  launchAssembly?: any[];
   /** Remaining fuel per assembly root index (parallel to assembly array). */
   fuel: number[];
   position: [number, number, number];
@@ -134,7 +136,8 @@ export function hasFlightSave(): boolean {
 }
 
 export function clearFlightSave(): void {
-  localStorage.removeItem(FLIGHT_KEY);
+  try { localStorage.removeItem(FLIGHT_KEY); }
+  catch { /* A blocked save must not prevent starting or ending a flight. */ }
 }
 
 
@@ -165,6 +168,7 @@ function validFlight(s: any): s is FlightSave {
   if (!Array.isArray(s.bodies) || !s.bodies.every((b: any) => b && typeof b.name === 'string' && vector(b.position, 3) && vector(b.velocity, 3))) return false;
   // Resume replays these events; reject corrupt values that could stall the browser.
   if (s.stageSeparations !== undefined && (!Number.isInteger(s.stageSeparations) || s.stageSeparations > 10000)) return false;
+  if (s.launchAssembly !== undefined && (!Array.isArray(s.launchAssembly) || !s.launchAssembly.length || !s.launchAssembly.every((n:any)=>validNode(n)))) return false;
   if (s.version !== undefined && s.version !== 2 && s.version !== 3) return false;
   if (s.mission !== undefined) {
     const solidBodies = ['mercury', 'venus', 'earth', 'moon', 'mars', 'pluto'];

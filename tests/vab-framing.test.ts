@@ -127,3 +127,13 @@ it('frames the whole starter rocket inside the free viewport on a portrait phone
     Object.defineProperty(window,'innerHeight',{value:oldHeight,configurable:true});
   }
 });
+it('treats saved rocket names as text and fits when the canvas is double-clicked',async()=>{
+ const {saveAssembly}=await import('../src/storage/SaveLoad');const v=new VABScene(()=>{},()=>{});v.mount();
+ try{
+  (v as any).add(findPart('capsule_mk1')!);saveAssembly('<b>Explorer</b>',v.assembly);(v as any).showLoadDialog();
+  expect(document.querySelector('#load-list b')).toBeNull();expect(document.querySelector('#load-list')!.textContent).toContain('<b>Explorer</b>');
+  document.querySelector('.guide-overlay')?.remove();const c=document.createElement('canvas');document.body.append(c);
+  (v as any).dt=20;(v as any).cam();c.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));
+  expect((v as any).dt).toBeLessThan(2);c.remove();
+ }finally{v.unmount();document.querySelectorAll('.guide-overlay').forEach(e=>e.remove());}
+});

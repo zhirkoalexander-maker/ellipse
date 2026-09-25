@@ -282,7 +282,7 @@ export class HUD {
     for (const [label, action, title] of [
       ['−', 'warpDown', 'Slower time warp ([ / Q)'],
       ['+', 'warpUp', 'Faster time warp (] / E)'],
-      ['100×', 'warp100', '100× coast above 70 km — engines off'],
+      ['100×', 'warp100', '100× coast above 17.5 km — engines off'],
     ]) {
       const button = document.createElement('button');
       button.textContent = label!; button.dataset.action = action!; button.title = title!;

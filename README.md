@@ -1,50 +1,59 @@
 # Ellipse
 
-Ellipse is a small browser rocket simulator built with Three.js. Build a vehicle, launch it from the Earth pad, fly by hand, or ask the flight computer to carry out a transfer and landing.
+A rocket game that runs in your browser. Build a rocket, launch it, and try to bring it down in one piece.
 
-Play the current build at <https://zhirkoalexander-maker.github.io/ellipse/>.
+**[Play Ellipse](https://zhirkoalexander-maker.github.io/ellipse/)**
 
-## Start locally
+## First flight
 
-```sh
-npm install
-npm run dev
-```
+Choose **Flight** for a ready-made rocket. Press **Launch** or **Space** and wait for the countdown. The arrow buttons control throttle; W/S and A/D steer.
 
-The production check is:
+For a trip to the Moon, open **Map**, choose **Moon**, then **Autopilot to destination**. It uses the rocket's engines and fuel. Steering or changing throttle gives you control again.
 
-```sh
-npm test -- --run
-npm run build
-```
+Want to build your own? Open **Vehicle assembly** and add an engine, tanks, then a capsule. The stack list lets you move or remove individual parts. Put a decoupler between stages, then choose **Take to pad**.
 
 ## Controls
 
-- `↑/↓` changes throttle; `W/S` pitches and `A/D` yaws the rocket.
-- `Space` launches on the pad and stages a live vehicle.
-- `L` toggles landing assist.
-- `Q/E` changes time warp; `100×` and `1000×` are available above 70 km with the engines off.
-- `C` switches the chase and free cameras; drag or use the camera buttons to orbit and zoom.
-- `M` or `Tab` opens the map. `M` or `Esc` closes it; outside the map, `Esc` pauses.
+| Key | Action |
+| --- | --- |
+| ↑ / ↓ | Throttle |
+| W / S, A / D | Steer |
+| J / K | Roll |
+| Space | Launch or separate a stage |
+| L | Landing assist |
+| T | Cycle stability modes |
+| P / G | Parachute / landing gear |
+| M / Tab | Open map |
+| Q / E or [ / ] | Change time warp |
+| C / F | Free camera / reset view |
+| Esc | Close the map or pause flight |
 
-Search the parts library in Vehicle Assembly and click a part to add it on top. The stack list shows the top of the rocket first; use its arrows to move parts or × to remove one. You can save and load designs.
+Drag to orbit the camera; scroll or pinch to zoom. High warp needs the engines off and at least 17.5 km altitude.
 
-The map opens on your selected destination. Choose another planet from Destination, or use All planets for the whole system. The view keeps its orientation and scale during flight; Centre view fits it again. Scroll or pinch to zoom and drag to pan. To adjust a flight, choose Toward destination, Speed up or Slow down, pick Gentle, Medium or Strong, then Apply correction. Fine tuning keeps the individual burn axes available. Corrections use the engines and fuel; they do not replace the automatic transfer and landing flight. The yellow preview assumes a short burn around the current reference body and ends if the path reaches the surface.
+The map starts with an overview of the system. Pick a planet to see the route. **Adjust course** opens the burn controls and a yellow preview. Applying a correction uses fuel; the preview only accounts for the current planet's gravity.
 
-Automatic time acceleration ramps up after launch and slows before arrival. Lunar flights use up to 100×; longer transfers can reach 1000×.
+On descent, watch **Above surface**. Keep fuel for braking, or use **L** for landing assist. Parachutes work only in an atmosphere. Upright landings can survive up to 90 m/s; sideways or inverted impacts can still crash.
 
-Upright touchdowns allow up to 90 m/s of descent; sideways and inverted impacts can still crash. Engine audio is disabled.
+## Saves
 
-While descending below 20 km, Above surface shows terrain clearance and descent speed. Look down points the camera toward the ground without changing zoom.
+**Continue** resumes the last saved flight. **Restart** returns the original rocket to the pad, including stages dropped during flight. Saves from older versions may only contain the remaining stages.
 
-## Project layout
+Flights save automatically unless you turn this off in Settings. Named designs are saved separately in Vehicle assembly. Everything stays in this browser; clearing site data removes it.
 
-```text
-src/core       app startup and scene routing
-src/scenes     menu, assembly, and flight scenes
-src/flight     controls, guidance, camera, and HUD
-src/physics    gravity, orbits, transfers, and collision checks
-src/planets    planet meshes, terrain, and atmospheres
-src/parts      procedural parts and thumbnails
-src/rocket     assembly and fuel state
+## Run locally
+
+Requires Node.js 20 or newer.
+
+```sh
+npm ci
+npm run dev
 ```
+
+```sh
+npm test
+npm run build
+```
+
+The app uses TypeScript, Three.js and Vite. Pushes to `main` run the tests, build the game and publish it to GitHub Pages.
+
+[Code layout and flight model](SPECIFICATION.md) · [Recent changes](DEVLOG.md)
