@@ -119,6 +119,10 @@ export class OrbitMap {
   const origin:Vec3=[...ref.position];
   let span=Math.max((ref.radius||1)*2.8,new Vector3(...r).length()*2.5);
   if(this.mode==='target'&&target){for(let i=0;i<3;i++)origin[i]=(s.position[i]!+target.position[i]!)/2;span=Math.max(new Vector3(...s.position).distanceTo(new Vector3(...target.position))*1.5,(target.radius||1)*4);}
+  if(this.mode==='target'&&target?.name==='moon'&&ref.name==='earth'){
+   origin.splice(0,3,...ref.position);
+   span=2.4*Math.max(new Vector3(...target.position).distanceTo(new Vector3(...ref.position)),new Vector3(...r).length());
+  }
   if(this.mode==='system'){origin.splice(0,3,...(s.bodies.find(b=>b.name==='sun')?.position||[0,0,0]));span=Math.max(...s.bodies.map(b=>new Vector3(...b.position).distanceTo(new Vector3(...origin))))*2.4;}
   // Fit once. Follow the anchor's translation, never the craft's changing heading or SOI.
   if(!this.viewFrame){

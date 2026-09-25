@@ -17,6 +17,18 @@ function create() {
   return { f, scene, body: system.bodyByName('earth')! as any };
 }
 describe('terminal crash contact', () => {
+  it('settles an upright 90 m/s contact without bouncing or breaking the rocket',()=>{
+    const {f,body}=create();
+    const up=new THREE.Vector3(...f.groundedDir),surface=body.getSurfaceRadiusAt(f.state.position);
+    f.grounded=false;f.groundedDir=null;f.launched=true;
+    f.state.velocity=new THREE.Vector3(...body.velocity).addScaledVector(up,-90).toArray();
+    f.resolveSurfaceContact(body,up.clone().multiplyScalar(surface+4).toArray(),up.clone().multiplyScalar(surface).toArray(),false);
+    expect(f.crashed).toBe(false);expect(f.grounded).toBe(true);
+    expect(f.state.velocity).toEqual([0,0,0]);expect(f.state.throttle).toBe(0);
+    for(let i=0;i<60;i++)f.update(1/60);
+    expect(f.crashed).toBe(false);expect(f.grounded).toBe(true);
+    expect(Math.hypot(...f.state.position.map((x:number,i:number)=>x-body.position[i]))-body.getSurfaceRadiusAt(f.state.position)).toBeCloseTo(FlightScene.SPAWN_OFFSET_M,4);
+  });
   it('keeps a high-speed inclined impact fixed relative to the moving planet for subsequent frames', () => {
     const { f, body, scene } = create();
     const up = new THREE.Vector3(...f.groundedDir);
