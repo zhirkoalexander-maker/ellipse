@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.15
+
+- Smoother map zoom and view changes. Dragging now redraws on every display frame.
+
 ## 2.5.14
 
 - Fixed keyboard and touch takeover from autopilot, and conflicts between landing assist and course corrections.
