@@ -1,7 +1,7 @@
 import { it, expect } from 'vitest';
 import { gasColor, ringGeometry, ringTexture } from '../../src/planets/GasAppearance';
 it('joins cloud colors at the longitude seam and poles', () => {
- for (const kind of ['jupiter','saturn'] as const) {
+ for (const kind of ['jupiter','saturn','uranus','neptune','venus'] as const) {
   for (const v of [0,.2,.5,.8,1]) expect(gasColor(kind,0,v)).toEqual(gasColor(kind,1,v));
   for (const v of [0,1]) expect(gasColor(kind,.2,v)).toEqual(gasColor(kind,.7,v));
  }

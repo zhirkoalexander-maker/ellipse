@@ -1,3 +1,4 @@
+import { configureSurfaceMaterial } from './SurfaceMaterial';
 import { rockyTerrain, paintTerrain } from './Terrain';
 import * as THREE from 'three';
 import type { Vec3 } from '../physics/Body';
@@ -23,6 +24,7 @@ export class Pluto extends Planet {
     geom.computeVertexNormals();
     paintTerrain(geom, 'pluto', this.visualRadius);
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, roughness: 0.9, metalness: 0.0 });
+    configureSurfaceMaterial(mat, 'pluto', this.visualRadius);
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.position.set(position[0] * VS, position[1] * VS, position[2] * VS);
   }
