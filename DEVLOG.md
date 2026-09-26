@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.30
+
+- Let the first central fuel tank be added while Side pair is selected, so the assembly instructions no longer send you in circles. Show the next step beside the attachment selector.
+
 ## 2.5.29
 
 - Separating a stage no longer changes the rocket’s altitude or orbit. Upper-stage engines wait until their stage is exposed.

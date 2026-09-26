@@ -118,6 +118,7 @@ export class VABScene {
             </select>
           </label>
           <select id="vp-host" aria-label="Tank for side engines" style="width:100%;margin-top:5px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;"></select>
+          <div id="vp-hint" role="status" style="margin-top:6px;font:12px/1.4 system-ui;color:#c4cfdb;"></div>
           <details id="vab-stack"><summary style="cursor:pointer;font:12px system-ui;color:#ced7e2;padding-top:8px;">Rocket parts</summary><div id="vi" style="margin-top:10px;font:400 12px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">Nothing added yet</div></details>
         </div>
         <div id="vl" style="flex:1;min-height:0;overflow-y:auto;padding:8px 0;"></div>
@@ -142,8 +143,8 @@ export class VABScene {
       </div>`;
     const style = document.createElement('style');
     style.textContent = `
-      #vp-host { display:none; }
-      #vab-header:has(#vp-placement option[value="side"]:checked) #vp-host { display:block; }
+      #vp-host, #vp-hint { display:none; }
+      #vab-header:has(#vp-placement option[value="side"]:checked) #vp-host, #vab-header:has(#vp-placement option[value="side"]:checked) #vp-hint { display:block; }
       #vab-stack[open] #vi { max-height:22vh; overflow:auto; }
       @media (max-height:600px) {
         #vab-header { padding:8px!important; }
@@ -159,6 +160,8 @@ export class VABScene {
     this.partSearch = this.root.querySelector('#vp-search')!;
     this.partSearch.addEventListener('input', () => this.filterParts(this.partSearch.value));
     this.build();
+    this.root.querySelector('#vp-placement')!.addEventListener('change', () => this.up());
+    this.up();
     this.root.querySelector('#vg')!.addEventListener('click', () => {
       if(this.assembly.roots.length) {
         if (!saveLastAssembly(this.assembly)) toast.show("Could not save this build. You can still fly it.");
@@ -237,11 +240,14 @@ export class VABScene {
   }
 
   private add(p: Part) {
-    if (this.root.querySelector<HTMLSelectElement>('#vp-placement')!.value === 'side') {
-      if (p.kind !== 'engine' && p.kind !== 'decoupler') { toast.show('Choose an engine or decoupler for the side mounts.'); return; }
-      const hostId = this.root.querySelector<HTMLSelectElement>('#vp-host')!.value;
-      const host = this.assembly.roots.find(n => n.uid === hostId && n.part.kind === 'tank');
-      if (!host) { toast.show('Add a tank first, then choose it for the side mounts.'); return; }
+    const side = this.root.querySelector<HTMLSelectElement>('#vp-placement')!.value === 'side';
+    const hostId = this.root.querySelector<HTMLSelectElement>('#vp-host')!.value;
+    const host = this.assembly.roots.find(n => n.uid === hostId && n.part.kind === 'tank');
+    // The first tank is the central attachment point, even when Side pair is selected.
+    const firstSideTank = side && !this.assembly.roots.some(n => n.part.kind === 'tank') && p.kind === 'tank';
+    if (side && !firstSideTank) {
+      if (!host) { toast.show('Add a central tank from Tanks below.'); return; }
+      if (p.kind !== 'engine' && p.kind !== 'decoupler') { toast.show('For central parts, choose On top.'); return; }
       this.remember();
       const error = addSidePair(this.assembly,host,p);
       if (error) { this.history.pop(); toast.show(error); return; }
@@ -249,6 +255,7 @@ export class VABScene {
       this.remember();
       this.assembly.addRoot({part:p,position:[0,0,0],rotation:0,children:[]});
       this.assembly.restack();
+      if (firstSideTank) toast.show('Tank added. Now choose side parts.');
     }
     this.nm = this.assembly.roots.map(n => n.part.name); this.rf(); this.up();
   }
@@ -304,6 +311,11 @@ export class VABScene {
     }
     if ([...host.options].some(o => o.value === selected)) host.value = selected;
     host.disabled = !host.options.length;
+    this.root.querySelector('#vp-hint')!.textContent = host.disabled
+      ? 'First choose a fuel tank below for the centre. Then add side engines or decouplers.'
+      : 'Choose an engine or decoupler below. A matching pair attaches to this tank.';
+    if (host.disabled) host.add(new Option('No central tank yet', ''));
+
 
     if(!this.nm.length){this.info.innerHTML='<span style="color:rgba(255,255,255,0.5);">Nothing added yet</span>';return;}
     const dm=this.assembly.totalMass(), fl=this.assembly.totalFuelCapacity();
