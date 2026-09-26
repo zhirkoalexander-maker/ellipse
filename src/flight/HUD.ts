@@ -110,7 +110,7 @@ export class HUD {
     this.root.appendChild(this.landingStatusEl);
     this.surfacePanel.className = 'surface-readout';
     this.surfacePanel.hidden = true;
-    this.surfacePanel.innerHTML = '<span>Above surface</span><strong data-surface-height></strong><span data-surface-speed></span><div class="surface-distance-track"><i></i></div><button data-action="lookDown">Look down</button>';
+    this.surfacePanel.innerHTML = '<span>Above surface</span><strong data-surface-height></strong><span data-surface-speed></span><b data-surface-time title="Estimate at current vertical speed; braking and terrain change it"></b><div class="surface-distance-track"><i></i></div><button data-action="lookDown">Landing view</button>';
     this.root.appendChild(this.surfacePanel);
     this.lifetime.listen(this.surfacePanel.querySelector('button')!, 'click', () => this.onAction?.('lookDown'));
     this.root.appendChild(bar);
@@ -653,6 +653,7 @@ setFreeCamera(active: boolean): void {
     this.surfacePanel.classList.toggle('near-surface', value.near);
     this.surfacePanel.querySelector('[data-surface-height]')!.textContent = value.height;
     this.surfacePanel.querySelector('[data-surface-speed]')!.textContent = value.descent;
+    this.surfacePanel.querySelector('[data-surface-time]')!.textContent = value.time;
     (this.surfacePanel.querySelector('i') as HTMLElement).style.width = `${value.progress * 100}%`;
   }
 

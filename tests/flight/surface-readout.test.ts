@@ -7,3 +7,5 @@ it('shows readable surface clearance while descending and hides on the pad',()=>
  expect(surfaceReadout(0,0,true).visible).toBe(false);
  expect(surfaceReadout(20,-3,false).progress).toBeGreaterThan(surfaceReadout(2000,-3,false).progress);
 });
+
+it('warns early during fast descent with time at current descent speed',()=>{expect(surfaceReadout(160000,-8000,false)).toMatchObject({visible:true,time:'~20 s to surface',near:true});});

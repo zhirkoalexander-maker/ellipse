@@ -1,5 +1,12 @@
 # Changes
 
+## 2.5.16
+
+- Map opens on the rocket flight path, with brighter lines and predicted impact markers.
+- Earlier surface warnings, time-to-ground estimate and a more visible landing readout.
+- Reduced hull drag during atmospheric entry; parachute braking is unchanged.
+- Automatic missions cruise at up to 40× and slow down on approach.
+
 ## 2.5.15
 
 - Smoother map zoom and view changes. Dragging now redraws on every display frame.

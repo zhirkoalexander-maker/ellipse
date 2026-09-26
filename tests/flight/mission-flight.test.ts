@@ -35,14 +35,15 @@ describe('automatic flight and landing', () => {
     f.hud.onAction('autopilot:' + target);
     expect(f.autopilotActive).toBe(true);
     let fastFrames = 0;
-    for (let i = 0; i < 30000 && !f.crashed && f.autopilotActive; i++) {
+    for (let i = 0; i < (target==='mars'?120000:30000) && !f.crashed && f.autopilotActive; i++) {
       const beforeAttitude = f.rocketGroup.quaternion.clone();
-      const frameDt=target==='moon'?[1/60,1/30,1/20,.08][i%4]!:1/30;
+      const frameDt=target==='moon'?[1/60,1/30,1/20,.08][i%4]!:1/20;
       f.update(frameDt);
       if (f.autopilotActive && !f.grounded) {
+        expect(f.missionRate).toBeLessThanOrEqual(40);
         expect(beforeAttitude.angleTo(f.rocketGroup.quaternion)).toBeLessThanOrEqual(1.4 * frameDt + 1e-6);
       }
-      if (f.autopilotActive && f.missionRate >= 100) {
+      if (f.autopilotActive && f.missionRate >= 39) {
         const up = f.presentationUp;
         const look = new THREE.Vector3(...f.state.position).multiplyScalar(ORBIT_SCALE * VISUAL_PLANET_MULT)
           .addScaledVector(up, -f.rocketBottomY * ROCKET_VISUAL_SCALE)
@@ -60,7 +61,7 @@ describe('automatic flight and landing', () => {
     expect(f.rocket.totalFuelMass()).toBeLessThan(before);
     expect(f.rocket.totalFuelMass()).toBeGreaterThan(500);
     expect(f.state.throttle).toBe(0);
-  }, 120000);
+  }, 300000);
 
   it('cancels automatic flight before accepting manual steering', () => {
     const f = create(); f.hud.onAction('autopilot:moon');

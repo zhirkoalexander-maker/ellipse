@@ -8,7 +8,8 @@ export function dragArea(nodes: AssemblyNode[], alignment: number, gear: boolean
   visit(nodes);
   const frontal = Math.PI * width * width / 4;
   const side = 1 - Math.min(1, alignment * alignment);
-  return frontal * (.22 + side * 1.4) + (gear ? frontal * .35 : 0) + (parachute ? 300 : 0);
+  // Lighter hull drag suits the accelerated flight scale; chutes retain their braking area.
+  return (frontal * (.22 + side * 1.4) + (gear ? frontal * .35 : 0)) * .08 + (parachute ? 300 : 0);
 }
 
 /** Exact quadratic-drag decay for constant density; cannot reverse velocity. */
