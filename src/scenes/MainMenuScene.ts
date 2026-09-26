@@ -142,10 +142,10 @@ export class MainMenuScene {
       <p><b>Flight</b> puts a ready-made rocket on the pad. Press <b>Launch</b> or <b>Space</b> and wait for the countdown.</p>
       <p>To build your own, open <b>Vehicle assembly</b>. Add an engine, fuel tanks, then a capsule. Use the arrows in the stack list to move parts. Put a decoupler between stages. <b>Take to pad</b> starts the flight.</p>
       <h3>Going somewhere</h3>
-      <p>Open <b>Map</b> and choose a planet. <b>Autopilot to destination</b> handles the launch, transfer and landing using your fuel. Steering or changing throttle takes back control.</p>
+      <p>Open <b>Map</b> to see your blue flight path. <b>Planets</b> shows all destinations. <b>Autopilot to destination</b> handles the launch, transfer and landing using your fuel. Steering or changing throttle takes back control.</p>
       <p>For a manual flight, open <b>Adjust course</b>. Choose a change, check the yellow path and press <b>Apply correction</b>. The preview covers the current planet's gravity; it is not a guaranteed landing route.</p>
       <h3>Coming down</h3>
-      <p>Watch <b>Above surface</b> and keep fuel for braking. <b>L</b> turns on landing assist. Parachutes need an atmosphere. An upright touchdown can survive up to <b>90 m/s</b>, but sideways motion or a bad angle can still wreck the rocket.</p>
+      <p>Watch <b>Above surface</b> and the estimated time to the ground. <b>Landing view</b> points the camera down. Keep fuel for braking. <b>L</b> turns on landing assist. Parachutes need an atmosphere. An upright touchdown can survive up to <b>90 m/s</b>, but sideways motion or a bad angle can still wreck the rocket.</p>
       <details><summary>Keyboard controls</summary><table>
       <tr><td>↑ / ↓</td><td>Throttle</td></tr><tr><td>W / S · A / D</td><td>Steer</td></tr><tr><td>J / K</td><td>Roll</td></tr>
       <tr><td>Space</td><td>Launch or separate a stage</td></tr><tr><td>L · T</td><td>Landing assist · stability mode</td></tr>
