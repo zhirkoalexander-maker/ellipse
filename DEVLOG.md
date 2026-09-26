@@ -1,5 +1,11 @@
 # Changes
 
+## 2.5.20
+
+- Reuse terrain buffers and materials when moving across a planet.
+- Skip invisible surface detail calculations and unchanged HUD text updates.
+- Stop drawing the 3D view underneath the map; flight simulation continues.
+
 ## 2.5.19
 
 - Three separated mountains inland from the launch site.
