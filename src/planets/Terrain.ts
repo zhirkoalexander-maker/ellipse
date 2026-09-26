@@ -80,15 +80,16 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
     const north=dotFrame(earthLaunchFrame.north);
     const local=1-THREE.MathUtils.smoothstep(angle,.008,.012);
     // A continuous coastal plain: launch site inland, open sea to the east.
-    const coast=.0014-east+.00022*Math.sin(north*1300)+.00008*Math.sin(north*3700);
-    const localLand=THREE.MathUtils.smoothstep(coast,-.00012,.00012);
+    const coast=.0004-east+.00009*Math.sin(north*6000)+.00003*Math.sin(north*13000);
+    const localLand=THREE.MathUtils.smoothstep(coast,-.000018,.000018);
     land=THREE.MathUtils.lerp(land,localLand,local);
     const inland=Math.exp(-(((east+.0012)/.00065)**2)-((north-.0004)/.0015)**2);
     const folds=1-Math.abs(terrainNoise(x*1800+41,y*1800+19,z*1800)*2-1);
-    const coastalHeight=.000004+inland*(.00005+Math.pow(folds,3)*.0002);
+    const rolling=terrainNoise(x*9000+17,y*9000+3,z*9000+61);
+    const coastalHeight=.0000018+rolling*.000004+inland*(.000015+Math.pow(folds,2)*.00004);
     const continentalHeight=.00004+broad*.00006+ranges+foothills;
     height=THREE.MathUtils.smoothstep(land,.02,.85)*THREE.MathUtils.lerp(continentalHeight,coastalHeight,local);
-    const pad=1-THREE.MathUtils.smoothstep(angle,.00015,.0005);
+    const pad=1-THREE.MathUtils.smoothstep(angle,.00006,.00014);
     return THREE.MathUtils.lerp(Math.max(0,height),12/(6.371e6*2.5),pad);
 
   }
