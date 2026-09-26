@@ -59,6 +59,7 @@ export class EngineFlame {
   private ages: Float32Array;
   private colors: Float32Array;
   private sizes: Float32Array;
+  private liveIndices = new THREE.BufferAttribute(new Uint16Array(PARTICLE_COUNT), 1).setUsage(THREE.DynamicDrawUsage);
   private active: boolean;
   private nextIndex: number;
   private coreTex: THREE.Texture;
@@ -91,6 +92,7 @@ export class EngineFlame {
     coreGeom.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     coreGeom.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     coreGeom.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+    coreGeom.setIndex(this.liveIndices); coreGeom.setDrawRange(0, 0);
 
     const coreMat = new THREE.PointsMaterial({
       size: SPRITE_SCALE * 0.3,
@@ -113,8 +115,9 @@ export class EngineFlame {
 
     // Outer glow particles (slightly larger, softer)
     const outerGeom = new THREE.BufferGeometry();
-    outerGeom.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(), 3));
-    outerGeom.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    outerGeom.setAttribute('position', coreGeom.attributes.position!);
+    outerGeom.setAttribute('color', coreGeom.attributes.color!);
+    outerGeom.setIndex(this.liveIndices); outerGeom.setDrawRange(0, 0);
     const outerMat = new THREE.PointsMaterial({
       size: SPRITE_SCALE * 0.8,
       map: this.outerTex,
@@ -150,6 +153,8 @@ export class EngineFlame {
   stop(): void {
     this.active = false;
     this.group.visible = false;
+    this.particles.geometry.setDrawRange(0, 0);
+    this.outerParticles.geometry.setDrawRange(0, 0);
     this.colors.fill(0);
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       this.ages[i] = this.lifetimes[i]!;
@@ -266,16 +271,14 @@ export class EngineFlame {
     this.particles.geometry.attributes.color!.needsUpdate = true;
     (this.particles.geometry.attributes as any).size.needsUpdate = true;
 
-    // Sync outer particle positions (shared, simpler)
-    const outerPos = this.outerParticles.geometry.attributes.position!;
+    // Dead particles contribute black to additive blending, but still cost fill rate.
+    let liveCount = 0;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      outerPos.array[i3]     = this.positions[i3] ?? 0;
-      outerPos.array[i3 + 1] = this.positions[i3 + 1] ?? 0;
-      outerPos.array[i3 + 2] = this.positions[i3 + 2] ?? 0;
+      if (this.ages[i]! < this.lifetimes[i]!) this.liveIndices.setX(liveCount++, i);
     }
-    outerPos.needsUpdate = true;
-    this.outerParticles.geometry.attributes.color!.needsUpdate = true;
+    this.liveIndices.needsUpdate = true;
+    this.particles.geometry.setDrawRange(0, liveCount);
+    this.outerParticles.geometry.setDrawRange(0, liveCount);
   }
 
   getMesh(): THREE.Group {
