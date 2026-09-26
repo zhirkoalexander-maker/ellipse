@@ -16,7 +16,10 @@ it('plays through the lesson, pauses, and remembers dismissal',async()=>{
  expect(document.querySelector('.tutorial h2')!.textContent).toBe('Lift off');
  document.querySelector<HTMLButtonElement>('[data-tutorial=skip]')!.click();
  expect(closed).toHaveBeenCalledOnce();expect(shouldShowTutorial()).toBe(false);
- expect(document.querySelector('.tutorial')).toBeNull();expect(vi.getTimerCount()).toBe(0);
+ expect(document.querySelector('.tutorial')).toBeNull();
+ // jsdom queues the storage event at 0 ms when dismissal is saved.
+ vi.advanceTimersByTime(0);
+ expect(vi.getTimerCount()).toBe(0);
  tutorial.dispose();
 });
 it('cleans up playback when its menu is removed',async()=>{
