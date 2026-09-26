@@ -143,7 +143,7 @@ it('quick start builds only game parts and releases the old preview on rebuild a
  try{
   const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Build a rocket'));
   expect(preset).toBeDefined();preset!.click();
-  expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']);
+  expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(['engine_ant','tank_s_lfo','tank_s_lfo','capsule_s']);
   const group=(vab as any).rg as THREE.Group;
   let disposed=0;group.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.addEventListener('dispose',()=>disposed++);});
   preset!.click();expect(disposed).toBeGreaterThan(0);

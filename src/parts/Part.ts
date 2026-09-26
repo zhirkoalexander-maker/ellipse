@@ -9,6 +9,7 @@ export interface Part {
   size: PartSize;
   mass: number;            // kg (dry)
   fuelCapacity?: number;   // kg of fuel (tanks only)
+  tankStyle?: 'ribbed';    // Same attachment dimensions, alternate tank housing
   fuelType?: FuelType;     // for tanks + engines
   thrust?: number;         // kN (engines only)
   isp?: number;            // s (engines only)

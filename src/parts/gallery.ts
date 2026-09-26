@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildLegacyPartMesh, buildPartMesh, SIZE_DIMS } from './PartBuilder';
-import { PART_CATALOG } from './PartCatalog';
+import { ASSEMBLY_PARTS as PART_CATALOG } from './PartCatalog';
 
-const kinds = ['starter','capsule','tank','engine','decoupler','legs','fairing','heatshield','parachute','rcs','solar'];
+const kinds = ['starter','capsule','tank','engine','decoupler','legs','fairing','heatshield'];
 const labels: Record<string,string> = {starter:'Starter rocket',capsule:'Command capsule',tank:'Fuel tank',engine:'Liquid-fuel engine',decoupler:'Stage decoupler',legs:'Landing gear',fairing:'Payload fairing',heatshield:'Heat shield',parachute:'Parachute pack',rcs:'RCS thrusters',solar:'Solar panels'};
 const container = document.querySelector<HTMLElement>('#gallery')!;
 let legacy = false;
@@ -31,7 +31,7 @@ const cards = kinds.map(kind => {
     if(model){scene.remove(model);model.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const mats=Array.isArray(o.material)?o.material:[o.material];for(const mat of mats)mat.dispose();}});}
     if(kind==='starter') {
       model=new THREE.Group();let y=0;
-      for(const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']) {
+      for(const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_s']) {
         const module=PART_CATALOG.find(p=>p.id===id)!;
         const height=SIZE_DIMS[module.size].height;
         const mesh=legacy?buildLegacyPartMesh(module):buildPartMesh(module);

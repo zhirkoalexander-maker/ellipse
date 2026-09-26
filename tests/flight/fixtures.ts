@@ -27,12 +27,12 @@ export function buildDefaultRocket(): Rocket {
   const engY = stack(H.S);
   const tank1Y = stack(H.S);
   const tank2Y = stack(H.S);
-  const capY = stack(H.M);
+  const capY = stack(H.S);
 
   a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
   a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank1Y, 0], rotation: 0, children: [] });
   a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank2Y, 0], rotation: 0, children: [] });
-  a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
+  a.addRoot({ part: findPart('capsule_s')!, position: [0, capY, 0], rotation: 0, children: [] });
   return new Rocket(a);
 }
 

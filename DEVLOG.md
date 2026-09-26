@@ -1,5 +1,11 @@
 # Changes
 
+## 2.5.31
+
+- Trim Vehicle assembly to 16 parts in S and XL sizes. Old builds still load with their original parts.
+- Offer two tanks per size: 5/10 t for S and 250/500 t for XL. Each pair has identical dimensions and dry mass, with different fuel capacity and bodywork.
+- Use an S capsule in the starter rocket. Both new capsules include a parachute.
+
 ## 2.5.30
 
 - Let the first central fuel tank be added while Side pair is selected, so the assembly instructions no longer send you in circles. Show the next step beside the attachment selector.
