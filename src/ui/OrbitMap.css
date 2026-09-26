@@ -34,8 +34,8 @@
  .map-course .map-simple-actions{grid-template-columns:1.5fr 1fr 1fr}
  .orbit-map footer{bottom:10px}
 }
-/* Keep the descent warning in the pilot's sight line, above the flight controls. */
-.surface-readout{left:50%;bottom:100px;transform:translateX(-50%);width:220px;background:#071119f5;border:1px solid #92c9e5;text-align:center;gap:6px}
+/* Landing readout stays beside the rocket. */
+.surface-readout{left:16px;bottom:110px;transform:none;width:220px;background:#071119f5;border:1px solid #92c9e5;text-align:center;gap:6px}
 .surface-readout strong{font-size:40px}.surface-readout [data-surface-time]{font-size:15px;color:#c2e7ff}.surface-readout.near-surface{border:2px solid #ffb86a;background:#211409f5}.surface-readout.near-surface [data-surface-time]{color:#ffd098}
 .orbit-map i.map-current{border-color:#73d9ff}
 @media(max-width:700px){.surface-readout{left:8px;bottom:155px;transform:none;width:160px;padding:10px}.surface-readout strong{font-size:32px}.surface-readout [data-surface-time]{font-size:12px}}
