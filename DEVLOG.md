@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.23
+
+- Skip terrain calculations that have no effect on the launch pad, open water or distant regions. Surface heights stay the same.
+
 ## 2.5.22
 
 - Draw only live exhaust particles; keep the same plume simulation.
