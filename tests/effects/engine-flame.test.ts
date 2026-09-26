@@ -25,3 +25,18 @@ describe('EngineFlame', () => {
     expect(posBefore).not.toEqual(posAfter);
   });
 });
+
+it('draws only live particles while keeping their order and shared plume data',()=>{
+ const flame=new EngineFlame();flame.start();
+ for(let i=0;i<30;i++)flame.update(1/60);
+ const state=flame as any;
+ const expected=Array.from(state.ages as Float32Array).flatMap((age,i)=>age<state.lifetimes[i]?[i]:[]);
+ const [core,outer]=flame.getMesh().children as THREE.Points[];
+ expect(core!.geometry.drawRange.count).toBe(expected.length);
+ expect(Array.from(core!.geometry.index!.array).slice(0,expected.length)).toEqual(expected);
+ expect(outer!.geometry.attributes.position===core!.geometry.attributes.position).toBe(true);
+ expect(outer!.geometry.drawRange.count).toBe(expected.length);
+ flame.stop();expect(core!.geometry.drawRange.count).toBe(0);expect(outer!.geometry.drawRange.count).toBe(0);
+ flame.start();flame.update(1/60);expect(core!.geometry.drawRange.count).toBeGreaterThan(0);
+ flame.dispose();
+});

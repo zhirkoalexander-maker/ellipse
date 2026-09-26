@@ -4,7 +4,7 @@ A rocket game I'm working on. The flight model, map and landing controls are sti
 
 [Play here](https://zhirkoalexander-maker.github.io/ellipse/)
 
-You can use the starter rocket or build one in Vehicle assembly. Controls are under Guide in the main menu. Saves stay in the browser, so clearing site data will delete them.
+You can use the starter rocket or build one in Vehicle assembly. Controls are under Guide in the main menu. Saves stay in the browser, so clearing site data will delete them. Each browser has its own progress. The player total uses [Abacus](https://github.com/JasonLovesDoggo/abacus) and counts new browsers since the counter was added.
 
 ## Running the project
 

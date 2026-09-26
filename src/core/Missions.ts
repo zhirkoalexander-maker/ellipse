@@ -2,7 +2,6 @@ import { MISSIONS, type MissionDef } from './MissionData';
 import { toast } from '../ui/Toast';
 
 const COMPLETED_KEY = 'ellipse_missions_completed';
-const SCORE_KEY = 'ellipse_missions_score';
 
 /** Live flight state snapshot used to evaluate mission conditions. */
 export interface FlightSnapshot {
@@ -25,8 +24,6 @@ export class Missions {
   private completed: Set<string> = new Set();
   private stageCountThisFlight = 0;
   private landedThisFrame = false;
-  private score = 0;
-  private onScoreChange: Array<(s: number) => void> = [];
 
   constructor() {
     try {
@@ -36,13 +33,10 @@ export class Missions {
         if(MISSIONS.some(m=>m.id===id))this.completed.add(id);
       }
     } catch { /* Progress still works for this session without storage. */ }
-    this.score=MISSIONS.filter(m=>this.completed.has(m.id)).reduce((sum,m)=>sum+m.reward,0);
   }
 
-  get totalScore(): number { return this.score; }
   getCompleted(): string[] { return [...this.completed]; }
   isCompleted(id: string): boolean { return this.completed.has(id); }
-  onScore(cb: (s: number) => void): () => void { this.onScoreChange.push(cb); return () => { this.onScoreChange=this.onScoreChange.filter(fn=>fn!==cb); }; }
 
   /** Call when a stage separation happens during flight. */
   recordStageSeparation(): void {
@@ -83,10 +77,7 @@ export class Missions {
     try { localStorage.setItem(COMPLETED_KEY, JSON.stringify([...this.completed])); } catch {}
     const def = MISSIONS.find(m => m.id === id);
     if (def) {
-      this.score += def.reward;
-      try { localStorage.setItem(SCORE_KEY, String(this.score)); } catch {}
-      this.onScoreChange.forEach(cb => cb(this.score));
-      toast.show(`☑ ${def.name} (+${def.reward})`, 3200);
+      toast.show(`☑ ${def.name}`, 3200);
     }
   }
 }
