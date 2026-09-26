@@ -67,7 +67,9 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
           mix(groundHash(i+vec3(0,1,1)),groundHash(i+vec3(1,1,1)),f.x),f.y),f.z);
       }
       float filteredGrain(vec3 p,float frequency,float footprint){
-        return (groundNoise(p*frequency)-.5)*(1.0-smoothstep(.2,.7,footprint*frequency));
+        float weight=1.0-smoothstep(.2,.7,footprint*frequency);
+        if(weight==0.0)return 0.0;
+        return (groundNoise(p*frequency)-.5)*weight;
       }
       float filteredFbm(vec3 p,float frequency,float footprint){
         return .5+filteredGrain(p,frequency,footprint)*.57
@@ -126,5 +128,5 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
       totalEmissiveRadiance*=1.0-waterMask;
     `);
   };
-  material.customProgramCacheKey=()=>`surface-${name}-v5`;
+  material.customProgramCacheKey=()=>`surface-${name}-v6`;
 }

@@ -81,6 +81,7 @@ export class FlightScene {
   private surfaceView = new SurfaceView();
   private reentryGlow: THREE.Mesh | null = null;
   private orbitMap!: OrbitMap;
+  get flightViewVisible(): boolean { return !this.orbitMap?.active; }
   private maneuverRemaining = new THREE.Vector3();
   private rocketQuat = new THREE.Quaternion();
   private attitudePresentationActive = false;

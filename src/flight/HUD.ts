@@ -6,6 +6,11 @@ import { Lifetime } from '../core/Lifetime';
 import { flightTelemetry, type FlightTelemetry } from './Telemetry';
 import { getReferenceBody } from '../physics/SoiResolver';
 
+/** Keep existing text nodes when the displayed value has not changed. */
+function setText(element: Node, value: string): void {
+  if (element.textContent !== value) element.textContent = value;
+}
+
 export class HUD {
   private lifetime = new Lifetime();
   private paused = false;
@@ -106,7 +111,7 @@ export class HUD {
     bar.style.flexWrap = 'wrap'; bar.style.justifyContent = 'center'; bar.style.width = 'min(96vw, 760px)';
     this.landingStatusEl.className = 'flight-landing-status';
     this.landingStatusEl.style.cssText = 'position:fixed;bottom:82px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;background:rgba(8,14,22,.88);color:#bbcbd4;font:11px monospace;text-align:center;border:1px solid #40515d;border-radius:6px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity 160ms ease;';
-    this.landingStatusEl.textContent = 'Ready to launch';
+    setText(this.landingStatusEl, 'Ready to launch');
     this.root.appendChild(this.landingStatusEl);
     this.surfacePanel.className = 'surface-readout';
     this.surfacePanel.hidden = true;
@@ -193,8 +198,8 @@ export class HUD {
   setAutopilotStatus(phase: string | null, target: string, detail: string): void {
     this.autopilotMission.hidden = phase === null;
     const human = (value: string) => value.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
-    this.autopilotTitle.textContent = phase === null ? '' : `${human(target)} · ${human(phase)}`;
-    this.autopilotDetail.textContent = detail;
+    setText(this.autopilotTitle, phase === null ? '' : `${human(target)} · ${human(phase)}`);
+    setText(this.autopilotDetail, detail);
   }
 
   _throttleBtn = false;
@@ -205,7 +210,7 @@ export class HUD {
   setGrounded(grounded: boolean): void {
     if (this.grounded === grounded) return;
     this.grounded = grounded;
-    this.stageButton.textContent = grounded ? 'Launch' : 'Stage';
+    setText(this.stageButton, grounded ? 'Launch' : 'Stage');
     this.stageButton.title = grounded ? 'Start engines at full throttle (Space)' : 'Separate the next stage (Space)';
     this.stageButton.style.background = grounded ? '#b94f20' : 'rgba(0,0,0,0.6)';
     this.stageButton.style.color = grounded ? '#fff' : '#ffcc44';
@@ -378,12 +383,12 @@ export class HUD {
   }
 
   setMass(kg: number): void {
-    if (this.massVal) this.massVal.textContent = `${(kg / 1000).toFixed(1)}`;
+    if (this.massVal) setText(this.massVal, `${(kg / 1000).toFixed(1)}`);
   }
 
 setFreeCamera(active: boolean): void {
     if (this.camModeEl) {
-      this.camModeEl.textContent = active ? 'FREE' : '';
+      setText(this.camModeEl, active ? 'FREE' : '');
     }
   }
 
@@ -391,7 +396,7 @@ setFreeCamera(active: boolean): void {
     if (this.warpLabel) {
       const label=`x${value<10?Number(value.toFixed(1)):Math.round(value)}`;
       if(this.warpLabel.textContent===label)return;
-      this.warpLabel.textContent = label;
+      setText(this.warpLabel, label);
       // Brief pulse on change
       this.warpLabel.classList.remove('warp-pulse');
       void this.warpLabel.offsetWidth; // reflow to restart animation
@@ -401,7 +406,7 @@ setFreeCamera(active: boolean): void {
 
   setTwr(twr: number): void {
     if (!this.twrVal) return;
-    this.twrVal.textContent = twr.toFixed(2);
+    setText(this.twrVal, twr.toFixed(2));
     this.twrVal.style.color = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
     const pct = Math.min(100, (twr / 2) * 100);
     this.twrFill.style.width = `${pct}%`;
@@ -416,7 +421,7 @@ setFreeCamera(active: boolean): void {
     const labels: Record<string, string> = {
       off: 'OFF', hold: 'HOLD', prograde: 'PRO', retrograde: 'RET',
     };
-    this.sasModeEl.textContent = labels[mode]!;
+    setText(this.sasModeEl, labels[mode]!);
     this.sasModeEl.style.color =
       mode === 'off' ? '#666' :
       mode === 'prograde' ? '#44ff88' :
@@ -428,8 +433,8 @@ setFreeCamera(active: boolean): void {
   setDeltaV(dv: number): void {
     if (!this.dvVal) return;
     dv = gameMetres(dv);
-    if (dv >= 10000) this.dvVal.textContent = `${(dv / 1000).toFixed(1)} km/s`;
-    else this.dvVal.textContent = `${dv.toFixed(0)} m/s`;
+    if (dv >= 10000) setText(this.dvVal, `${(dv / 1000).toFixed(1)} km/s`);
+    else setText(this.dvVal, `${dv.toFixed(0)} m/s`);
     this.dvVal.style.color = dv > 3000 ? '#44ff88' : dv > 1000 ? '#ffcc44' : '#ff6644';
   }
 
@@ -440,10 +445,10 @@ setFreeCamera(active: boolean): void {
   }): void {
     if (!this.orbitPanel) return;
     if (!o.bound || o.apoapsis === undefined || o.periapsis === undefined) {
-      this.orbitAp.textContent = '—';
-      this.orbitPe.textContent = '—';
-      this.orbitTta.textContent = '—';
-      this.orbitEcc.textContent = 'suborbital';
+      setText(this.orbitAp, '—');
+      setText(this.orbitPe, '—');
+      setText(this.orbitTta, '—');
+      setText(this.orbitEcc, 'suborbital');
       this.orbitPanel.style.borderColor = 'rgba(221,170,68,0.25)';
       return;
     }
@@ -458,10 +463,10 @@ setFreeCamera(active: boolean): void {
       if (s > 60) return `${(s/60).toFixed(0)} min`;
       return `${s.toFixed(0)} s`;
     };
-    this.orbitAp.textContent = fmt(o.apoapsis);
-    this.orbitPe.textContent = fmt(o.periapsis);
-    this.orbitTta.textContent = fmtT(o.timeToAp);
-    this.orbitEcc.textContent = o.eccentricity !== undefined ? `e=${o.eccentricity.toFixed(2)}` : '—';
+    setText(this.orbitAp, fmt(o.apoapsis));
+    setText(this.orbitPe, fmt(o.periapsis));
+    setText(this.orbitTta, fmtT(o.timeToAp));
+    setText(this.orbitEcc, o.eccentricity !== undefined ? `e=${o.eccentricity.toFixed(2)}` : '—');
     this.orbitPanel.style.borderColor = 'rgba(68,136,204,0.4)';
   }
 
@@ -479,7 +484,7 @@ setFreeCamera(active: boolean): void {
 
   setThrottle(throttle: number): void {
     const pct = Math.round(throttle * 100);
-    this.throttlePct.textContent = `${pct}%`;
+    setText(this.throttlePct, `${pct}%`);
     this.throttleFill.style.width = `${pct}%`;
     this.throttleFill.style.background = pct > 80 ? '#ff6644' : '#4488ff';
   }
@@ -651,9 +656,9 @@ setFreeCamera(active: boolean): void {
     const value = surfaceReadout(altitude, verticalSpeed, grounded);
     this.surfacePanel.hidden = !value.visible;
     this.surfacePanel.classList.toggle('near-surface', value.near);
-    this.surfacePanel.querySelector('[data-surface-height]')!.textContent = value.height;
-    this.surfacePanel.querySelector('[data-surface-speed]')!.textContent = value.descent;
-    this.surfacePanel.querySelector('[data-surface-time]')!.textContent = value.time;
+    setText(this.surfacePanel.querySelector('[data-surface-height]')!, value.height);
+    setText(this.surfacePanel.querySelector('[data-surface-speed]')!, value.descent);
+    setText(this.surfacePanel.querySelector('[data-surface-time]')!, value.time);
     (this.surfacePanel.querySelector('i') as HTMLElement).style.width = `${value.progress * 100}%`;
   }
 
@@ -665,38 +670,38 @@ setFreeCamera(active: boolean): void {
 
     const heatPct = Math.min(100, (heat / 300000) * 100);
 
-    this.speedVal.textContent = speed > 1000 ? (speed/1000).toFixed(1)+'k' : speed.toFixed(1);
+    setText(this.speedVal, speed > 1000 ? (speed/1000).toFixed(1)+'k' : speed.toFixed(1));
     this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
-    const nearestAltKm = nearestAlt / 1000; this.altVal.textContent = nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0);
+    const nearestAltKm = nearestAlt / 1000; setText(this.altVal, nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0));
     // Vertical speed
     const vs = gameMetres(values.verticalSpeed);
-    this.vsVal.textContent = vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0);
+    setText(this.vsVal, vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0));
     this.vsVal.style.color = vs > 0 ? '#88ff88' : vs < 0 ? '#ff6644' : '#88ccff';
     const fuelKg = state.rocket.totalFuelMass();
     if (fuelKg > 1000) {
-      this.fuelVal.textContent = (fuelKg / 1000).toFixed(1);
-      (this.fuelVal.nextElementSibling as HTMLElement).textContent = 't';
+      setText(this.fuelVal, (fuelKg / 1000).toFixed(1));
+      setText((this.fuelVal.nextElementSibling as HTMLElement), 't');
     } else {
-      this.fuelVal.textContent = fuelKg.toFixed(0);
-      (this.fuelVal.nextElementSibling as HTMLElement).textContent = 'kg';
+      setText(this.fuelVal, fuelKg.toFixed(0));
+      setText((this.fuelVal.nextElementSibling as HTMLElement), 'kg');
     }
     const tPct = Math.round(throttle * 100);
-    this.throttlePct.textContent = `${tPct}%`;
+    setText(this.throttlePct, `${tPct}%`);
     // Right fuel panel
     const fKg = state.rocket.totalFuelMass();
     const maxF = state.rocket.assembly.totalFuelCapacity();
-    if (this._fuelRKg) this._fuelRKg.textContent = fKg > 1000 ? `${(fKg/1000).toFixed(1)} t` : `${fKg.toFixed(0)} kg`;
+    if (this._fuelRKg) setText(this._fuelRKg, fKg > 1000 ? `${(fKg/1000).toFixed(1)} t` : `${fKg.toFixed(0)} kg`);
     if (this._fuelRBar) this._fuelRBar.style.width = `${maxF > 0 ? (fKg/maxF)*100 : 0}%`;
     this.throttleFill.style.width = `${tPct}%`;
     this.throttleFill.style.background = tPct > 80 ? '#ff4444' : tPct > 40 ? '#ffaa00' : '#4488ff';
-    this.heatPct.textContent = `${heatPct.toFixed(0)}%`;
+    setText(this.heatPct, `${heatPct.toFixed(0)}%`);
     this.heatPct.style.color = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
     this.heatFill.style.width = `${heatPct}%`;
     this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
   }
 
   setLandingStatus(text: string, active: boolean): void {
-    this.landingStatusEl.textContent = text;
+    setText(this.landingStatusEl, text);
     this.landingStatusEl.style.borderColor = active ? '#7fafbc' : '#40515d';
     const isHint = /^(Click Launch|W\/S and A\/D|Ready to launch)/.test(text);
     const visible = !isHint && (active || /^(GROUND|LANDING|LOW THRUST|Landed|Impact|Insufficient)/.test(text));

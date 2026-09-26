@@ -37,3 +37,16 @@ it('uses the same reduced distance scale for speed, altitude and delta-v',async(
  expect((hud as any).vsVal.textContent).toBe('+50');
  expect((hud as any).altVal.textContent).toBe('200');hud.unmount();
 });
+
+it('does not replace unchanged telemetry text nodes and still updates changing values',async()=>{
+ const {buildDefaultRocket,buildSystem}=await import('./fixtures');
+ const {FlightState}=await import('../../src/flight/FlightState');
+ const system=buildSystem(),state=new FlightState(buildDefaultRocket(),system,[0,0,0],[0,0,0]);
+ const hud=new HUD();hud.mount();
+ const draw=()=>{hud.update(state,system,0,0,{speed:400,verticalSpeed:200,altitude:800});hud.setTwr(2);hud.setGrounded(true);};
+ draw();const speed=(hud as any).speedVal as HTMLElement,twr=(hud as any).twrVal as HTMLElement;
+ const speedText=speed.firstChild,twrText=twr.firstChild;
+ draw();expect(speed.firstChild).toBe(speedText);expect(twr.firstChild).toBe(twrText);
+ hud.update(state,system,0,0,{speed:800,verticalSpeed:200,altitude:800});expect(speed.textContent).toBe('200.0');
+ hud.unmount();
+});

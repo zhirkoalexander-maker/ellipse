@@ -81,3 +81,22 @@ it('keeps distant planets small in the sky and restores their full size before a
  expect(moon.mesh.scale.x).toBeCloseTo(view.scale);
  expect(moon.radius).toBe(2.2e6);view.dispose([earth,moon,jupiter]);
 });
+
+it('reuses terrain buffers and material when recentering, with identical geometry to a fresh view',()=>{
+ const earth=new Earth([0,0,0],[0,0,0]),view=new SurfaceView();
+ view.update([0,earth.radius+100,0],earth,[earth]);
+ const mesh=earth.mesh.getObjectByName('local-terrain') as THREE.Mesh;
+ const geometry=mesh.geometry,material=mesh.material,positions=geometry.attributes.position,colors=geometry.attributes.color,index=geometry.index;
+ const next=new THREE.Vector3(.002,1,.001).normalize().multiplyScalar(earth.radius+100).toArray();
+ view.update(next,earth,[earth]);
+ const moved=earth.mesh.getObjectByName('local-terrain') as THREE.Mesh;
+ expect(moved===mesh).toBe(true);expect(moved.geometry).toBe(geometry);expect(moved.material).toBe(material);
+ expect(geometry.attributes.position).toBe(positions);expect(geometry.attributes.color).toBe(colors);expect(geometry.index).toBe(index);
+ const expectedPositions=positions!.array.slice(),expectedColors=colors!.array.slice(),expectedNormals=geometry.attributes.normal!.array.slice();
+ view.dispose([earth]);const fresh=new SurfaceView();fresh.update(next,earth,[earth]);
+ const rebuilt=(earth.mesh.getObjectByName('local-terrain') as THREE.Mesh).geometry;
+ expect(rebuilt.attributes.position!.array).toEqual(expectedPositions);
+ expect(rebuilt.attributes.color!.array).toEqual(expectedColors);
+ expect(rebuilt.attributes.normal!.array).toEqual(expectedNormals);
+ fresh.dispose([earth]);
+});
