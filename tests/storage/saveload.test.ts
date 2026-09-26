@@ -31,7 +31,7 @@ describe('SaveLoad', () => {
 });
 
 it('handles full storage and a damaged assembly index without throwing',()=>{
- localStorage.setItem('ellipse_assemblies','{}');expect(listAssemblies()).toEqual([]);
+ localStorage.setItem('challenger_assemblies','{}');expect(listAssemblies()).toEqual([]);
  const a=new Assembly();a.addRoot({part:findPart('capsule_mk1')!,position:[0,0,0],rotation:0,children:[]});
  vi.stubGlobal('localStorage',{getItem:localStorage.getItem.bind(localStorage),setItem:()=>{throw new Error('quota');}});
  try{expect(saveAssembly('test',a)).toBe(false);}finally{vi.unstubAllGlobals();}

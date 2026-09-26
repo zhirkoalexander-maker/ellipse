@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.27
+
+- Rename the game to Challenger. Existing saves, designs and settings carry over.
+
 ## 2.5.26
 
 - Keep only the Planets map view. Selecting destinations and adjusting course stay in that view.

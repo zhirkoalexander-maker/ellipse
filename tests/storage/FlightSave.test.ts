@@ -54,11 +54,11 @@ describe('flight persistence', () => {
     { stageSeparations: 1e100 }, { stageSeparations: 1.5 },
     { assembly: [null] }, { fuelByPath: { '0': 'bad' } }, { bodyRadii: { Earth: -1 } },
   ])('rejects corrupt state %j', patch => {
-    localStorage.setItem('ellipse_flight_save', JSON.stringify({ ...valid(), ...patch }));
+    localStorage.setItem('challenger_flight_save', JSON.stringify({ ...valid(), ...patch }));
     expect(saves.loadFlightState()).toBeNull();
   });
   it('does not throw on malformed saved assemblies', () => {
-    localStorage.setItem('ellipse_assembly_bad', '{');
+    localStorage.setItem('challenger_assembly_bad', '{');
     expect(() => saves.loadAssembly('bad')).not.toThrow();
     expect(saves.loadAssembly('bad')).toBeNull();
   });

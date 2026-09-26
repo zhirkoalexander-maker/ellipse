@@ -1,3 +1,4 @@
+import { storageKey } from '../storage/MigrateLegacySaves';
 import { PartThumbnails } from '../parts/PartThumbnails';
 import * as THREE from 'three';
 import { PART_CATALOG } from '../parts/PartCatalog';
@@ -354,7 +355,7 @@ export class VABScene {
   }
 
   private showLoadDialog(): void {
-    const names = listAssemblies().filter(n => n !== 'ellipse_assembly_last');
+    const names = listAssemblies().filter(n => n !== storageKey('assembly_last'));
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
     card.className = 'guide-card';

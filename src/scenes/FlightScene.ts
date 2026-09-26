@@ -406,7 +406,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
     this.hud = new HUD();
     // Debug/diagnostics hook (headless e2e tests read live state from here)
-    (window as any).__ellipse = { flight: this };
+    (window as any).__challenger = { flight: this };
     this.hud.onAction = (action) => {
       if (this.lifetime.disposed || this.crashed) return;
       if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100', 'cameraZoomIn', 'cameraZoomOut'].includes(action) && this.paused) return;
@@ -2676,7 +2676,7 @@ private positionFlameAtNozzle(): void {
     this.launchClamps = null;
     this.surfaceView.dispose(this.system.bodies);
     this.deployedChuteMesh?.removeFromParent();
-    if ((window as any).__ellipse?.flight === this) delete (window as any).__ellipse;
+    if ((window as any).__challenger?.flight === this) delete (window as any).__challenger;
     if (this.crashOverlay) {
       this.crashOverlay.remove();
       this.crashOverlay = null;

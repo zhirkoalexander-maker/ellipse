@@ -3,7 +3,7 @@ afterEach(()=>{vi.useRealTimers();});
 it('plays through the lesson, pauses, and remembers dismissal',async()=>{
  vi.resetModules();
  const { Tutorial, shouldShowTutorial } = await import('../../src/ui/Tutorial');
- vi.useFakeTimers();localStorage.removeItem('ellipse_tutorial_seen');
+ vi.useFakeTimers();localStorage.removeItem('challenger_tutorial_seen');
  expect(shouldShowTutorial()).toBe(true);
  const closed=vi.fn(),tutorial=new Tutorial(closed);
  expect(document.querySelector('.tutorial h2')!.textContent).toBe('Start here');

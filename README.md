@@ -1,10 +1,10 @@
-# Ellipse
+# Challenger
 
-A browser game about building and flying rockets.
+Build rockets, explore the solar system and try to land.
 
 [Play in your browser](https://zhirkoalexander-maker.github.io/ellipse/)
 
-Requires Node.js and npm.
+Requires Node.js 20+.
 
 ```sh
 npm ci

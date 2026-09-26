@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>Ellipse</title>
+    <title>Challenger</title>
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="stylesheet" href="/styles/tokens.css" />
     <link rel="stylesheet" href="/styles/typography.css" />
@@ -35,12 +35,12 @@
     <script>
       window.onerror = function(m) { alert('JS Error: '+m); };
       (function(){
-        var v = 'v2.5.26';
-        if (sessionStorage.getItem('ellipse_ver') && sessionStorage.getItem('ellipse_ver') !== v) {
-          sessionStorage.setItem('ellipse_ver', v);
+        var v = 'v2.5.27';
+        if (sessionStorage.getItem('challenger_ver') && sessionStorage.getItem('challenger_ver') !== v) {
+          sessionStorage.setItem('challenger_ver', v);
           location.reload(true);
         } else {
-          sessionStorage.setItem('ellipse_ver', v);
+          sessionStorage.setItem('challenger_ver', v);
         }
       })();
       if('serviceWorker' in navigator) {

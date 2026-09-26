@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'ellipse_achievements';
+import { storageKey } from '../storage/MigrateLegacySaves';
+const STORAGE_KEY = () => storageKey('achievements');
 
 export class Achievements {
   private unlocked: Set<string> = new Set();
@@ -6,7 +7,7 @@ export class Achievements {
 
   constructor() {
     let raw: string | null = null;
-    try { raw = localStorage.getItem(STORAGE_KEY); } catch {}
+    try { raw = localStorage.getItem(STORAGE_KEY()); } catch {}
     if (raw) {
       try { JSON.parse(raw).forEach((id: string) => this.unlocked.add(id)); } catch {}
     }
@@ -15,7 +16,7 @@ export class Achievements {
   unlock(id: string): void {
     if (this.unlocked.has(id)) return;
     this.unlocked.add(id);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.unlocked])); } catch {}
+    try { localStorage.setItem(STORAGE_KEY(), JSON.stringify([...this.unlocked])); } catch {}
     this.callbacks.forEach((cb) => cb(id));
   }
 

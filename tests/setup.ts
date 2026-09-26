@@ -112,7 +112,7 @@ if (typeof (globalThis as any).window !== 'undefined' && !(globalThis as any).wi
 }
 // Each flight owns listeners, DOM and GPU-side effects; exercise its teardown between tests.
 afterEach(() => {
-  (window as any).__ellipse?.flight?.dispose();
+  (window as any).__challenger?.flight?.dispose();
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
