@@ -4,7 +4,7 @@ import { PART_CATALOG } from '../parts/PartCatalog';
 import { Assembly } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
-import { gltfCache } from '../parts/PartBuilder';
+import { releaseSceneObjects } from '../core/disposeObject';
 import { saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
 import { toast } from '../ui/Toast';
 
@@ -168,22 +168,22 @@ export class VABScene {
     presetHeader.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
-    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a Saturn V</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">2 stages</span>`;
+    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a rocket</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">4 parts</span>`;
     presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
     presetBtn.addEventListener('mouseenter', () => { presetBtn.style.background='rgba(255,255,255,0.05)'; });
     presetBtn.addEventListener('mouseleave', () => { presetBtn.style.background='transparent'; });
-    presetBtn.addEventListener('click', () => this.buildSaturnVPreset());
+    presetBtn.addEventListener('click', () => this.buildStarterPreset());
     el.appendChild(presetBtn);
 
     const groups = new Map<string,{parts:Part[],color:string}>();
-    const cmap: Record<string,string> = { capsule:'#a0b0c0', tank:'#6090c0', engine:'#c08060', decoupler:'#c06070', parachute:'#60a070', legs:'#8090a0', heatshield:'#b08060', gltf:'#b080a0', fairing:'#a0c0e0', rcs:'#c0a0d0', solar:'#4080d0' };
+    const cmap: Record<string,string> = { capsule:'#a0b0c0', tank:'#6090c0', engine:'#c08060', decoupler:'#c06070', parachute:'#60a070', legs:'#8090a0', heatshield:'#b08060', fairing:'#a0c0e0', rcs:'#c0a0d0', solar:'#4080d0' };
     for (const p of PART_CATALOG) {
       if (!groups.has(p.kind)) groups.set(p.kind, {parts:[],color:cmap[p.kind]||'#888'});
       groups.get(p.kind)!.parts.push(p);
     }
     for (const [kind, g] of groups) {
       const h = document.createElement('div');
-      const names: Record<string, string> = { capsule: 'Capsules', tank: 'Tanks', engine: 'Engines', decoupler: 'Decouplers', parachute: 'Parachutes', legs: 'Landing gear', heatshield: 'Heat shields', gltf: 'Models', fairing: 'Fairings', rcs: 'RCS', solar: 'Solar panels' };
+      const names: Record<string, string> = { capsule: 'Capsules', tank: 'Tanks', engine: 'Engines', decoupler: 'Decouplers', parachute: 'Parachutes', legs: 'Landing gear', heatshield: 'Heat shields', fairing: 'Fairings', rcs: 'RCS', solar: 'Solar panels' };
       h.textContent = names[kind] ?? kind;
       h.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
       el.appendChild(h);
@@ -218,20 +218,16 @@ export class VABScene {
     this.st+=h; this.nm.push(p.name); this.rf(); this.up();
   }
 
-  /** One-click Saturn V: slim L-profile booster (TwinBoar + 2 L tanks) + decoupler + Saturn V upper stage. */
-  private buildSaturnVPreset(): void {
+  private buildStarterPreset(): void {
     this.assembly = new Assembly(); this.st = 0; this.nm = [];
-    const twinBoar = PART_CATALOG.find(p => p.id === 'engine_twinboar')!;
-    const tankL = PART_CATALOG.find(p => p.id === 'tank_l_lfo')!;
-    const decouplerL = PART_CATALOG.find(p => p.id === 'decoupler_l')!;
-    const saturn = PART_CATALOG.find(p => p.id === 'saturn_v')!;
-    // Stack bottom→top (same order as clicking parts manually)
-    this.add(twinBoar);
-    this.add(tankL);
-    this.add(tankL);
-    this.add(decouplerL);
-    this.add(saturn);
-    toast.show('Saturn V preset: 2-stage, press SPACE in flight to separate booster', 4000);
+    for (const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']) {
+      const part = PART_CATALOG.find(p => p.id === id)!;
+      const height = PH[part.size]!;
+      this.assembly.addRoot({part,position:[0,(this.st+height/2)*PART_SCALE,0],rotation:0,children:[]});
+      this.st += height; this.nm.push(part.name);
+    }
+    this.rf(); this.up();
+    toast.show('Ready. Take to pad to launch.', 3000);
   }
   private undo() {
     if(!this.assembly.roots.length) return;
@@ -301,15 +297,10 @@ export class VABScene {
       list.appendChild(row);
     }
   }
-  private async rf() {
-    while(this.rg.children.length) this.rg.remove(this.rg.children[0]!);
-    if (this.assembly.roots.length) {
-      const ng=this.assembly.roots.some(n=>n.part.kind==='gltf'&&n.part.gltfUrl&&!gltfCache.has(n.part.gltfUrl));
-      if(ng){const{loadGLTF}=await import('../parts/PartBuilder');for(const r of this.assembly.roots)if(r.part.kind==='gltf'&&r.part.gltfUrl&&!gltfCache.has(r.part.gltfUrl))await loadGLTF(r.part.gltfUrl,r.part.gltfScale??1);}
-      this.rg.add(this.assembly.toMesh());
-    }
-    // Re-frame after every rebuild — covers add/undo/clear/load and the
-    // async GLTF path (mesh lands only after await).
+  private rf() {
+    releaseSceneObjects([this.rg]);
+    this.rg.clear();
+    if (this.assembly.roots.length) this.rg.add(this.assembly.toMesh());
     this.frame();
   }
   private cam(){
@@ -320,6 +311,7 @@ export class VABScene {
     const ox=this.dt*Math.sin(this.po)*Math.cos(this.az),oy=this.dt*Math.cos(this.po),oz=this.dt*Math.sin(this.po)*Math.sin(this.az);this.camera.position.set(this.tg.x+ox,this.tg.y+oy,this.tg.z+oz);this.camera.lookAt(this.tg);}
   mount(){document.body.appendChild(this.root);}
   unmount(){
+    releaseSceneObjects([this.scene]); this.scene.clear();
     this.overlays.forEach(overlay=>overlay.remove());this.overlays.clear();
     this.root.remove();
     document.removeEventListener('mousedown', this._onDown);
