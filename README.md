@@ -1,40 +1,21 @@
 # Ellipse
 
-[Play in the browser](https://zhirkoalexander-maker.github.io/ellipse/)
+A rocket game I'm working on. The flight model, map and landing controls are still being adjusted.
 
-A spaceflight simulator built with TypeScript and Three.js.
+[Play here](https://zhirkoalexander-maker.github.io/ellipse/)
 
-**Flight** starts with a rocket on the pad. **Vehicle assembly** opens the builder. There’s a guide in the main menu.
+You can use the starter rocket or build one in Vehicle assembly. Controls are under Guide in the main menu. Saves stay in the browser, so clearing site data will delete them.
 
-## Controls
+## Running the project
 
-| Key | Action |
-| --- | --- |
-| Space | Launch / stage |
-| ↑ / ↓ | Throttle |
-| W / S, A / D | Steering |
-| J / K | Roll |
-| M / Tab | Map |
-| L | Landing assist |
-| T | Stability mode |
-| P / G | Parachute / landing gear |
-| Q / E | Time warp |
-| C / F | Free camera / reset view |
-| Esc | Pause / close map |
-
-Drag to move the camera. Scroll or pinch to zoom.
-
-Saves are stored in your browser. **Continue** loads the last flight; builds saved in the assembly screen have their own names.
-
-## Development
-
-Node.js 20+.
+You'll need Node.js 20 or newer.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-`npm test` runs the tests. `npm run build` writes the production build to `dist/`.
+The code is in `src/`. It uses Three.js and Vite.
 
-Source code is in [`src/`](src/). See [SPECIFICATION.md](SPECIFICATION.md) for the flight model and [DEVLOG.md](DEVLOG.md) for changes.
+- `npm test` — tests
+- `npm run build` — builds the game into `dist/`
