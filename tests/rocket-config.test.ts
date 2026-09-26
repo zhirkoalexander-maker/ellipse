@@ -52,10 +52,11 @@ describe('Rocket Configurations', () => {
     expect(r.totalFuelMass()).toBeGreaterThan(0);
   });
 
-  it('XL tank + XL engine adapter is created', () => {
+  it('XL tank + S engine adapter is created', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('tank_xl_lfo')!, position: [0, 0.6 * 0.05, 0], rotation: 0, children: [] });
     a.addRoot({ part: findPart('engine_ant')!, position: [0, 0, 0], rotation: 0, children: [] });
+    a.roots.reverse(); a.restack();
     const mesh = a.toMesh();
     // XL tank and S engine have different sizes → adapter should exist
     const cylinders = mesh.children.filter(

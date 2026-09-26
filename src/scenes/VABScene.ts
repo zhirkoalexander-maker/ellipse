@@ -2,11 +2,12 @@ import { storageKey } from '../storage/MigrateLegacySaves';
 import { PartThumbnails } from '../parts/PartThumbnails';
 import * as THREE from 'three';
 import { PART_CATALOG } from '../parts/PartCatalog';
+import { addSidePair } from '../rocket/SideAttachments';
 import { Assembly } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
 import { PART_SCALE } from '../config/constants';
 import { releaseSceneObjects } from '../core/disposeObject';
-import { saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
+import { serializeAssembly, deserializeAssembly, saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
 import { toast } from '../ui/Toast';
 
 // Part stacking heights — MUST match PartBuilder SIZE_DIMS heights (×PART_SCALE)
@@ -21,9 +22,10 @@ export class VABScene {
   private root!: HTMLDivElement;
   private info!: HTMLElement;
   private partSearch!: HTMLInputElement;
+  private history: Assembly[] = [];
   private st = 0;
   private nm: string[] = [];
-  private az = 0; private po = Math.PI/2; private dt = 1.5;
+  private az = Math.PI / 2 - .35; private po = Math.PI/2; private dt = 1.5;
   private dr = false; private pr = { x:0, y:0 };
   private tg = new THREE.Vector3(0, PART_SCALE, 0);
   private _onDown!: (e: MouseEvent) => void;
@@ -47,7 +49,7 @@ export class VABScene {
     this._onDown = (e:MouseEvent) => {
       // Don't start orbit-drag from UI element presses (zoom buttons, sidebar)
       const t = e.target as Element | null;
-      if (t && t.closest && t.closest('button, input, select, #vl, #vi')) return;
+      if (t && t.closest && t.closest('button, input, select, #vl, #vi, #vab-header')) return;
       if(e.button===0){this.dr=true;this.pr={x:e.clientX,y:e.clientY};}
     };
     this._onMove = (e:MouseEvent) => { if(!this.dr)return; this.az-=(e.clientX-this.pr.x)*0.005; this.po=Math.max(0.05,Math.min(Math.PI-0.05,this.po+(e.clientY-this.pr.y)*0.005)); this.pr={x:e.clientX,y:e.clientY}; this.cam(); };
@@ -60,7 +62,7 @@ export class VABScene {
       // LIST must not silently zoom the camera out (that kept making the
       // rocket look tiny for no visible reason).
       const t = e.target as Element | null;
-      if (t && t.closest && t.closest('#vl, #vi, button, input, select, .guide-overlay')) return;
+      if (t && t.closest && t.closest('#vl, #vi, #vab-header, button, input, select, .guide-overlay')) return;
       this.dt = Math.max(0.12, Math.min(40, this.dt * (e.deltaY > 0 ? 1.15 : 0.87)));
       this.cam();
     };
@@ -73,7 +75,7 @@ export class VABScene {
     );
     this._onTStart = (e:TouchEvent) => {
       const t = e.target as Element | null;
-      if (t && t.closest && t.closest('#vl, #vi, button, input, select, .guide-overlay')) return;
+      if (t && t.closest && t.closest('#vl, #vi, #vab-header, button, input, select, .guide-overlay')) return;
       if (e.touches.length === 2) this._pinchDist = tDist(e);
     };
     this._onTMove = (e:TouchEvent) => {
@@ -106,14 +108,20 @@ export class VABScene {
     this.root.style.cssText = 'position:fixed;inset:0;z-index:150;pointer-events:none;display:flex;';
     this.root.innerHTML = `
       <div style="width:clamp(148px,40vw,260px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
-        <div style="padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.15);">
+        <div id="vab-header" style="box-sizing:border-box;flex-shrink:0;overflow-y:auto;max-height:min(48vh,calc(100dvh - 250px));padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.15);">
           <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Rocket build</div>
-          <div style="margin-top:6px;font:400 9px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Click a part to place it on top.</div>
+          <div style="margin-top:6px;font:400 9px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose where to attach, then click a part.</div>
           <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 11px system-ui;outline:none;">
+          <label style="display:block;margin-top:8px;font:11px system-ui;color:#ccd5df;">Attach
+            <select id="vp-placement" style="width:100%;margin-top:4px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;">
+              <option value="stack">On top</option><option value="side">Side pair · engines / decouplers</option>
+            </select>
+          </label>
+          <select id="vp-host" aria-label="Tank for side engines" style="width:100%;margin-top:5px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;"></select>
           <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">Nothing added yet</div>
         </div>
-        <div id="vl" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
-        <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;gap:6px;">
+        <div id="vl" style="flex:1;min-height:0;overflow-y:auto;padding:8px 0;"></div>
+        <div style="flex-shrink:0;padding:12px 16px;border-top:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;gap:6px;">
           <button id="vg" style="width:100%;padding:12px;background:#c89542;color:#111827;border:1px solid #eacb8b;font:600 12px system-ui;letter-spacing:0.04em;cursor:pointer;transition:all 0.2s;">Take to pad</button>
           <div style="display:flex;gap:4px;">
             <button id="vu" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 10px system-ui;cursor:pointer;">Undo</button>
@@ -145,7 +153,7 @@ export class VABScene {
       }
     });
     this.root.querySelector('#vu')!.addEventListener('click', () => this.undo());
-    this.root.querySelector('#vc')!.addEventListener('click', () => { this.assembly=new Assembly(); this.st=0; this.nm=[]; this.rf(); this.up(); });
+    this.root.querySelector('#vc')!.addEventListener('click', () => { this.remember(); this.assembly=new Assembly(); this.st=0; this.nm=[]; this.rf(); this.up(); });
     this.root.querySelector('#vs')!.addEventListener('click', () => this.showSaveDialog());
     this.root.querySelector('#vlb')!.addEventListener('click', () => this.showLoadDialog());
     this.root.querySelector('#vb')!.addEventListener('click', () => this.ob());
@@ -214,12 +222,24 @@ export class VABScene {
   }
 
   private add(p: Part) {
-    const h = PH[p.size]||0.6; const y = this.st+h/2;
-    this.assembly.addRoot({part:p,position:[0,y*PART_SCALE,0],rotation:0,children:[]});
-    this.st+=h; this.nm.push(p.name); this.rf(); this.up();
+    if (this.root.querySelector<HTMLSelectElement>('#vp-placement')!.value === 'side') {
+      if (p.kind !== 'engine' && p.kind !== 'decoupler') { toast.show('Choose an engine or decoupler for the side mounts.'); return; }
+      const hostId = this.root.querySelector<HTMLSelectElement>('#vp-host')!.value;
+      const host = this.assembly.roots.find(n => n.uid === hostId && n.part.kind === 'tank');
+      if (!host) { toast.show('Add a tank first, then choose it for the side mounts.'); return; }
+      this.remember();
+      const error = addSidePair(this.assembly,host,p);
+      if (error) { this.history.pop(); toast.show(error); return; }
+    } else {
+      this.remember();
+      this.assembly.addRoot({part:p,position:[0,0,0],rotation:0,children:[]});
+      this.assembly.restack();
+    }
+    this.nm = this.assembly.roots.map(n => n.part.name); this.rf(); this.up();
   }
 
   private buildStarterPreset(): void {
+    this.remember();
     this.assembly = new Assembly(); this.st = 0; this.nm = [];
     for (const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']) {
       const part = PART_CATALOG.find(p => p.id === id)!;
@@ -227,12 +247,18 @@ export class VABScene {
       this.assembly.addRoot({part,position:[0,(this.st+height/2)*PART_SCALE,0],rotation:0,children:[]});
       this.st += height; this.nm.push(part.name);
     }
-    this.rf(); this.up();
+    this.assembly.restack(); this.rf(); this.up();
     toast.show('Ready. Take to pad to launch.', 3000);
   }
+  private remember(): void {
+    this.history.push(deserializeAssembly(serializeAssembly(this.assembly)) ?? new Assembly());
+    if (this.history.length > 30) this.history.shift();
+  }
   private undo() {
-    if(!this.assembly.roots.length) return;
-    const r = this.assembly.roots.pop()!; this.st-=PH[r.part.size]||0.6; this.nm.pop();
+    const previous = this.history.pop();
+    if (!previous) return;
+    this.assembly = previous;
+    this.nm = this.assembly.roots.map(n => n.part.name);
     this.rf(); this.up();
   }
 
@@ -255,9 +281,20 @@ export class VABScene {
     this.cam();
   }
   private up() {
+    const host = this.root.querySelector<HTMLSelectElement>('#vp-host')!;
+    const selected = host.value;
+    host.replaceChildren();
+    for (const [i, node] of this.assembly.roots.entries()) if (node.part.kind === 'tank') {
+      const option = new Option(`${i + 1}. ${node.part.name}`, node.uid); host.add(option);
+    }
+    if ([...host.options].some(o => o.value === selected)) host.value = selected;
+    host.disabled = !host.options.length;
+
     if(!this.nm.length){this.info.innerHTML='<span style="color:rgba(255,255,255,0.5);">Nothing added yet</span>';return;}
-    const dm=this.assembly.roots.reduce((s,n)=>s+n.part.mass,0), fl=this.assembly.roots.reduce((s,n)=>s+(n.part.fuelCapacity||0),0);
-    this.info.innerHTML = `<div style="margin-bottom:6px;">${this.nm.length} parts · ${(dm/1000).toFixed(1)} t${fl ? ' · '+(fl/1000).toFixed(1)+' t fuel' : ''}</div><div id="build-stack" style="max-height:24vh;overflow:auto;display:flex;flex-direction:column;gap:3px;"></div>`;
+    const dm=this.assembly.totalMass(), fl=this.assembly.totalFuelCapacity();
+    const countParts = (nodes: typeof this.assembly.roots): number => nodes.reduce((sum,n) => sum + 1 + countParts(n.children),0);
+    const count = countParts(this.assembly.roots);
+    this.info.innerHTML = `<div style="margin-bottom:6px;">${count} parts · ${(dm/1000).toFixed(1)} t${fl ? ' · '+(fl/1000).toFixed(1)+' t fuel' : ''}</div><div id="build-stack" style="max-height:24vh;overflow:auto;display:flex;flex-direction:column;gap:3px;"></div>`;
     const list = this.info.querySelector('#build-stack')!;
     // Display the physical top first, while retaining bottom-first assembly order.
     for (let i = this.nm.length - 1; i >= 0; i--) {
@@ -278,24 +315,28 @@ export class VABScene {
         button.setAttribute(`data-${action}`, String(i)); button.disabled = disabled;
         button.style.cssText = `width:25px;height:28px;flex:none;background:#192536;border:0;color:#fff;cursor:pointer;opacity:${disabled ? 0.25 : 1};`;
         button.onclick = () => {
+          this.remember();
           const roots = this.assembly.roots;
           if (action === 'remove') roots.splice(i, 1);
           else {
             const to = i + (action === 'move-up' ? 1 : -1);
             [roots[i], roots[to]] = [roots[to]!, roots[i]!];
           }
-          this.st = 0;
-          for (const node of roots) {
-            const height = PH[node.part.size] || 0.6;
-            const nextY = (this.st + height / 2) * PART_SCALE;
-            node.position[1] = nextY; this.st += height;
-          }
+          this.assembly.restack();
           this.nm = roots.map(node => node.part.name);
           this.rf(); this.up();
         };
         row.appendChild(button);
       }
       list.appendChild(row);
+      const node = this.assembly.roots[i]!;
+      if (node.children.some(n => n.part.kind === 'engine' || n.radial)) {
+        const remove = document.createElement('button');
+        remove.textContent = node.children.some(n => n.radial) ? 'Side pair · Decouplers · Remove' : 'Side engines ×2 · Remove'; remove.dataset.removeSide = String(i);
+        remove.style.cssText = 'padding:6px;background:#192536;color:#cdd7e2;border:0;text-align:left;cursor:pointer';
+        remove.onclick = () => { this.remember(); node.children = node.children.filter(n => n.part.kind !== 'engine' && !n.radial); this.rf(); this.up(); };
+        list.appendChild(remove);
+      }
     }
   }
   private rf() {
@@ -381,6 +422,7 @@ export class VABScene {
         loadBtn.addEventListener('click', () => {
           const a = loadAssembly(name);
           if (a) {
+            this.remember();
             this.assembly = a;
             // Restore stack height so further adds/undo stack correctly on top
             this.st = a.roots.reduce((s, r) => s + (PH[r.part.size] || 0.6), 0);

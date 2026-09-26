@@ -33,3 +33,16 @@ describe('engine exhaust at rocket scale', () => {
     flame.dispose();
   });
 });
+
+it('emits from both side nozzles without allocating another particle system', () => {
+ vi.spyOn(Math, 'random').mockReturnValue(.5);
+ const f:any=new EngineFlame();
+ try {
+ f.setNozzles([new THREE.Vector3(-.1,0,0),new THREE.Vector3(.1,0,0)]);f.start();f.update(1/60);
+ const mesh=f.getMesh().children[0] as THREE.Points;
+ const pos=mesh.geometry.attributes.position!, color=mesh.geometry.attributes.color!;
+ const x=[];for(let i=0;i<pos.count;i++)if(color.getX(i)>0)x.push(pos.getX(i));
+ expect(Math.min(...x)).toBeCloseTo(-.1);expect(Math.max(...x)).toBeCloseTo(.1);
+ expect(pos.count).toBe(900);
+ }finally{f.dispose();}
+});

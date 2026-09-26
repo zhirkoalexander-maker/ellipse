@@ -41,23 +41,30 @@ export class Rocket {
     return consumed;
   }
 
-  /** Position-based staging: drop the decoupler + everything physically BELOW it (Y < decoupler Y).
-   *  Works regardless of root array order (VAB adds bottom-first, Game default top-first). */
-  removeStage(decouplerNode: AssemblyNode): void {
-    const roots = this.assembly.roots;
-    const decY = decouplerNode.position[1];
-
-    const removedNodes = new Set<AssemblyNode>();
-    const walk = (n: AssemblyNode) => { removedNodes.add(n); n.children.forEach(walk); };
-
-    for (const r of roots) {
-      if (r === decouplerNode || r.position[1] < decY) walk(r);
+  stageRoots(decoupler: AssemblyNode): AssemblyNode[] {
+    if (decoupler.radial) {
+      const siblings = (nodes: AssemblyNode[]): AssemblyNode[] | undefined => {
+        if (nodes.includes(decoupler)) return nodes.filter(n => n.radial);
+        for (const n of nodes) { const found = siblings(n.children); if (found) return found; }
+      };
+      return siblings(this.assembly.roots) ?? [decoupler];
     }
-
-    this.fuelTanks = this.fuelTanks.filter(t => !removedNodes.has(t.node));
-    this.assembly.roots = roots.filter(r => !removedNodes.has(r));
-    decouplerNode.children = [];
+    if (!this.assembly.roots.includes(decoupler)) return [decoupler];
+    return this.assembly.roots.filter(n => n === decoupler || n.position[1] < decoupler.position[1]);
   }
+
+  /** Keep each detached branch intact, including its side-mounted engines. */
+  removeStage(decoupler: AssemblyNode): void {
+    const removed = new Set<AssemblyNode>();
+    const walk = (n: AssemblyNode) => { removed.add(n); n.children.forEach(walk); };
+    this.stageRoots(decoupler).forEach(walk);
+    this.fuelTanks = this.fuelTanks.filter(t => !removed.has(t.node));
+    const retain = (nodes: AssemblyNode[]): AssemblyNode[] => nodes.filter(n => !removed.has(n)).map(n => {
+      n.children = retain(n.children); return n;
+    });
+    this.assembly.roots = retain(this.assembly.roots);
+  }
+
 }
 
 function collectTanks(nodes: AssemblyNode[], out: FuelTank[]) {
