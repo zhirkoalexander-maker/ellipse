@@ -19,3 +19,4 @@ npm run build
 ```
 
 Saves are stored in your browser.
+Flight controls and instructions are available in the in-game Guide.

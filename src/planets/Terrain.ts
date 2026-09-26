@@ -86,7 +86,13 @@ export function rockyTerrain(name: string, x: number, y: number, z: number): num
     const inland=Math.exp(-(((east+.0012)/.00065)**2)-((north-.0004)/.0015)**2);
     const folds=1-Math.abs(terrainNoise(x*1800+41,y*1800+19,z*1800)*2-1);
     const rolling=terrainNoise(x*9000+17,y*9000+3,z*9000+61);
-    const coastalHeight=.0000018+rolling*.000004+inland*(.000015+Math.pow(folds,2)*.00004);
+    // Three separated peaks inland; their footprints end before the launch plain.
+    let peaks=0;
+    for(const [e,n,h] of [[-.003,.001,.00018],[-.0017,.0021,.00014],[-.0018,-.002,.00016]]){
+      const slope=Math.max(0,1-((east-e!)/.00065)**2-((north-n!)/.0008)**2);
+      peaks+=h!*slope*slope;
+    }
+    const coastalHeight=.0000018+rolling*.000004+inland*(.000015+Math.pow(folds,2)*.00004)+peaks;
     const continentalHeight=.00004+broad*.00006+ranges+foothills;
     height=THREE.MathUtils.smoothstep(land,.02,.85)*THREE.MathUtils.lerp(continentalHeight,coastalHeight,local);
     const pad=1-THREE.MathUtils.smoothstep(angle,.00006,.00014);
