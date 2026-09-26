@@ -33,3 +33,12 @@ it('removes mission overlays and score subscriptions when leaving the menu',asyn
  menu.unmount();expect(document.querySelector('.guide-overlay')).toBeNull();
  expect((missions as any).onScoreChange).toHaveLength(0);
 });
+
+it('returns focus to Guide after replaying the tour',()=>{
+ const menu=new MainMenuScene(vi.fn(),vi.fn(),vi.fn());menu.mount();
+ document.querySelector<HTMLButtonElement>('[data-tutorial=skip]')?.click();
+ [...document.querySelectorAll('button')].find(b=>b.textContent==='Guide')!.click();
+ document.querySelector<HTMLButtonElement>('#guide-tour')!.click();
+ document.querySelector<HTMLButtonElement>('[data-tutorial=skip]')!.click();
+ expect(document.activeElement?.textContent).toBe('Guide');menu.unmount();
+});

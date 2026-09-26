@@ -76,3 +76,14 @@ it('places a low rolling coast within view of the launch site',async()=>{
  expect(Math.max(...hills)).toBeGreaterThan(250);
  expect(Math.max(...hills)).toBeLessThan(1400);
 });
+
+it('adds three isolated mountains inland without raising the launch plain',async()=>{
+ const {earthLaunchFrame}=await import('../../src/planets/EarthGeography');
+ const {rockyTerrain}=await import('../../src/planets/Terrain');
+ const up=new THREE.Vector3(...earthLaunchFrame.up),east=new THREE.Vector3(...earthLaunchFrame.east),north=new THREE.Vector3(...earthLaunchFrame.north);
+ const height=(e:number,n:number)=>{const p=up.clone().addScaledVector(east,e).addScaledVector(north,n).normalize();return rockyTerrain('earth',p.x,p.y,p.z)*6.371e6*2.5;};
+ for(const [e,n] of [[-.003,.001],[-.0017,.0021],[-.0018,-.002]])expect(height(e!,n!)).toBeGreaterThan(1800);
+ expect(height(0,0)).toBeCloseTo(12,5);
+ expect(height(.00065,0)).toBeCloseTo(0,5);
+ for(const [e,n] of [[-.0003,.001],[-.003,-.001],[-.004,.002]])expect(height(e!,n!)).toBeLessThan(500);
+});
