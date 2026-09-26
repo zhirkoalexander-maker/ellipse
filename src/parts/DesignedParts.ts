@@ -51,14 +51,25 @@ export function buildDesignedPart(part: Part, d: { radius: number; height: numbe
     return mesh;
   }
   switch (part.kind) {
-    case 'tank':
-      cylinder(0.99, 0.99, 1, 0, ceramic);
+    case 'tank': {
+      const ribbed = part.tankStyle === 'ribbed';
+      cylinder(0.99, 0.99, 1, 0, ribbed ? titanium : ceramic);
       // Broad roll marks remain readable from the launch camera.
       for (const y of [-0.455, 0.455]) {
         cylinder(1.015, 1.015, 0.075, y, graphite);
         ring(1.022, y, titanium, 0.014);
       }
-      cylinder(1.002, 1.002, 0.14, -0.25, copper);
+      if (ribbed) {
+        // Longitudinal ribs sit inside the shared attachment rings and outer envelope.
+        cylinder(1.002,1.002,.09,-.30,graphite);
+        cylinder(1.002,1.002,.09,.30,graphite);
+        for (let i=0;i<16;i++) {
+          const a=i*Math.PI/8;
+          const rib=add(new THREE.BoxGeometry(r*.045,h*.48,r*.04),ceramic,
+            Math.sin(a)*r*.994,0,Math.cos(a)*r*.994);
+          rib.rotation.y=a;
+        }
+      } else cylinder(1.002, 1.002, 0.14, -0.25, copper);
       for (let i = 0; i < 4; i++) {
         const a = i * Math.PI / 2;
         add(new THREE.CylinderGeometry(r * 1.002, r * 1.002, h * 0.22, 12, 1, true, a, Math.PI / 5), graphite, 0, h * 0.28);
@@ -69,6 +80,7 @@ export function buildDesignedPart(part: Part, d: { radius: number; height: numbe
       add(new THREE.BoxGeometry(r * 0.25, h * 0.18, r * 0.08), graphite, 0, -h*0.025, r*0.988);
       add(new THREE.BoxGeometry(r * 0.19, h * 0.13, r * 0.02), titanium, 0, -h*0.025, r*1.04);
       break;
+    }
     case 'capsule': {
       // The Mk1 M capsule has a narrow adapter matching the starter S tanks.
       const base = part.id === 'capsule_mk1' ? 0.60 / 0.85 : 0.96;

@@ -15,7 +15,7 @@ export const PART_CATALOG: Part[] = [
   // Tanks
   {
     id: 'tank_s_lfo',
-    name: 'Fuel Tank S (LFO)',
+    name: 'Tank S · 5 t',
     kind: 'tank',
     size: 'S',
     mass: 200,
@@ -45,7 +45,7 @@ export const PART_CATALOG: Part[] = [
   },
   {
     id: 'tank_xl_lfo',
-    name: 'Fuel Tank XL (LFO)',
+    name: 'Tank XL · 250 t',
     kind: 'tank',
     size: 'XL',
     mass: 2500,
@@ -265,6 +265,29 @@ export const PART_CATALOG: Part[] = [
   },
 
 ];
+
+// Retain old IDs and dimensions for saved rockets; only this smaller set is offered for new builds.
+const addedParts: Part[] = [
+  {id:'tank_s_dense',name:'Tank S · 10 t',kind:'tank',size:'S',mass:200,fuelCapacity:10000,fuelType:'LFO',dragCoeff:.4,tankStyle:'ribbed'},
+  {id:'tank_xl_dense',name:'Tank XL · 500 t',kind:'tank',size:'XL',mass:2500,fuelCapacity:500000,fuelType:'LFO',dragCoeff:.4,tankStyle:'ribbed'},
+  {id:'capsule_s',name:'Capsule S',kind:'capsule',size:'S',mass:1200,crewCapacity:1,hasParachute:true,dragCoeff:.5},
+  {id:'capsule_xl',name:'Capsule XL',kind:'capsule',size:'XL',mass:6000,crewCapacity:3,hasParachute:true,dragCoeff:.5},
+  {id:'decoupler_xl',name:'Decoupler XL',kind:'decoupler',size:'XL',mass:400,dragCoeff:.3},
+  {id:'legs_xl',name:'Landing Legs XL',kind:'legs',size:'XL',mass:400,dragCoeff:.1},
+  {id:'heatshield_xl',name:'Heat Shield XL',kind:'heatshield',size:'XL',mass:800,heatCapacity:800000,dragCoeff:1.2},
+  {id:'fairing_xl',name:'Nose Cone XL',kind:'fairing',size:'XL',mass:180,dragCoeff:.1},
+];
+PART_CATALOG.push(...addedParts);
+
+export const ASSEMBLY_PARTS: Part[] = [
+  'capsule_s','capsule_xl',
+  'tank_s_lfo','tank_s_dense','tank_xl_lfo','tank_xl_dense',
+  'engine_ant','engine_mammoth',
+  'decoupler_s','decoupler_xl',
+  'legs_landini','legs_xl',
+  'heatshield_s','heatshield_xl',
+  'fairing_s','fairing_xl',
+].map(id => PART_CATALOG.find(p => p.id === id)!);
 
 export function findPart(id: string): Part | undefined {
   return PART_CATALOG.find((p) => p.id === id);

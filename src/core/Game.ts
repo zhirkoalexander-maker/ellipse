@@ -186,7 +186,7 @@ export class Game {
       if (!save) clearFlightSave();
       const a = rocket?.assembly ?? new Assembly();
 if (!rocket) {
-        // Ant engine + 2x S tank + MK1 capsule (classic small rocket)
+        // Ant engine + 2x S tank + S capsule
         const p = PART_SCALE;
         const H = { S: 1.4 * p, M: 2.0 * p, L: 2.8 * p, XL: 3.6 * p };
         const gap = 0;
@@ -197,12 +197,12 @@ if (!rocket) {
         const engY = stack(H.S);       // engine_ant (S)
         const tank1Y = stack(H.S);     // tank_s_lfo (S)
         const tank2Y = stack(H.S);     // tank_s_lfo (S)
-        const capY = stack(H.M);       // capsule_mk1 (M)
+        const capY = stack(H.S);       // capsule_s (S)
 
         a.addRoot({ part: findPart('engine_ant')!, position: [0, engY, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank1Y, 0], rotation: 0, children: [] });
         a.addRoot({ part: findPart('tank_s_lfo')!, position: [0, tank2Y, 0], rotation: 0, children: [] });
-        a.addRoot({ part: findPart('capsule_mk1')!, position: [0, capY, 0], rotation: 0, children: [] });
+        a.addRoot({ part: findPart('capsule_s')!, position: [0, capY, 0], rotation: 0, children: [] });
       }
       // Keep an immutable launch blueprint: staging mutates the live assembly.
       const currentAssembly = serializeAssembly(a);

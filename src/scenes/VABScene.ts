@@ -1,7 +1,7 @@
 import { storageKey } from '../storage/MigrateLegacySaves';
 import { PartThumbnails } from '../parts/PartThumbnails';
 import * as THREE from 'three';
-import { PART_CATALOG } from '../parts/PartCatalog';
+import { PART_CATALOG, ASSEMBLY_PARTS } from '../parts/PartCatalog';
 import { addSidePair } from '../rocket/SideAttachments';
 import { Assembly } from '../rocket/Assembly';
 import type { Part } from '../parts/Part';
@@ -204,7 +204,7 @@ export class VABScene {
 
     const groups = new Map<string,{parts:Part[],color:string}>();
     const cmap: Record<string,string> = { capsule:'#a0b0c0', tank:'#6090c0', engine:'#c08060', decoupler:'#c06070', parachute:'#60a070', legs:'#8090a0', heatshield:'#b08060', fairing:'#a0c0e0', rcs:'#c0a0d0', solar:'#4080d0' };
-    for (const p of PART_CATALOG) {
+    for (const p of ASSEMBLY_PARTS) {
       if (!groups.has(p.kind)) groups.set(p.kind, {parts:[],color:cmap[p.kind]||'#888'});
       groups.get(p.kind)!.parts.push(p);
     }
@@ -263,7 +263,7 @@ export class VABScene {
   private buildStarterPreset(): void {
     this.remember();
     this.assembly = new Assembly(); this.st = 0; this.nm = [];
-    for (const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']) {
+    for (const id of ['engine_ant','tank_s_lfo','tank_s_lfo','capsule_s']) {
       const part = PART_CATALOG.find(p => p.id === id)!;
       const height = PH[part.size]!;
       this.assembly.addRoot({part,position:[0,(this.st+height/2)*PART_SCALE,0],rotation:0,children:[]});
