@@ -69,6 +69,12 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
       float filteredGrain(vec3 p,float frequency,float footprint){
         return (groundNoise(p*frequency)-.5)*(1.0-smoothstep(.2,.7,footprint*frequency));
       }
+      float filteredFbm(vec3 p,float frequency,float footprint){
+        return .5+filteredGrain(p,frequency,footprint)*.57
+          +filteredGrain(p+vec3(.13,.27,.07),frequency*2.03,footprint)*.26
+          +filteredGrain(p+vec3(.21,.03,.11),frequency*4.09,footprint)*.12
+          +filteredGrain(p,frequency*8.17,footprint)*.05;
+      }
       float groundFbm(vec3 p){return groundNoise(p)*.57+groundNoise(p*2.03+vec3(7,13,3))*.26+groundNoise(p*4.09+vec3(11,2,5))*.12+groundNoise(p*8.17)*.05;}
     `).replace('#include <map_fragment>','').replace('#include <color_fragment>',`
       vec3 p=normalize(terrainDirection);
@@ -88,16 +94,20 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
         float east=dot(p,vec3(${earthLaunchFrame.east.map(v=>v.toFixed(12)).join(',')}));
         float north=dot(p,vec3(${earthLaunchFrame.north.join(',')}));
         float local=1.0-smoothstep(.008,.012,angle);
-        float coast=.0014-east+.00022*sin(north*1300.0)+.00008*sin(north*3700.0);
-        float land=smoothstep(-.00012,.00012,coast);
+        float coast=.0004-east+.00009*sin(north*6000.0)+.00003*sin(north*13000.0);
+        float land=smoothstep(-.000018,.000018,coast);
         waterMask=mix(waterMask,1.0-smoothstep(.02,.06,land),local);
-        vec3 grass=mix(${rgb(0x52643a)},${rgb(0x304b2b)},groundFbm(p*2800.0));
+        float meadow=filteredFbm(p,55000.0,footprint);
+        float soil=smoothstep(.53,.61,filteredFbm(p+vec3(.1,.3,.7),170000.0,footprint));
+        vec3 grass=mix(${rgb(0x425b2a)},${rgb(0x536735)},smoothstep(.3,.68,meadow));
+        grass=mix(grass,${rgb(0x817958)},soil*.18);
+        grass*=1.0+filteredGrain(p,1500000.0,footprint)*.45;
         color=mix(color,grass,local*(1.0-waterMask));
         float beach=mix(1.0-smoothstep(.00000025,.00000075,h),1.0-smoothstep(.07,.6,land),local);
-        color=mix(color,${rgb(0xbca77b)},beach*(1.0-waterMask));
+        color=mix(color,${rgb(0xc2b69a)},beach*(1.0-waterMask));
         float localRock=smoothstep(.00008,.00016,h)*local;
         color=mix(color,${rgb(0x7a7569)},localRock*.8);
-        vec3 sea=mix(${rgb(0x083b61)},${rgb(0x238d94)},local*smoothstep(-.0008,0.0,coast));
+        vec3 sea=mix(${rgb(0x102a4b)},${rgb(0x285d6c)},local*smoothstep(-.00012,0.0,coast));
         color=mix(color,sea,waterMask);`:''}
       #endif
       float grain=filteredGrain(p,1800.0,footprint)*.55+filteredGrain(p,6000.0,footprint)*.3+filteredGrain(p,18000.0,footprint)*.15;
@@ -116,5 +126,5 @@ export function configureSurfaceMaterial(material:THREE.MeshStandardMaterial,nam
       totalEmissiveRadiance*=1.0-waterMask;
     `);
   };
-  material.customProgramCacheKey=()=>`surface-${name}-v4`;
+  material.customProgramCacheKey=()=>`surface-${name}-v5`;
 }

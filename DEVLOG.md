@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.18
+
+- Moved the launch coast closer, with a narrower beach and darker water.
+- Lower, broader hills near the pad; finer grass and soil detail.
+
 ## 2.5.16
 
 - Map opens on the rocket flight path, with brighter lines and predicted impact markers.

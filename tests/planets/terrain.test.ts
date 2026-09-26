@@ -60,8 +60,19 @@ it('has visible inland ridges and a shore at sea level near the launch coast',()
  const east=new THREE.Vector3(-Math.sin(lon),0,Math.cos(lon));
  const height=(offset:number)=>earth.getSurfaceRadiusAt(pad.clone().addScaledVector(east,offset).normalize().multiplyScalar(earth.radius).toArray())-earth.radius;
  const peaks=Array.from({length:40},(_,i)=>height(-.002+i*.00005));
- expect(Math.max(...peaks)).toBeGreaterThan(700);
+ expect(Math.max(...peaks)).toBeGreaterThan(250);
  const shore=Array.from({length:80},(_,i)=>height(.001+i*.00001));
  expect(Math.min(...shore)).toBeCloseTo(0,6);
  for(let i=1;i<shore.length;i++)expect(Math.abs(shore[i]!-shore[i-1]!)).toBeLessThan(50);
+});
+
+it('places a low rolling coast within view of the launch site',async()=>{
+ const {earthLaunchFrame}=await import('../../src/planets/EarthGeography');
+ const earth=new Earth([0,0,0],[0,0,0]);
+ const up=new THREE.Vector3(...earthLaunchFrame.up),east=new THREE.Vector3(...earthLaunchFrame.east),north=new THREE.Vector3(...earthLaunchFrame.north);
+ const height=(e:number,n:number)=>earth.getSurfaceRadiusAt(up.clone().addScaledVector(east,e).addScaledVector(north,n).normalize().multiplyScalar(earth.radius).toArray())-earth.radius;
+ expect(height(.00065,0)).toBeCloseTo(0,5);
+ const hills=Array.from({length:40},(_,i)=>height(-.002+i*.00005,.0004));
+ expect(Math.max(...hills)).toBeGreaterThan(250);
+ expect(Math.max(...hills)).toBeLessThan(1400);
 });
