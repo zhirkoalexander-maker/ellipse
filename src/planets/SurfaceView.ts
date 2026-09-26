@@ -57,7 +57,7 @@ export class SurfaceView {
     if (detailed !== this.active) { this.clearDetail(); if (detailed) this.attachDetail(detailed); }
     if (detailed) {
       const direction = new THREE.Vector3(...position).sub(new THREE.Vector3(...detailed.position)).normalize();
-      if (!this.patch || direction.distanceTo(this.center) > this.extent * 0.18) this.rebuild(direction);
+      if (!this.patch || direction.distanceTo(this.center) > (detailed.name === 'earth' ? Math.max(.0005,Math.min(this.extent*.18,altitude/detailed.radius*.5)) : this.extent * 0.18)) this.rebuild(direction);
     }
   }
 
@@ -74,13 +74,15 @@ export class SurfaceView {
     if (this.patch) { this.patch.removeFromParent(); this.patch.geometry.dispose(); (this.patch.material as THREE.Material).dispose(); }
     const east = new THREE.Vector3().crossVectors(up, Math.abs(up.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
     const north = new THREE.Vector3().crossVectors(east, up).normalize();
-    const nearRings = 96, rings = 224, segments = 192;
+    const nearRings = body.name === 'earth' ? 192 : 96, rings = nearRings + 128, segments = 192;
     const positions: number[] = [], colors: number[] = [], indices: number[] = [];
     for (let ring = 0; ring <= rings; ring++) {
       // One continuous globe: dense near the craft, coarse on the far side.
       // Shared rings eliminate the cracks of overlapping terrain patches.
       const angle = ring <= nearRings
-        ? (ring / nearRings) ** 1.35 * this.extent
+        ? body.name === 'earth'
+          ? ring <= 96 ? (ring / 96) ** 1.3 * .0012 : .0012 + ((ring - 96) / 96) ** 1.35 * (this.extent - .0012)
+          : (ring / nearRings) ** 1.35 * this.extent
         : this.extent + ((ring - nearRings) / (rings - nearRings)) ** 1.35 * (Math.PI - this.extent);
       for (let s = 0; s <= segments; s++) {
         const azimuth = s / segments * Math.PI * 2;
