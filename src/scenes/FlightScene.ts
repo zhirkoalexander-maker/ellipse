@@ -23,7 +23,7 @@ import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, R
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { OrbitMap } from '../ui/OrbitMap';
-import { buildDeployedParachute, gltfCache } from '../parts/PartBuilder';
+import { buildDeployedParachute } from '../parts/PartBuilder';
 import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
 import { gravitationalAccelerationAt, totalGravityOn } from '../physics/Gravity';
 import { LaunchClamps } from '../flight/LaunchClamps';
@@ -1413,7 +1413,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         d.life -= baseDt;
         if (d.life <= 0 || d.body.mass <= 0) {
           this.sceneMgr.scene.remove(d.mesh);
-          releaseSceneObjects([d.mesh], [this.rocketGroup, ...gltfCache.values()]);
+          releaseSceneObjects([d.mesh], [this.rocketGroup]);
           this.debris.splice(i, 1);
           continue;
         }
@@ -1437,7 +1437,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         const bodyR = (refBody as any).getSurfaceRadiusAt?.(d.body.position) ?? (refBody as any).radius ?? 6.371e6;
         if (bd < bodyR) {
           this.sceneMgr.scene.remove(d.mesh);
-          releaseSceneObjects([d.mesh], [this.rocketGroup, ...gltfCache.values()]);
+          releaseSceneObjects([d.mesh], [this.rocketGroup]);
           this.debris.splice(i, 1);
         }
       }
@@ -2690,7 +2690,7 @@ private positionFlameAtNozzle(): void {
     this.lifetime.dispose();
     this.engineFlame.getMesh().removeFromParent();
     this.groundSmoke.getMesh().removeFromParent();
-    const protectedObjects: THREE.Object3D[] = [...gltfCache.values(), ...this.system.bodies.map(b => (b as any).mesh).filter(Boolean)];
+    const protectedObjects: THREE.Object3D[] = [...this.system.bodies.map(b => (b as any).mesh).filter(Boolean)];
     releaseSceneObjects([
       ...this.ownedSceneObjects, this.rocketGroup, ...this.debris.map(d => d.mesh),
       ...[this.orbitLine, this.deployedChuteMesh].filter((x): x is THREE.Line | THREE.Group => x !== null),

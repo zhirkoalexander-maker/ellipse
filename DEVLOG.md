@@ -1,5 +1,11 @@
 # Changes
 
+## 2.5.21
+
+- Removed imported vehicles and their startup downloads. Quick start uses the four-part starter rocket.
+- Release old VAB previews when rebuilding or leaving the editor.
+- Batch static rocket decorations without reducing mesh detail.
+
 ## 2.5.20
 
 - Reuse terrain buffers and materials when moving across a planet.

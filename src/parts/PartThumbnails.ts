@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Part } from './Part';
-import { buildPartMesh, gltfCache } from './PartBuilder';
+import { buildPartMesh } from './PartBuilder';
 import { releaseSceneObjects } from '../core/disposeObject';
 
 // Only encoded images survive the batch: no mesh or GPU context is cached.
@@ -15,7 +15,7 @@ export class PartThumbnails {
   get(part: Part): string | undefined {
     const key = `${part.kind}:${part.id}:${part.size}`;
     if (images.has(key)) return images.get(key);
-    if (this.unavailable || (part.gltfUrl && !gltfCache.has(part.gltfUrl))) return undefined;
+    if (this.unavailable) return undefined;
     try {
       if (!this.renderer) {
         this.renderer = this.createRenderer();
@@ -43,8 +43,7 @@ export class PartThumbnails {
         images.set(key, image);
         return image;
       } finally {
-        // Imported clones share resources with the model cache; keep those alive.
-        releaseSceneObjects([model], [...gltfCache.values()]);
+        releaseSceneObjects([model]);
       }
     } catch {
       // The part names/buttons remain usable if WebGL is unavailable.
