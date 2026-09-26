@@ -1,5 +1,11 @@
 # Changes
 
+## 2.5.22
+
+- Draw only live exhaust particles; keep the same plume simulation.
+- Missions keep completion progress without points or rewards.
+- Add a shared browser-based player count to the menu.
+
 ## 2.5.21
 
 - Removed imported vehicles and their startup downloads. Quick start uses the four-part starter rocket.

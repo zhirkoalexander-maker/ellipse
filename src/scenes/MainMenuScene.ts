@@ -1,3 +1,4 @@
+import { PlayerCounter } from '../ui/PlayerCounter';
 import { Tutorial, shouldShowTutorial } from '../ui/Tutorial';
 import { Lifetime } from '../core/Lifetime';
 import { version as appVersion } from '../../package.json';
@@ -6,6 +7,7 @@ import type { Missions } from '../core/Missions';
 
 export class MainMenuScene {
   private root: HTMLDivElement;
+  private playerCounter = new PlayerCounter();
   private tutorial: Tutorial | null = null;
   private life=new Lifetime();
   private helpOverlay: HTMLDivElement | null = null;
@@ -26,6 +28,7 @@ export class MainMenuScene {
 
     this.root = document.createElement('div');
     this.root.className = 'panel';
+    this.root.appendChild(this.playerCounter.element);
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 500;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -151,5 +154,5 @@ export class MainMenuScene {
 
   private showTutorial(returnLabel='Flight'): void { this.tutorial?.dispose(); this.tutorial=new Tutorial(()=>{this.tutorial=null;[...this.root.querySelectorAll<HTMLButtonElement>('.menu-btn')].find(button=>button.textContent===returnLabel)?.focus();}); }
   mount(parent: HTMLElement = document.body): void { parent.appendChild(this.root); if(shouldShowTutorial())this.showTutorial(); }
-  unmount(): void { this.tutorial?.dispose();this.tutorial=null;this.root.remove(); this.helpOverlay?.remove(); this.missionsOverlay?.remove(); this.life.dispose(); }
+  unmount(): void { this.playerCounter.dispose(); this.tutorial?.dispose();this.tutorial=null;this.root.remove(); this.helpOverlay?.remove(); this.missionsOverlay?.remove(); this.life.dispose(); }
 }

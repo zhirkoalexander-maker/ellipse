@@ -150,3 +150,5 @@ vite.config.ts.timestamp-*
 # Project-specific
 screenshots/
 backups/
+
+.counter-admin.json
