@@ -161,3 +161,22 @@ it('disposes preview geometries when adding another part',()=>{
   expect(disposed).toBeGreaterThan(0);
  }finally{vab.unmount();}
 });
+
+it.each(['engine_ant','decoupler_s'])('can add a central tank and side pair without leaving side mode (%s)', first => {
+ const vab=new VABScene(()=>{},()=>{});vab.mount();
+ try {
+  const mode=document.querySelector<HTMLSelectElement>('#vp-placement')!;
+  mode.value='side';mode.dispatchEvent(new Event('change'));
+  const click=(id:string)=>document.querySelector<HTMLButtonElement>(`button[title='Add ${findPart(id)!.name}']`)!.click();
+  click(first);
+  expect(vab.assembly.roots).toHaveLength(0);
+  click('tank_s_lfo');
+  expect(vab.assembly.roots).toHaveLength(1);
+  expect(vab.assembly.roots[0]!.part.kind).toBe('tank');
+  expect(mode.value).toBe('side');
+  click(first);click(first==='engine_ant'?'decoupler_s':'engine_ant');
+  const mounts=vab.assembly.roots[0]!.children;
+  expect(mounts).toHaveLength(2);
+  expect(mounts.every(n=>n.radial && n.children[0]?.part.kind==='engine')).toBe(true);
+ }finally{vab.unmount();}
+});
