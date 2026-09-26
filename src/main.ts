@@ -1,3 +1,4 @@
+import { migrateLegacySaves } from './storage/MigrateLegacySaves';
 import { Game } from './core/Game';
 import '../styles/tokens.css';
 import '../styles/typography.css';
@@ -12,7 +13,7 @@ function hideLoadingScreen(): void {
 }
 
 function showStartupError(error: unknown): void {
-  console.error('Failed to start Ellipse:', error);
+  console.error('Failed to start Challenger:', error);
   hideLoadingScreen();
   const panel = document.createElement('div');
   panel.style.cssText = 'position:fixed;inset:0;z-index:10000;color:white;padding:32px;font-family:monospace;background:#06080f;';
@@ -25,6 +26,7 @@ function showStartupError(error: unknown): void {
 }
 
 try {
+  migrateLegacySaves();
   const game = new Game();
   void game.start().catch(showStartupError);
 } catch (error) {

@@ -233,7 +233,7 @@ it.each([90,90.01])('applies the touchdown limit in displayed units at %s m/s',s
  expect(f.grounded).toBe(speed===90);expect(f.crashed).toBe(speed>90);
 });
 it('honors disabled flight autosave without deleting an existing save',()=>{
- const {f}=create();f.persistFlight();const previous=localStorage.getItem('ellipse_flight_save');expect(previous).not.toBeNull();
- localStorage.setItem('ellipse_settings',JSON.stringify({autoSave:false}));
- try{f.missionTime=987;f.persistFlight();expect(localStorage.getItem('ellipse_flight_save')).toBe(previous);}finally{localStorage.removeItem('ellipse_settings');}
+ const {f}=create();f.persistFlight();const previous=localStorage.getItem('challenger_flight_save');expect(previous).not.toBeNull();
+ localStorage.setItem('challenger_settings',JSON.stringify({autoSave:false}));
+ try{f.missionTime=987;f.persistFlight();expect(localStorage.getItem('challenger_flight_save')).toBe(previous);}finally{localStorage.removeItem('challenger_settings');}
 });

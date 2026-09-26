@@ -1,19 +1,20 @@
+import { storageKey } from '../storage/MigrateLegacySaves';
 import type { Settings } from '../config/settings';
 import { DEFAULT_SETTINGS } from '../config/settings';
 import { Lifetime } from '../core/Lifetime';
 import { toast } from './Toast';
-const KEY = 'ellipse_settings';
+const KEY = () => storageKey('settings');
 
 export function loadSettings(): Settings {
   try {
-    const value=JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const value=JSON.parse(localStorage.getItem(KEY()) ?? '{}');
     return {...DEFAULT_SETTINGS,
       autoSave:typeof value?.autoSave==='boolean'?value.autoSave:DEFAULT_SETTINGS.autoSave,
       sfxVolume:typeof value?.sfxVolume==='number'&&Number.isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):DEFAULT_SETTINGS.sfxVolume};
   } catch { return {...DEFAULT_SETTINGS}; }
 }
 export function saveSettings(settings: Settings): boolean {
-  try { localStorage.setItem(KEY,JSON.stringify(settings));return true; } catch { return false; }
+  try { localStorage.setItem(KEY(),JSON.stringify(settings));return true; } catch { return false; }
 }
 
 export class SettingsPanel {

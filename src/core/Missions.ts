@@ -1,7 +1,8 @@
+import { storageKey } from '../storage/MigrateLegacySaves';
 import { MISSIONS, type MissionDef } from './MissionData';
 import { toast } from '../ui/Toast';
 
-const COMPLETED_KEY = 'ellipse_missions_completed';
+const COMPLETED_KEY = () => storageKey('missions_completed');
 
 /** Live flight state snapshot used to evaluate mission conditions. */
 export interface FlightSnapshot {
@@ -27,7 +28,7 @@ export class Missions {
 
   constructor() {
     try {
-      const saved=JSON.parse(localStorage.getItem(COMPLETED_KEY) ?? '[]');
+      const saved=JSON.parse(localStorage.getItem(COMPLETED_KEY()) ?? '[]');
       if(Array.isArray(saved))for(const raw of saved){
         const id=raw==='ev astronaut'?'ev_astronaut':raw;
         if(MISSIONS.some(m=>m.id===id))this.completed.add(id);
@@ -74,7 +75,7 @@ export class Missions {
     if (!condition) return;
     if (this.completed.has(id)) return;
     this.completed.add(id);
-    try { localStorage.setItem(COMPLETED_KEY, JSON.stringify([...this.completed])); } catch {}
+    try { localStorage.setItem(COMPLETED_KEY(), JSON.stringify([...this.completed])); } catch {}
     const def = MISSIONS.find(m => m.id === id);
     if (def) {
       toast.show(`☑ ${def.name}`, 3200);

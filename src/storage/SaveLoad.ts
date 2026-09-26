@@ -1,10 +1,11 @@
+import { storageKey } from './MigrateLegacySaves';
 import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Rocket } from '../rocket/Rocket';
 import { findPart } from '../parts/PartCatalog';
 
-const KEY_PREFIX = 'ellipse_assembly_';
-const INDEX_KEY = 'ellipse_assemblies';
-const LAST_KEY = 'ellipse_assembly_last';
+const KEY_PREFIX = () => storageKey('assembly_');
+const INDEX_KEY = () => storageKey('assemblies');
+const LAST_KEY = () => storageKey('assembly_last');
 
 function serializeNode(n: AssemblyNode): any {
   return { partId: n.part.id, position: [...n.position], rotation: n.rotation, children: n.children.map(serializeNode) };
@@ -38,38 +39,38 @@ export function deserializeAssembly(data: any[]): Assembly | null {
 export function saveAssembly(name: string, assembly: Assembly): boolean {
   try {
     const idx = listAssemblies();
-    localStorage.setItem(KEY_PREFIX + name, JSON.stringify(serializeAssembly(assembly)));
-    if (!idx.includes(name)) localStorage.setItem(INDEX_KEY, JSON.stringify([...idx, name]));
+    localStorage.setItem(KEY_PREFIX() + name, JSON.stringify(serializeAssembly(assembly)));
+    if (!idx.includes(name)) localStorage.setItem(INDEX_KEY(), JSON.stringify([...idx, name]));
     return true;
   } catch { return false; }
 }
 
 export function loadAssembly(name: string): Assembly | null {
   try {
-    const raw = localStorage.getItem(KEY_PREFIX + name);
+    const raw = localStorage.getItem(KEY_PREFIX() + name);
     return raw ? deserializeAssembly(JSON.parse(raw)) : null;
   } catch { return null; }
 }
 
 export function listAssemblies(): string[] {
-  try { const value=JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]'); return Array.isArray(value) ? [...new Set(value.filter((n:unknown):n is string=>typeof n==='string'))] : []; } catch { return []; }
+  try { const value=JSON.parse(localStorage.getItem(INDEX_KEY()) ?? '[]'); return Array.isArray(value) ? [...new Set(value.filter((n:unknown):n is string=>typeof n==='string'))] : []; } catch { return []; }
 }
 
 export function deleteAssembly(name: string): boolean {
   try {
-    localStorage.setItem(INDEX_KEY, JSON.stringify(listAssemblies().filter(n=>n!==name)));
-    localStorage.removeItem(KEY_PREFIX + name);
+    localStorage.setItem(INDEX_KEY(), JSON.stringify(listAssemblies().filter(n=>n!==name)));
+    localStorage.removeItem(KEY_PREFIX() + name);
     return true;
   } catch { return false; }
 }
 
 /** Persist the most recent build so "Continue" can resume it. */
 export function saveLastAssembly(assembly: Assembly): boolean {
-  return saveAssembly(LAST_KEY, assembly);
+  return saveAssembly(LAST_KEY(), assembly);
 }
 
 export function loadLastAssembly(): Assembly | null {
-  return loadAssembly(LAST_KEY);
+  return loadAssembly(LAST_KEY());
 }
 
 export function hasLastAssembly(): boolean {
@@ -78,7 +79,7 @@ export function hasLastAssembly(): boolean {
 
 // ─── Full flight-state save: CONTINUE resumes WHERE YOU LEFT OFF ───
 
-const FLIGHT_KEY = 'ellipse_flight_save';
+const FLIGHT_KEY = () => storageKey('flight_save');
 
 export interface FlightSave {
   version?: 2 | 3;
@@ -115,13 +116,13 @@ export interface FlightSave {
 
 export function saveFlightState(s: FlightSave): void {
   try {
-    localStorage.setItem(FLIGHT_KEY, JSON.stringify(s));
+    localStorage.setItem(FLIGHT_KEY(), JSON.stringify(s));
   } catch { /* storage full — non-fatal */ }
 }
 
 export function loadFlightState(): FlightSave | null {
   try {
-    const raw = localStorage.getItem(FLIGHT_KEY);
+    const raw = localStorage.getItem(FLIGHT_KEY());
     if (!raw) return null;
     const s = JSON.parse(raw) as FlightSave;
     if (!validFlight(s)) return null;
@@ -136,7 +137,7 @@ export function hasFlightSave(): boolean {
 }
 
 export function clearFlightSave(): void {
-  try { localStorage.removeItem(FLIGHT_KEY); }
+  try { localStorage.removeItem(FLIGHT_KEY()); }
   catch { /* A blocked save must not prevent starting or ending a flight. */ }
 }
 
