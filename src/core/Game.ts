@@ -104,17 +104,6 @@ export class Game {
     style.textContent = '@keyframes spin{to{transform:rotate(360deg);}}';
     document.head.appendChild(style);
     document.body.appendChild(loader);
-    const progEl = loader.querySelector('#load-progress');
-
-    // Preload GLTF models
-    const models = ['/models/agena.glb','/models/saturn_v.glb','/models/apollo_soyuz.glb','/models/ares_1.glb','/models/apollo_lunar_module.glb','/models/atlas_6.glb','/models/atlas_9.glb','/models/crawler.glb'];
-    const { loadGLTF } = await import('../parts/PartBuilder');
-    let done = 0;
-    await Promise.allSettled(models.map(async url => {
-      await loadGLTF(url, 1.0);
-      done++;
-      if (progEl) (progEl as HTMLElement).textContent = `${done}/${models.length} models`;
-    }));
     // Brief fade-out
     loader.style.transition = 'opacity 320ms ease-out';
     requestAnimationFrame(() => { loader.style.opacity = '0'; });

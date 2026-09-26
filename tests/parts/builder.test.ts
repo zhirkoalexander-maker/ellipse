@@ -22,15 +22,11 @@ function countMeshesWithGoldTexture(g: THREE.Group): number {
   return n;
 }
 
-function hasGeometryType(g: THREE.Group, type: string): boolean {
-  let found = false;
-  g.traverse((o) => {
-    if (o instanceof THREE.Mesh && o.geometry.type === type) found = true;
-  });
-  return found;
+function countTriangles(g: THREE.Group): number {
+  let count=0;
+  g.traverse(o=>{if(o instanceof THREE.Mesh)count+=(o.geometry.index?.count??o.geometry.attributes.position!.count)/3;});
+  return count;
 }
-
-const CL_GOLD = 0xF2D496;
 
 describe('PartBuilder', () => {
   it('returns a Group for each part kind', () => {
@@ -46,10 +42,8 @@ describe('PartBuilder', () => {
   it('capsule has body, nose cone, heat shield, docking port + windows', () => {
     const p = findPart('capsule_mk1')!;
     const g = buildPartMesh(p);
-    // body + heat shield cylinders, sphere nose/windows, torus gold band
-    expect(hasGeometryType(g, 'CylinderGeometry')).toBe(true);
-    expect(hasGeometryType(g, 'SphereGeometry')).toBe(true);
-    expect(hasGeometryType(g, 'TorusGeometry')).toBe(true);
+    expect(countTriangles(g)).toBe(8136);
+    expect(g.getObjectByName('cockpit-window')).toBeDefined();
     // Textured meshes (capsule skin + gold accents)
     expect(countMeshesWithGoldTexture(g)).toBeGreaterThanOrEqual(1);
   });
@@ -63,8 +57,7 @@ describe('PartBuilder', () => {
   it('engine has chamber, rings, bell, inner cavity, and exit rim', () => {
     const p = findPart('engine_vector')!;
     const g = buildPartMesh(p);
-    expect(countMeshes(g)).toBeGreaterThanOrEqual(7);
-    expect(hasGeometryType(g, 'TorusGeometry')).toBe(true);
+    expect(countTriangles(g)).toBe(4832);
   });
 
   it('parachute is packed container (3 meshes) until deployed in flight', () => {
@@ -79,7 +72,7 @@ describe('PartBuilder', () => {
     let feet = 0;
     g.traverse(o => { if (o.name === 'landing-foot') feet++; });
     expect(feet).toBe(4);
-    expect(countMeshes(g)).toBeGreaterThanOrEqual(12);
+    expect(countTriangles(g)).toBe(1184);
   });
 
   it('all materials use MeshStandardMaterial or BasicMaterial', () => {

@@ -1,3 +1,4 @@
+import { batchStaticMeshes } from './StaticMeshes';
 import * as THREE from 'three';
 import type { Part } from './Part';
 
@@ -176,5 +177,6 @@ export function buildDesignedPart(part: Part, d: { radius: number; height: numbe
       }
       break;
   }
+  batchStaticMeshes(g);
   return g;
 }

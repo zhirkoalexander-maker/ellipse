@@ -137,3 +137,27 @@ it('treats saved rocket names as text and fits when the canvas is double-clicked
   expect((v as any).dt).toBeLessThan(2);c.remove();
  }finally{v.unmount();document.querySelectorAll('.guide-overlay').forEach(e=>e.remove());}
 });
+
+it('quick start builds only game parts and releases the old preview on rebuild and exit',()=>{
+ const vab=new VABScene(()=>{},()=>{});vab.mount();
+ try{
+  const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Build a rocket'));
+  expect(preset).toBeDefined();preset!.click();
+  expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(['engine_ant','tank_s_lfo','tank_s_lfo','capsule_mk1']);
+  const group=(vab as any).rg as THREE.Group;
+  let disposed=0;group.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.addEventListener('dispose',()=>disposed++);});
+  preset!.click();expect(disposed).toBeGreaterThan(0);
+  let finalDisposed=0;group.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.addEventListener('dispose',()=>finalDisposed++);});
+  vab.unmount();expect(finalDisposed).toBeGreaterThan(0);
+ }finally{vab.unmount();}
+});
+
+it('disposes preview geometries when adding another part',()=>{
+ const vab=new VABScene(()=>{},()=>{});vab.mount();
+ try{
+  (vab as any).add(findPart('engine_ant')!);
+  let disposed=0;((vab as any).rg as THREE.Group).traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.addEventListener('dispose',()=>disposed++);});
+  (vab as any).add(findPart('tank_s_lfo')!);
+  expect(disposed).toBeGreaterThan(0);
+ }finally{vab.unmount();}
+});
