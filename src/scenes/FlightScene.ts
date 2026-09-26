@@ -16,10 +16,10 @@ import { FlightState } from '../flight/FlightState';
 import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
-import { applyThrust, findFirstEngine, totalThrust, weightedIsp } from '../flight/Thrust';
+import { applyThrust, findFirstEngine, totalThrust } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
-import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE, FUEL_FLOW_MULT } from '../config/constants';
+import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
 import { getReferenceBody } from '../physics/SoiResolver';
 import { predictOrbit } from '../physics/OrbitPredictor';
 import { OrbitMap } from '../ui/OrbitMap';
@@ -1609,18 +1609,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.hud.setSasMode(this.sasMode);
     this.hud.setGrounded(this.grounded);
     this.hud.setLandingStatus(this.landingStatus, this.landingAssist);
-
-    // Delta-V budget: Tsiolkovsky with game fuel-flow scaling
-    // (effective exhaust velocity = Isp * g0 / FUEL_FLOW_MULT)
-    const dvIsp = weightedIsp(this.state.rocket.assembly.roots);
-    const dvMass0 = this.state.rocket.totalMass();
-    const dvFuel = this.state.rocket.totalFuelMass();
-    const dvMass1 = dvMass0 - dvFuel;
-    let deltaV = 0;
-    if (dvIsp > 0 && dvMass0 > 0 && dvMass1 > 0) {
-      deltaV = (dvIsp * 9.80665 / FUEL_FLOW_MULT) * Math.log(dvMass0 / dvMass1);
-    }
-    this.hud.setDeltaV(deltaV);
 
     const surfaceTelemetry = flightTelemetry(this.state.position, this.state.velocity, this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system), this.grounded);
     this.hud.update(this.state, this.system, this.heatEnergy, this.state.throttle, surfaceTelemetry);
