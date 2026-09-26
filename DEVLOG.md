@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.25
+
+- Keep the flight path on the map and remove the line from the flight view.
+- Manual warp changes time speed without cancelling autopilot. Toggle it during a mission to return to automatic warp.
+
 ## 2.5.24
 
 - Reorganize the flight instruments and remove the delta-v readout.

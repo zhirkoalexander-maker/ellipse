@@ -11,10 +11,30 @@ it('offers landable destinations and submits the chosen target and time-warp pre
  const select=picker.querySelector('select')!;
  expect(Array.from(select.options).map(o=>o.value)).toEqual(['moon','mercury','venus','earth','mars','pluto']);
  expect(select.value).toBe('moon');expect(hud.autopilotAutoWarp).toBe(true);
- select.value='mars';picker.querySelector<HTMLInputElement>('input')!.checked=false;
+ expect(picker.textContent).toContain('Manual warp');
+ select.value='mars';picker.querySelector<HTMLInputElement>('input')!.checked=true;
  button('autopilotStart').click();
  expect(action.mock.calls).toEqual([['autopilot:mars']]);expect(hud.autopilotAutoWarp).toBe(false);
  expect(picker.hidden).toBe(true);
+});
+it('switches manual warp during a mission and keeps both toggles in sync',()=>{
+ hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;
+ hud.setAutopilotStatus('Cruising','moon','On course');
+ const manual=document.querySelector<HTMLInputElement>('.autopilot-mission input')!;
+ expect(manual).not.toBeNull();expect(manual.checked).toBe(false);
+ manual.click();expect(hud.autopilotAutoWarp).toBe(false);
+ expect(action).toHaveBeenLastCalledWith('autopilotWarp:manual');
+ expect(document.querySelector<HTMLInputElement>('.autopilot-picker input')!.checked).toBe(true);
+ manual.click();expect(hud.autopilotAutoWarp).toBe(true);
+ expect(action).toHaveBeenLastCalledWith('autopilotWarp:auto');
+});
+it('does not change manual warp while the flight is paused',()=>{
+ hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;
+ const manual=document.querySelector<HTMLInputElement>('.autopilot-mission input')!;
+ manual.focus();hud.setPaused(true);manual.click();
+ expect(manual.checked).toBe(false);expect(action).not.toHaveBeenCalled();
+ hud.setPaused(false);manual.click();
+ expect(manual.checked).toBe(true);expect(action).toHaveBeenCalledWith('autopilotWarp:manual');
 });
 it('updates mission progress, exposes cancellation and removes its controls and listeners on exit',()=>{
  hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;

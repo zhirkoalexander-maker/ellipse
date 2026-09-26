@@ -27,6 +27,7 @@ export class HUD {
   private autopilotTitle!: HTMLElement;
   private autopilotDetail!: HTMLElement;
   private autopilotWarp!: HTMLInputElement;
+  private missionWarp!: HTMLInputElement;
   private autopilotEntry!: HTMLButtonElement;
   private stageButton!: HTMLButtonElement;
   private grounded?: boolean;
@@ -129,7 +130,12 @@ export class HUD {
     this.lifetime.listen(window, 'blur', () => { this._throttleBtn = false; this._throttleDn = false; });
   }
 
-  get autopilotAutoWarp(): boolean { return this.autopilotWarp.checked; }
+  get autopilotAutoWarp(): boolean { return !this.autopilotWarp.checked; }
+
+  setAutopilotAutoWarp(auto: boolean): void {
+    this.autopilotWarp.checked = !auto;
+    this.missionWarp.checked = !auto;
+  }
 
   private openAutopilotPicker(): void {
     if (this.paused || this.lifetime.disposed) return;
@@ -163,7 +169,7 @@ export class HUD {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Fly & land</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
         <p style="color:#a6b8c9;margin:0 0 20px">Choose a destination. Autopilot handles the flight and touchdown.</p>
         <label>Destination<select aria-label="Destination"><option value="moon">Moon</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth</option><option value="mars">Mars</option><option value="pluto">Pluto</option></select></label>
-        <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px"><input type="checkbox" checked style="width:18px;height:18px;accent-color:#eacd9e">Automatic time warp</label>
+        <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px" title="On: choose time warp yourself. Off: autopilot adjusts it."><input type="checkbox" style="width:18px;height:18px;accent-color:#eacd9e">Manual warp</label>
         <button type="button" data-action="autopilotStart" style="width:100%">Start flight</button>
       </section>`;
     this.autopilotWarp = this.autopilotPicker.querySelector('input')!;
@@ -196,7 +202,18 @@ export class HUD {
     this.autopilotDetail = document.createElement('div'); this.autopilotDetail.style.color = '#b7c8d6';
     const cancel = document.createElement('button'); cancel.textContent = 'Cancel mission'; cancel.dataset.action = 'autopilotCancel';
     this.lifetime.listen(cancel, 'click', () => this.onAction?.('autopilotCancel'));
-    this.autopilotMission.append(this.autopilotTitle, this.autopilotDetail, cancel);
+    const warpLabel = document.createElement('label');
+    warpLabel.style.cssText = 'display:flex;align-items:center;gap:7px;margin-top:7px;cursor:pointer';
+    warpLabel.title = 'On: choose time warp yourself. Off: autopilot adjusts it.';
+    this.missionWarp = document.createElement('input'); this.missionWarp.type = 'checkbox';
+    this.missionWarp.style.accentColor = '#eacd9e';
+    warpLabel.append(this.missionWarp, 'Manual warp');
+    for (const input of [this.autopilotWarp, this.missionWarp]) this.lifetime.listen(input, 'change', () => {
+      const manual = input.checked;
+      this.setAutopilotAutoWarp(!manual);
+      this.onAction?.(`autopilotWarp:${manual ? 'manual' : 'auto'}`);
+    });
+    this.autopilotMission.append(this.autopilotTitle, this.autopilotDetail, warpLabel, cancel);
     this.root.append(this.autopilotPicker, this.autopilotMission);
   }
 
@@ -250,7 +267,7 @@ export class HUD {
     for (const [label, action, title] of [
       ['−', 'warpDown', 'Slower time warp ([ / Q)'],
       ['+', 'warpUp', 'Faster time warp (] / E)'],
-      ['100×', 'warp100', '100× coast above 17.5 km — engines off'],
+      ['100×', 'warp100', '100× time warp — limited near the surface'],
     ]) {
       const button = document.createElement('button');
       button.textContent = label!; button.dataset.action = action!; button.title = title!;
@@ -426,6 +443,8 @@ setFreeCamera(active: boolean): void {
 
   setPaused(paused: boolean): void {
     this.paused = paused;
+    this.autopilotWarp.disabled = paused;
+    this.missionWarp.disabled = paused;
     if (paused) {
       this.autopilotPicker.hidden = true;
       this.pauseOverlay.style.display = 'flex';
