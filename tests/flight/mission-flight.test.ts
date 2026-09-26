@@ -20,6 +20,26 @@ function create() {
 afterEach(() => { flight?.dispose(); flight = undefined; clearFlightSave(); });
 
 describe('automatic flight and landing', () => {
+  it('lets the pilot change mission warp without cancelling guidance or multiplying time twice', () => {
+    const f=create(),earth=f.system.bodyByName('earth');
+    f.grounded=false;f.launched=true;
+    f.state.position=[earth.position[0],earth.position[1]+earth.radius+200000,earth.position[2]];
+    f.state.velocity=[...earth.velocity];
+    f.hud.onAction('autopilot:moon');
+    f.hud.onAction('autopilotWarp:manual');
+    f.setPlayerWarp(f.warpLevels.indexOf(3));
+    expect(f.autopilotActive).toBe(true);
+    expect(f.missionAutoWarp).toBe(false);
+    const before=f.missionTime;
+    for(let i=0;i<5;i++)f.update(1/30);
+    expect(f.missionTime-before).toBeCloseTo(.5,5);
+    expect(f.missionRate).toBe(3);expect(f.timeWarp).toBe(1);
+    f.hud.onAction('warpDown');f.update(1/30);
+    expect(f.missionRate).toBe(1);expect(f.autopilotActive).toBe(true);
+    f.hud.onAction('autopilotWarp:auto');
+    expect(f.missionAutoWarp).toBe(true);expect(f.hud.autopilotAutoWarp).toBe(true);
+    f.update(1/30);expect(f.missionRate).toBeGreaterThan(1);
+  });
   it('starts a Moon mission from the HUD and actually lifts off with fuel consumption', () => {
     const f = create(); const before = f.rocket.totalFuelMass();
     f.hud.onAction('autopilot:moon');
@@ -106,19 +126,21 @@ describe('automatic flight and landing', () => {
     expect(f.rocket.totalFuelMass()).toBe(fuel);
   });
 
-  it('persists and resumes an in-progress automatic mission', () => {
+  it.each([true, false])('persists and resumes a mission with automatic warp %s', autoWarp => {
     const f = create();
+    f.hud.setAutopilotAutoWarp(autoWarp);
     f.hud.onAction('autopilot:moon');
     for (let i = 0; i < 300 && (f as any).grounded; i++) f.update(1 / 30);
     (f as any).persistFlight();
     const save = loadFlightState();
     expect(save?.version).toBe(3);
-    expect(save?.mission).toMatchObject({ target: 'moon', departure: 'earth', autoWarp: true });
+    expect(save?.mission).toMatchObject({ target: 'moon', departure: 'earth', autoWarp });
     f.dispose(); flight = undefined;
     const resumed = new FlightScene(new Renderer(), new SceneManager(), buildSystem(), buildDefaultRocket(), new Achievements(), new Missions(), save!);
     flight = resumed;
     expect((resumed as any).autopilotActive).toBe(true);
     expect((resumed as any).missionGuidance.target.name).toBe('moon');
+    expect((resumed as any).hud.autopilotAutoWarp).toBe(autoWarp);
     resumed.update(1 / 30);
     expect((resumed as any).crashed).toBe(false);
   });

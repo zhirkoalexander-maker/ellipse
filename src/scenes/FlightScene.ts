@@ -124,7 +124,6 @@ export class FlightScene {
   private impactMarker: THREE.Mesh | null = null;
   private maxAlt = 0;
   private maxSpeed = 0;
-  private orbitLine: THREE.Line | null = null;
   private exhaustLight: THREE.PointLight | null = null;
   private followLight: THREE.PointLight | null = null;
   private cameraMode: 'chase' | 'free' = 'chase';
@@ -413,6 +412,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       if (['stage', 'parachute', 'sas', 'landing', 'warpDown', 'warpUp', 'warp100', 'cameraZoomIn', 'cameraZoomOut'].includes(action) && this.paused) return;
       if (action.startsWith('autopilot') && this.paused) return;
       if (action.startsWith('autopilot:')) this.startMission(action.slice('autopilot:'.length));
+      else if (action.startsWith('autopilotWarp:')) this.setMissionWarpMode(action === 'autopilotWarp:auto');
       else if (action === 'autopilotCancel') this.abortAutopilot('Cancelled by user');
       else if (action === 'landing') this.toggleLandingAssist();
       else if (action === 'warpDown') this.setPlayerWarp(this.warpIndex - 1);
@@ -624,6 +624,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.missionDirection.set(0, 1, 0).applyQuaternion(this.rocketQuat).normalize();
         this.missionThrottle = this.state.throttle;
         this.missionAutoWarp = save.mission.autoWarp;
+        this.hud.setAutopilotAutoWarp(this.missionAutoWarp);
         this.missionRate = 1;
         this.timeWarp = 1;
         this.warpIndex = 0;
@@ -805,16 +806,18 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.lifetime.disposed || !Number.isFinite(_dt) || _dt <= 0) return;
     this.previousDisplayedAttitude.copy(this.rocketGroup.quaternion);
     try {
-      if (this.autopilotActive && this.missionGuidance && this.missionAutoWarp && !this.grounded && !this.paused && !this.crashed) {
+      if (this.autopilotActive && this.missionGuidance && !this.grounded && !this.paused && !this.crashed) {
         const ref = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
         const altitude = flightTelemetry(this.state.position, this.state.velocity, ref, false).altitude;
         const target = this.missionGuidance.target;
         const toTarget = Math.hypot(...this.state.position.map((v, i) => v - target.position[i]!)) - target.radius;
         const relativeSpeed = Math.hypot(...this.state.velocity.map((v,i) => v-target.velocity[i]!));
         const journey = new THREE.Vector3(...target.position).distanceTo(new THREE.Vector3(...this.missionGuidance.departure.position));
-        const requestedRate = automaticWarp(altitude,toTarget,relativeSpeed,journey);
+        const requestedRate = this.missionAutoWarp
+          ? automaticWarp(altitude,toTarget,relativeSpeed,journey)
+          : Math.min(this.warpLevels[this.warpIndex]!, altitude < 70000 || this.landingAssist ? 10 : Infinity);
         // Acceleration ramps up; braking the simulation rate takes effect immediately.
-        const rate = Math.min(requestedRate, this.missionRate + Math.max(1,this.missionRate)*_dt*.7);
+        const rate = this.missionAutoWarp ? Math.min(requestedRate, this.missionRate + Math.max(1,this.missionRate)*_dt*.7) : requestedRate;
         const maxStep = altitude < 20000 ? 0.1 : Math.min(1, Math.max(0.25, toTarget / 1e6));
         this.missionRate = Math.min(rate, maxStep * 32 / _dt);
         const total = _dt * this.missionRate;
@@ -878,8 +881,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       const atmoWarpLimit = 3; // index of 10x in warpLevels
       if (cR > 0 && cAlt < 70000 && this.warpIndex > atmoWarpLimit) {
         this.warpIndex = atmoWarpLimit;
-        this.timeWarp = this.warpLevels[this.warpIndex]!;
-        this.hud.setWarp(this.timeWarp);
+        this.timeWarp = this.autopilotActive && this.missionGuidance ? 1 : this.warpLevels[this.warpIndex]!;
+        this.hud.setWarp(this.warpLevels[this.warpIndex]!);
         toast.show('Time warp limited near the surface', 1800);
       }
     }
@@ -1643,41 +1646,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       softLanded: false,
     });
 
-    // Draw 3D orbit path
-    const refBodyOrbit = getReferenceBody(this.state.position, this.system);
-    const relPosOrbit: [number, number, number] = [
-      (this.state.position[0] - refBodyOrbit.position[0]),
-      (this.state.position[1] - refBodyOrbit.position[1]),
-      (this.state.position[2] - refBodyOrbit.position[2]),
-    ];
-    const orbitPred3d = predictOrbit(relPosOrbit, this.relVelocity(), refBodyOrbit.mass, 5e14, 90);
-    if (!this.grounded && orbitPred3d.points.length > 5) {
-      if (!this.orbitLine) {
-        const geom = new THREE.BufferGeometry();
-        const positions = new Float32Array(91 * 3);
-        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const mat = new THREE.LineBasicMaterial({
-          color: orbitPred3d.bound ? 0x4488cc : 0xddaa44,
-          transparent: true, opacity: 0.3, depthWrite: false
-        });
-        this.orbitLine = new THREE.Line(geom, mat);
-        this.sceneMgr.scene.add(this.orbitLine);
-      }
-      const pos = this.orbitLine.geometry.attributes.position as THREE.BufferAttribute;
-      for (let i = 0; i < orbitPred3d.points.length; i++) {
-        const point = new THREE.Vector3(...orbitPred3d.points3d[i]!).add(new THREE.Vector3(...refBodyOrbit.position)).multiplyScalar(VISUAL_SCALE);
-        const visual = magnifyPoint(point, this.surfaceView.pivot, this.surfaceView.scale);
-        pos.setXYZ(i, visual.x, visual.y, visual.z);
-      }
-      pos.needsUpdate = true;
-      this.orbitLine.geometry.computeBoundingSphere();
-      this.orbitLine.geometry.setDrawRange(0, orbitPred3d.points.length);
-      (this.orbitLine.material as THREE.LineBasicMaterial).color.set(orbitPred3d.bound ? 0x4488cc : 0xddaa44);
-      this.orbitLine.visible = true;
-    } else if (this.orbitLine) {
-      this.orbitLine.visible = false;
-    }
-
     // Track personal records
     if (nearestAlt > this.maxAlt) this.maxAlt = nearestAlt;
     if (speed > this.maxSpeed) this.maxSpeed = speed;
@@ -1908,6 +1876,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.missionDirection.set(0, 1, 0).applyQuaternion(this.rocketQuat).normalize();
     this.missionThrottle = 0;
     this.missionAutoWarp = autoWarp;
+    this.hud.setAutopilotAutoWarp(autoWarp);
     this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0;
     this.hud.setWarp(1); this.landingAssist = false; this.sasMode = 'off'; this.hud.setSasMode('off');
     if (this.parachuteDeployed) this.toggleParachute();
@@ -1941,7 +1910,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     else this.missionDirection.lerp(desiredDirection, directionResponse).normalize();
     this.missionThrottle += (command.throttle - this.missionThrottle) * (1 - Math.exp(-5 * Math.max(0, dt)));
     this.state.throttle = this.missionThrottle;
-    this.timeWarp = 1; this.warpIndex = 0;
+    this.timeWarp = 1;
+    if (this.missionAutoWarp) this.warpIndex = 0;
     if (command.readyToLand) {
       if (!this.landingAssist) this.landingDirection.set(0, 0, 0);
       this.landingAssist = true;
@@ -2157,12 +2127,31 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       return;
     }
     if (this.maneuverRemaining.lengthSq() > 0) this.stopMapBurn();
+    if (this.autopilotActive && this.missionGuidance) {
+      this.missionAutoWarp = false;
+      this.hud.setAutopilotAutoWarp(false);
+      this.warpIndex = nextIndex;
+      // Mission substeps already advance simulation time. Do not apply it twice.
+      this.timeWarp = 1;
+      this.missionRate = warp;
+      this.hud.setWarp(warp);
+      return;
+    }
     if (this.autopilotActive) this.abortAutopilot('Manual time warp');
     this.warpIndex = nextIndex; this.timeWarp = warp; this.hud.setWarp(warp);
     if (warp > 10) {
       this.state.throttle = 0;
       this.landingStatus = `${warp}× coast · engines off · use − or [ to slow down`;
       this.hud.setLandingStatus(this.landingStatus, false);
+    }
+  }
+
+  private setMissionWarpMode(auto: boolean): void {
+    this.missionAutoWarp = auto;
+    this.hud.setAutopilotAutoWarp(auto);
+    if (this.autopilotActive && this.missionGuidance) {
+      this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0;
+      this.hud.setWarp(1);
     }
   }
 
@@ -2403,7 +2392,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.controls.dispose();
     this.groundSmoke.stop();
     this.deployedChuteMesh && (this.deployedChuteMesh.visible = false);
-    this.orbitLine && (this.orbitLine.visible = false);
     // Propagation may already have occurred this frame. Render the planet at
     // that same instant before freezing so the impact cannot appear to bounce.
     clearFlightSave();
@@ -2681,14 +2669,13 @@ private positionFlameAtNozzle(): void {
     const protectedObjects: THREE.Object3D[] = [...this.system.bodies.map(b => (b as any).mesh).filter(Boolean)];
     releaseSceneObjects([
       ...this.ownedSceneObjects, this.rocketGroup, ...this.debris.map(d => d.mesh),
-      ...[this.orbitLine, this.deployedChuteMesh].filter((x): x is THREE.Line | THREE.Group => x !== null),
+      ...[this.deployedChuteMesh].filter((x): x is THREE.Group => x !== null),
     ], protectedObjects);
     this.ownedSceneObjects.forEach(obj => obj.removeFromParent());
     this.launchPadGroup = null;
     this.launchClamps = null;
     this.surfaceView.dispose(this.system.bodies);
     this.deployedChuteMesh?.removeFromParent();
-    this.orbitLine?.removeFromParent();
     if ((window as any).__ellipse?.flight === this) delete (window as any).__ellipse;
     if (this.crashOverlay) {
       this.crashOverlay.remove();
