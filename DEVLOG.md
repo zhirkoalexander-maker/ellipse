@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.24
+
+- Reorganize the flight instruments and remove the delta-v readout.
+
 ## 2.5.23
 
 - Skip terrain calculations that have no effect on the launch pad, open water or distant regions. Surface heights stay the same.
