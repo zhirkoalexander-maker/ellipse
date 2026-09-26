@@ -128,6 +128,7 @@ export class MainMenuScene {
     card.className = 'guide-card';
     card.style.cssText = 'width:min(560px,calc(100vw - 24px));box-sizing:border-box;max-height:90dvh;overflow:auto;padding:24px;font:14px/1.6 system-ui;color:#ddd;';
     card.innerHTML = `<h2>Quick guide</h2>
+      <p>Switch your keyboard to English before playing so the letter keys work correctly.</p>
       <button class="btn btn--primary" id="guide-tour" style="padding:10px 16px">Watch the tour</button>
       <ol class="quick-guide">
       <li><b>Start</b><span>Flight → Launch. Space works too.</span></li>
