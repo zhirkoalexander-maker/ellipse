@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.19
+
+- Three separated mountains inland from the launch site.
+- Shorter guide with a replayable animated tour, shown on the first visit.
+
 ## 2.5.18
 
 - Moved the launch coast closer, with a narrower beach and darker water.

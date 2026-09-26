@@ -1,3 +1,4 @@
+import { Tutorial, shouldShowTutorial } from '../ui/Tutorial';
 import { Lifetime } from '../core/Lifetime';
 import { version as appVersion } from '../../package.json';
 import { MISSIONS } from '../core/MissionData';
@@ -5,6 +6,7 @@ import type { Missions } from '../core/Missions';
 
 export class MainMenuScene {
   private root: HTMLDivElement;
+  private tutorial: Tutorial | null = null;
   private life=new Lifetime();
   private unsubscribeScore?:()=>void;
   private helpOverlay: HTMLDivElement | null = null;
@@ -138,21 +140,24 @@ export class MainMenuScene {
     const card = document.createElement('div');
     card.className = 'guide-card';
     card.style.cssText = 'width:min(560px,calc(100vw - 24px));box-sizing:border-box;max-height:90dvh;overflow:auto;padding:24px;font:14px/1.6 system-ui;color:#ddd;';
-    card.innerHTML = `<h2>Getting started</h2>
-      <p><b>Flight</b> puts a ready-made rocket on the pad. Press <b>Launch</b> or <b>Space</b> and wait for the countdown.</p>
-      <p>To build your own, open <b>Vehicle assembly</b>. Add an engine, fuel tanks, then a capsule. Use the arrows in the stack list to move parts. Put a decoupler between stages. <b>Take to pad</b> starts the flight.</p>
-      <h3>Going somewhere</h3>
-      <p>Open <b>Map</b> to see your blue flight path. <b>Planets</b> shows all destinations. <b>Autopilot to destination</b> handles the launch, transfer and landing using your fuel. Steering or changing throttle takes back control.</p>
-      <p>For a manual flight, open <b>Adjust course</b>. Choose a change, check the yellow path and press <b>Apply correction</b>. The preview covers the current planet's gravity; it is not a guaranteed landing route.</p>
-      <h3>Coming down</h3>
-      <p>Watch <b>Above surface</b> and the estimated time to the ground. <b>Landing view</b> points the camera down. Keep fuel for braking. <b>L</b> turns on landing assist. Parachutes need an atmosphere. An upright touchdown can survive up to <b>90 m/s</b>, but sideways motion or a bad angle can still wreck the rocket.</p>
+    card.innerHTML = `<h2>Quick guide</h2>
+      <button class="btn btn--primary" id="guide-tour" style="padding:10px 16px">Watch the tour</button>
+      <ol class="quick-guide">
+      <li><b>Start</b><span>Flight → Launch. Space works too.</span></li>
+      <li><b>Build</b><span>Vehicle assembly → engine → two tanks → capsule → Take to pad.</span></li>
+      <li><b>Fly</b><span>↑ / ↓ throttle. W/S and A/D steer.</span></li>
+      <li><b>Go to the Moon</b><span>Map → Moon → Autopilot to destination.</span></li>
+      <li><b>Land</b><span>Watch Above surface. Press L for landing assist. Keep fuel for braking.</span></li>
+      <li><b>Return</b><span>Keep fuel. Map → Earth → Autopilot to destination.</span></li>
+      </ol>
       <details><summary>Keyboard controls</summary><table>
       <tr><td>↑ / ↓</td><td>Throttle</td></tr><tr><td>W / S · A / D</td><td>Steer</td></tr><tr><td>J / K</td><td>Roll</td></tr>
       <tr><td>Space</td><td>Launch or separate a stage</td></tr><tr><td>L · T</td><td>Landing assist · stability mode</td></tr>
       <tr><td>P · G</td><td>Parachute · landing gear</td></tr><tr><td>M / Tab</td><td>Open map</td></tr><tr><td>Q / E or [ / ]</td><td>Time warp</td></tr>
       <tr><td>C · F</td><td>Free camera · reset view</td></tr><tr><td>Esc</td><td>Close map or pause</td></tr></table></details>
-      <p>Drag to orbit the camera; scroll or pinch to zoom. High warp needs engines off and at least <b>17.5 km</b> altitude. Save data stays in this browser.</p>
+      <p>Drag to look around. Scroll or pinch to zoom.</p>
       <button class="btn btn--primary" style="margin-top:12px;width:100%;padding:12px" id="help-close">Close</button>`;
+    card.querySelector('#guide-tour')!.addEventListener('click',()=>{overlay.remove();this.helpOverlay=null;this.showTutorial('Guide');});
     const closeBtn = card.querySelector('#help-close') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => { overlay.remove(); this.helpOverlay = null; });
     overlay.appendChild(card);
@@ -160,6 +165,7 @@ export class MainMenuScene {
     this.helpOverlay = overlay;
   }
 
-  mount(parent: HTMLElement = document.body): void { parent.appendChild(this.root); }
-  unmount(): void { this.root.remove(); this.helpOverlay?.remove(); this.missionsOverlay?.remove(); this.unsubscribeScore?.(); this.life.dispose(); }
+  private showTutorial(returnLabel='Flight'): void { this.tutorial?.dispose(); this.tutorial=new Tutorial(()=>{this.tutorial=null;[...this.root.querySelectorAll<HTMLButtonElement>('.menu-btn')].find(button=>button.textContent===returnLabel)?.focus();}); }
+  mount(parent: HTMLElement = document.body): void { parent.appendChild(this.root); if(shouldShowTutorial())this.showTutorial(); }
+  unmount(): void { this.tutorial?.dispose();this.tutorial=null;this.root.remove(); this.helpOverlay?.remove(); this.missionsOverlay?.remove(); this.unsubscribeScore?.(); this.life.dispose(); }
 }
