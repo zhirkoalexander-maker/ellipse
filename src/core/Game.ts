@@ -256,7 +256,7 @@ if (!rocket) {
     this.sceneMgr.update(dt);
     this.flight?.update(dt);
     if (this.vab) this.renderer.three.render(this.vab.scene, this.vab.camera);
-    else this.renderer.three.render(this.sceneMgr.scene, this.sceneMgr.camera);
+    else if (this.flight?.flightViewVisible !== false) this.renderer.three.render(this.sceneMgr.scene, this.sceneMgr.camera);
     requestAnimationFrame(() => this.loop());
   }
 }

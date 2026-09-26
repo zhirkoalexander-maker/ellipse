@@ -71,11 +71,26 @@ export class SurfaceView {
   private rebuild(up: THREE.Vector3): void {
     const body = this.active!;
     this.center.copy(up);
-    if (this.patch) { this.patch.removeFromParent(); this.patch.geometry.dispose(); (this.patch.material as THREE.Material).dispose(); }
     const east = new THREE.Vector3().crossVectors(up, Math.abs(up.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
     const north = new THREE.Vector3().crossVectors(east, up).normalize();
     const nearRings = body.name === 'earth' ? 192 : 96, rings = nearRings + 128, segments = 192;
-    const positions: number[] = [], colors: number[] = [], indices: number[] = [];
+    const geometry = this.patch?.geometry ?? new THREE.BufferGeometry();
+    const count = (rings + 1) * (segments + 1);
+    if (!geometry.attributes.position) {
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
+      geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
+      const indices: number[] = [];
+      for (let ring=0;ring<rings;ring++) for (let s=0;s<segments;s++) {
+        const a=ring*(segments+1)+s,b=a+segments+1;
+        indices.push(a,a+1,b,a+1,b+1,b);
+      }
+      geometry.setIndex(indices);
+    }
+    const positions = geometry.attributes.position as THREE.BufferAttribute;
+    const colors = geometry.attributes.color as THREE.BufferAttribute;
+    const direction = new THREE.Vector3(), point = new THREE.Vector3(), vertex = new THREE.Vector3();
+    const bodyPosition = new THREE.Vector3(...body.position);
+    const physicalPoint: Vec3 = [0,0,0];
     for (let ring = 0; ring <= rings; ring++) {
       // One continuous globe: dense near the craft, coarse on the far side.
       // Shared rings eliminate the cracks of overlapping terrain patches.
@@ -86,23 +101,23 @@ export class SurfaceView {
         : this.extent + ((ring - nearRings) / (rings - nearRings)) ** 1.35 * (Math.PI - this.extent);
       for (let s = 0; s <= segments; s++) {
         const azimuth = s / segments * Math.PI * 2;
-        const direction = up.clone().multiplyScalar(Math.cos(angle))
+        direction.copy(up).multiplyScalar(Math.cos(angle))
           .addScaledVector(east, Math.sin(angle) * Math.cos(azimuth)).addScaledVector(north, Math.sin(angle) * Math.sin(azimuth)).normalize();
-        const point = direction.clone().multiplyScalar(body.radius).add(new THREE.Vector3(...body.position));
-        const radius = body.getSurfaceRadiusAt(point.toArray() as Vec3);
-        positions.push(...direction.clone().multiplyScalar(radius * VS).toArray());
+        point.copy(direction).multiplyScalar(body.radius).add(bodyPosition);
+        point.toArray(physicalPoint);
+        const radius = body.getSurfaceRadiusAt(physicalPoint);
+        vertex.copy(direction).multiplyScalar(radius * VS);
+        const index = ring * (segments + 1) + s;
+        positions.setXYZ(index, vertex.x, vertex.y, vertex.z);
         const color = terrainColor(body.name, radius / body.radius - 1, direction);
-        colors.push(color.r, color.g, color.b);
-        if (ring < rings && s < segments) {
-          const a = ring * (segments + 1) + s, b = a + segments + 1;
-          indices.push(a, a + 1, b, a + 1, b + 1, b);
-        }
+        colors.setXYZ(index, color.r, color.g, color.b);
       }
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.setIndex(indices); geometry.computeVertexNormals();
+    positions.needsUpdate = true; colors.needsUpdate = true;
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    if (geometry.boundingBox) geometry.computeBoundingBox();
+    if (this.patch) return;
     const material = (body.mesh.material as THREE.MeshStandardMaterial).clone();
     material.visible = true; material.vertexColors = true; material.roughness = 1;
     material.emissiveMap = null;
