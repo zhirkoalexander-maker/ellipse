@@ -58,47 +58,59 @@ function smallCraters(x: number, y: number, z: number): number {
   return bowl + 0.0012 * Math.exp(-(((d - 0.62) / 0.12) ** 2));
 }
 
+function earthTerrain(x: number, y: number, z: number): number {
+  const dotFrame = (v: number[]) => x*v[0]! + y*v[1]! + z*v[2]!;
+  const angle = Math.acos(Math.max(-1, Math.min(1, dotFrame(earthLaunchFrame.up))));
+  const pad = 1 - THREE.MathUtils.smoothstep(angle, .00006, .00014);
+  const padHeight = 12 / (6.371e6 * 2.5);
+  if (pad === 1) return padHeight;
+
+  const local = 1 - THREE.MathUtils.smoothstep(angle, .008, .012);
+  let land = 0, continentalHeight = 0, coastalHeight = 0;
+  let east = 0, north = 0;
+  if (local < 1) land = earthLandFraction(x, y, z);
+  if (local > 0) {
+    east = dotFrame(earthLaunchFrame.east); north = dotFrame(earthLaunchFrame.north);
+    const coast = .0004-east+.00009*Math.sin(north*6000)+.00003*Math.sin(north*13000);
+    land = THREE.MathUtils.lerp(land, THREE.MathUtils.smoothstep(coast,-.000018,.000018), local);
+  }
+  // The sea surface is flat; terrain beneath this mask never contributes.
+  if (land <= .02) return THREE.MathUtils.lerp(0, padHeight, pad);
+  // Each region has zero weight outside its blend. Keep the transition exact.
+  if (local < 1) {
+    const broad = terrainNoise(x*9+11, y*9+23, z*9+45);
+    const ridges = 1-Math.abs(terrainNoise(x*45+11, y*45, z*45)*2-1);
+    const detail = terrainNoise(x*240+11, y*240+17, z*240+91);
+    const mountainRegion = earthMountainMask(x, y, z);
+    const fold = terrainNoise(x*18+detail*1.5+71, y*18+13, z*18+29);
+    const ridgeDetail = 1-Math.abs(terrainNoise(x*130+fold*2, y*130+31, z*130+11)*2-1);
+    const ranges = mountainRegion*Math.pow(ridges,2.5)*(.0012+ridgeDetail*.0006);
+    const foothills = (detail-.5)*.000045*(.25+mountainRegion);
+    continentalHeight = .00004+broad*.00006+ranges+foothills;
+  }
+  if (local > 0) {
+    const inland = Math.exp(-(((east+.0012)/.00065)**2)-((north-.0004)/.0015)**2);
+    const folds = 1-Math.abs(terrainNoise(x*1800+41,y*1800+19,z*1800)*2-1);
+    const rolling = terrainNoise(x*9000+17,y*9000+3,z*9000+61);
+    let peaks = 0;
+    for (const [e,n,h] of [[-.003,.001,.00018],[-.0017,.0021,.00014],[-.0018,-.002,.00016]]) {
+      const slope = Math.max(0,1-((east-e!)/.00065)**2-((north-n!)/.0008)**2);
+      peaks += h!*slope*slope;
+    }
+    coastalHeight = .0000018+rolling*.000004+inland*(.000015+Math.pow(folds,2)*.00004)+peaks;
+  }
+  const height = THREE.MathUtils.smoothstep(land,.02,.85)*THREE.MathUtils.lerp(continentalHeight,coastalHeight,local);
+  return THREE.MathUtils.lerp(Math.max(0,height), padHeight, pad);
+}
+
 /** Height as a fraction of planetary radius; shared by meshes and collisions. */
 export function rockyTerrain(name: string, x: number, y: number, z: number): number {
-  const seed = name === 'earth' ? 11 : name === 'mars' ? 31 : name === 'venus' ? 57 : 83;
+  if (name === 'earth') return earthTerrain(x, y, z);
+  const seed = name === 'mars' ? 31 : name === 'venus' ? 57 : 83;
   const broad = terrainNoise(x * 9 + seed, y * 9 + 23, z * 9 + 45);
   const ridges = 1 - Math.abs(terrainNoise(x * 45 + seed, y * 45, z * 45) * 2 - 1);
   const detail = terrainNoise(x * 240 + seed, y * 240 + 17, z * 240 + 91);
   let height = (broad - 0.35) * 0.004 + Math.pow(ridges, 5) * 0.003 + (detail - 0.5) * 0.0007;
-  if (name === 'earth') {
-    let land = earthLandFraction(x,y,z);
-    const mountainRegion = earthMountainMask(x,y,z);
-    // Broad lowlands, folded ranges and smaller foothills; avoid isolated giant spikes.
-    const fold=terrainNoise(x*18+detail*1.5+71,y*18+13,z*18+29);
-    const ridgeDetail=1-Math.abs(terrainNoise(x*130+fold*2,y*130+31,z*130+11)*2-1);
-    const ranges=mountainRegion*Math.pow(ridges,2.5)*(.0012+ridgeDetail*.0006);
-    const foothills=(detail-.5)*.000045*(.25+mountainRegion);
-    const dotFrame=(v:number[])=>x*v[0]!+y*v[1]!+z*v[2]!;
-    const dot = dotFrame(earthLaunchFrame.up);
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-    const east=dotFrame(earthLaunchFrame.east);
-    const north=dotFrame(earthLaunchFrame.north);
-    const local=1-THREE.MathUtils.smoothstep(angle,.008,.012);
-    // A continuous coastal plain: launch site inland, open sea to the east.
-    const coast=.0004-east+.00009*Math.sin(north*6000)+.00003*Math.sin(north*13000);
-    const localLand=THREE.MathUtils.smoothstep(coast,-.000018,.000018);
-    land=THREE.MathUtils.lerp(land,localLand,local);
-    const inland=Math.exp(-(((east+.0012)/.00065)**2)-((north-.0004)/.0015)**2);
-    const folds=1-Math.abs(terrainNoise(x*1800+41,y*1800+19,z*1800)*2-1);
-    const rolling=terrainNoise(x*9000+17,y*9000+3,z*9000+61);
-    // Three separated peaks inland; their footprints end before the launch plain.
-    let peaks=0;
-    for(const [e,n,h] of [[-.003,.001,.00018],[-.0017,.0021,.00014],[-.0018,-.002,.00016]]){
-      const slope=Math.max(0,1-((east-e!)/.00065)**2-((north-n!)/.0008)**2);
-      peaks+=h!*slope*slope;
-    }
-    const coastalHeight=.0000018+rolling*.000004+inland*(.000015+Math.pow(folds,2)*.00004)+peaks;
-    const continentalHeight=.00004+broad*.00006+ranges+foothills;
-    height=THREE.MathUtils.smoothstep(land,.02,.85)*THREE.MathUtils.lerp(continentalHeight,coastalHeight,local);
-    const pad=1-THREE.MathUtils.smoothstep(angle,.00006,.00014);
-    return THREE.MathUtils.lerp(Math.max(0,height),12/(6.371e6*2.5),pad);
-
-  }
   if (name === 'moon' || name === 'mercury') {
     height = (broad - 0.5) * 0.002 + (detail - 0.5) * 0.001 + smallCraters(x, y, z);
     for (const crater of craters) {
