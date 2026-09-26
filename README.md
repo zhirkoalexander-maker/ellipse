@@ -8,7 +8,7 @@ A rocket game that runs in your browser. Build a rocket, launch it, and try to b
 
 Choose **Flight** for a ready-made rocket. Press **Launch** or **Space** and wait for the countdown. The arrow buttons control throttle; W/S and A/D steer.
 
-For a trip to the Moon, open **Map**, choose **Moon**, then **Autopilot to destination**. It uses the rocket's engines and fuel. Steering or changing throttle gives you control again.
+For a trip to the Moon, open **Map**, choose **Moon**, then **Autopilot to destination**. It uses the rocket's engines and fuel, cruising at up to 40× time warp and slowing near the surface. Steering or changing throttle gives you control again.
 
 Want to build your own? Open **Vehicle assembly** and add an engine, tanks, then a capsule. The stack list lets you move or remove individual parts. Put a decoupler between stages, then choose **Take to pad**.
 
@@ -30,9 +30,9 @@ Want to build your own? Open **Vehicle assembly** and add an engine, tanks, then
 
 Drag to orbit the camera; scroll or pinch to zoom. High warp needs the engines off and at least 17.5 km altitude.
 
-The map starts with an overview of the system. Pick a planet to see the route. **Adjust course** opens the burn controls and a yellow preview. Applying a correction uses fuel; the preview only accounts for the current planet's gravity.
+The map opens on your flight path. Blue shows where the rocket is heading with engines off; an orange Impact marker shows a predicted collision. Planets opens the system overview. Pick a destination to see it beside your rocket. **Adjust course** opens the burn controls and a yellow preview. Applying a correction uses fuel; the preview only accounts for the current planet's gravity.
 
-On descent, watch **Above surface**. Keep fuel for braking, or use **L** for landing assist. Parachutes work only in an atmosphere. Upright landings can survive up to 90 m/s; sideways or inverted impacts can still crash.
+On descent, watch **Above surface** and the estimated time to the ground. **Landing view** points the camera down. Keep fuel for braking, or use **L** for landing assist. Parachutes work only in an atmosphere. Upright landings can survive up to 90 m/s; sideways or inverted impacts can still crash.
 
 ## Saves
 

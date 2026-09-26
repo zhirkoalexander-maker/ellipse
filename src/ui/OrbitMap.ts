@@ -42,7 +42,7 @@ export class OrbitMap {
   this.root.append(this.canvas);
   const ui=document.createElement('div');ui.className='orbit-map-ui';
   ui.innerHTML=`<header><button data-map="close" aria-label="Close map">‹ Flight</button><strong>Map</strong><span id="map-reference"></span></header>
-  <nav><button data-map="system">Solar system</button><button data-map="target">Route</button><button data-map="orbit">Near rocket</button><button data-map="reset" title="Centre view">⌖</button></nav>
+  <nav><button data-map="orbit">Flight path</button><button data-map="target">Destination</button><button data-map="system">Planets</button><button data-map="reset" title="Centre view">⌖</button></nav>
   <div class="map-destinations" aria-label="Choose destination"></div>
   <aside><label>Destination<select id="transfer-target"></select></label><div id="map-distance"></div>
   <button id="transfer-go">Autopilot to destination</button>
@@ -55,7 +55,7 @@ export class OrbitMap {
   <label>Normal <span>m/s</span><input id="map-normal" type="number" value="0" step="10" min="-50000" max="50000"></label>
   </details><div class="map-burn-actions"><button data-map="clear">Clear</button><button data-map="burn">Apply correction</button><button data-map="stop">Stop</button></div></details>
   <output id="map-status" aria-live="polite">Launch to adjust your orbit.</output></aside>
-  <footer><span><i class="map-current"></i>Current orbit <i class="map-preview"></i>After burn</span><label>View <select id="map-plane"><option value="destination">Destination</option><option value="orbit">Orbital plane</option><option value="xz">Top</option><option value="xy">Side</option></select></label><button data-map="minus" aria-label="Zoom out">−</button><button data-map="plus" aria-label="Zoom in">+</button></footer>`;
+  <footer><span><i class="map-current"></i>Flight path <i class="map-preview"></i>After burn</span><label>View <select id="map-plane"><option value="destination">Destination</option><option value="orbit">Orbital plane</option><option value="xz">Top</option><option value="xy">Side</option></select></label><button data-map="minus" aria-label="Zoom out">−</button><button data-map="plus" aria-label="Zoom in">+</button></footer>`;
   this.root.append(ui);this.life.append(this.root);
   const select=this.root.querySelector<HTMLSelectElement>('#transfer-target')!;
   for(const b of snapshot().bodies.filter(b=>b.name!=='sun')) {const o=document.createElement('option');o.value=b.name;o.textContent=b.name[0]!.toUpperCase()+b.name.slice(1);select.add(o);const button=document.createElement('button');button.dataset.destination=b.name;button.textContent=o.textContent;button.style.setProperty('--planet-color',colors[b.name]||'#aaa');this.root.querySelector('.map-destinations')!.append(button);}
@@ -113,7 +113,7 @@ export class OrbitMap {
  }
  private status(text:string,hold=false){if(hold)this.messageUntil=Date.now()+4000;if(hold||Date.now()>=this.messageUntil)this.root.querySelector('#map-status')!.textContent=text;}
  private fit(mode:typeof this.mode){this.mode=mode;this.root.dataset.view=mode;if(mode==='system')(this.root.querySelector('.map-course') as HTMLDetailsElement).open=false;this.viewFrame=null;this.plane=mode==='orbit'?'orbit':mode==='target'?'destination':'xz';(this.root.querySelector('#map-plane') as HTMLSelectElement).value=this.plane;this.pan=[0,0];this.zoom=1;this.displayPan=[0,0];this.displayZoom=1;this.fadeView();}
- toggle(){if(this.active)this.close();else{this.active=true;this.opened();this.root.hidden=false;this.fit('system');this.previousTime=0;if(!this.drawing){this.drawing=true;this.life.frame(this.draw);}}}
+ toggle(){if(this.active)this.close();else{this.active=true;this.opened();this.root.hidden=false;this.fit('orbit');this.previousTime=0;if(!this.drawing){this.drawing=true;this.life.frame(this.draw);}}}
  close(){this.viewAnimation?.cancel();this.active=false;this.root.hidden=true;this.pointers.clear();}
  dispose(){this.close();this.life.dispose();}
  private fadeView():void {
@@ -188,11 +188,13 @@ export class OrbitMap {
   this.root.querySelectorAll<HTMLButtonElement>('[data-destination]').forEach(b=>b.classList.toggle('selected',b.dataset.destination===this.target));
   if(this.mode==='system'){this.drawOverview(ctx,s,w,h);return;}
   const r=s.position.map((v,i)=>v-ref.position[i]!) as Vec3, v=s.velocity.map((v,i)=>v-ref.velocity[i]!) as Vec3;
+  const current=s.grounded?[]:mapTrajectory(r,v,ref.mass,ref.radius||1);
   const targetParent=s.bodies.find(b=>b.name===(target?.name==='moon'?'earth':'sun'));
   const transverse=target?.velocity.map((x,i)=>x-(targetParent?.velocity[i]||0)) as Vec3|undefined;
   let basis=this.plane==='destination'&&target?destinationBasis(s.position,target.position,transverse):mapBasis(r,v,this.plane==='destination'?'xz':this.plane);
   const origin:Vec3=[...ref.position];
   let span=Math.max((ref.radius||1)*2.8,new Vector3(...r).length()*2.5);
+  if(this.mode==='orbit'&&current.length)span=Math.max(span,Math.min(Math.max(...current.map(p=>Math.hypot(...p)))*2.3,Math.hypot(...r)*12));
   if(this.mode==='target'&&target){for(let i=0;i<3;i++)origin[i]=(s.position[i]!+target.position[i]!)/2;span=Math.max(new Vector3(...s.position).distanceTo(new Vector3(...target.position))*1.5,(target.radius||1)*4);}
   if(this.mode==='target'&&target?.name==='moon'&&ref.name==='earth'){
    origin.splice(0,3,...ref.position);
@@ -211,28 +213,49 @@ export class OrbitMap {
   const center:[number,number]=[availableW/2+this.displayPan[0],160+Math.max(100,availableH)/2+this.displayPan[1]];
   const project=(p:Vec3)=>projectMap(p,origin,basis,scale,center);
   const path=(points:Vec3[],base:Vec3,color:string,dashed=false)=>{
-   ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=dashed?1.5:1.3;ctx.setLineDash(dashed?[6,5]:[]);
+   ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=dashed?2:color==='#73d9ff'?2.5:1.2;ctx.setLineDash(dashed?[6,5]:[]);
    let started=false;
    for(const p of points){const [x,y]=project(p.map((v,i)=>v+base[i]!) as Vec3);if(!Number.isFinite(x+y)||Math.abs(x)+Math.abs(y)>1e8){started=false;continue;}if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);}
    ctx.stroke();ctx.setLineDash([]);
   };
   const sun=s.bodies.find(b=>b.name==='sun');
   for(const b of s.bodies){if(b===sun||!sun)continue;const parent=b.name==='moon'?s.bodies.find(b=>b.name==='earth')!:sun;if(!parent)continue;
-   if(this.mode==='orbit'||this.mode==='target'&&!(b===target&&parent===ref))continue;
+   if(!(parent===ref&&(b===target||this.mode==='orbit')))continue;
    const br=b.position.map((v,i)=>v-parent.position[i]!) as Vec3,bv=b.velocity.map((v,i)=>v-parent.velocity[i]!) as Vec3;
    path(mapTrajectory(br,bv,parent.mass,(parent as MapBody).radius||1),parent.position,'#3e4854');
   }
-  const current=s.grounded?[]:mapTrajectory(r,v,ref.mass,ref.radius||1);path(current,ref.position,'#e9edf1');
-  if(!s.grounded&&new Vector3(...delta).length()>.01)path(mapTrajectory(r,v.map((x,i)=>x+delta[i]!) as Vec3,ref.mass,ref.radius||1),ref.position,'#f4bb55',true);
+
   this.hits=[];
-  for(const b of s.bodies as MapBody[]){if(this.mode==='orbit'&&b!==ref&&b!==anchor||this.mode==='target'&&b!==ref&&b!==target&&b!==anchor)continue;const [x,y]=project(b.position);if(x<-80||y<-80||x>w+80||y>h+80)continue;const radius=Math.max(b===target?8:b===ref?6:3,Math.min(2000,(b.radius||1)/scale));
+  const normal=new Vector3().crossVectors(basis[0],basis[1]);
+  const outsidePlane=(b:MapBody)=>this.mode==='orbit'&&b!==ref&&Math.abs(new Vector3(...b.position).sub(new Vector3(...origin)).dot(normal))>span*.5;
+  for(const b of s.bodies as MapBody[]){if(outsidePlane(b))continue;const [x,y]=project(b.position);if(x<-80||y<-80||x>w+80||y>h+80)continue;const radius=Math.max(b===target?8:b===ref?6:3,Math.min(2000,(b.radius||1)/scale));
    const col=colors[b.name]||'#b9c1cb';const gradient=ctx.createRadialGradient(x-radius*.3,y-radius*.3,0,x,y,radius);gradient.addColorStop(0,col);gradient.addColorStop(1,'#14202d');
    ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();
    if(b.name===this.target){ctx.strokeStyle='#58baff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,radius+6,0,Math.PI*2);ctx.stroke();}
    ctx.font='12px system-ui';ctx.fillStyle=col;ctx.fillText(b.name[0]!.toUpperCase()+b.name.slice(1),x+Math.min(radius,80)+9,y-9);this.hits.push({name:b.name,x,y});
   }
-  const [rx,ry]=project(s.position);ctx.fillStyle='#65c8ff';ctx.beginPath();ctx.moveTo(rx,ry-8);ctx.lineTo(rx-5,ry+5);ctx.lineTo(rx+5,ry+5);ctx.closePath();ctx.fill();ctx.fillText('You',rx+10,ry+4);
-  if(this.mode==='orbit'&&!s.grounded&&current.length>2){const ordered=current.map(p=>({p,r:Math.hypot(...p)})).sort((a,b)=>a.r-b.r);for(const [point,label] of [[ordered[0],'Pe'],[ordered.at(-1),'Ap']] as const){if(!point || label==='Ap' && new Vector3(...v).lengthSq()/2-G*ref.mass/Math.hypot(...r)>=0)continue;const [x,y]=project(point.p.map((v,i)=>v+ref.position[i]!) as Vec3);if(x<0||y<0||x>w||y>h)continue;ctx.fillStyle='#aab5c2';ctx.fillText(`${label} ${distanceText(point.r-(ref.radius||0))}`,x+6,y+14);}}
+  path(current,ref.position,'#73d9ff');
+  if((this.root.querySelector('.map-course') as HTMLDetailsElement).open&&!s.grounded&&new Vector3(...delta).length()>.01)
+   path(mapTrajectory(r,v.map((x,i)=>x+delta[i]!) as Vec3,ref.mass,ref.radius||1),ref.position,'#f4bb55',true);
+  const impact=current.at(-1);
+  if(impact&&Math.abs(Math.hypot(...impact)-(ref.radius||1))<1){
+   const [ix,iy]=project(impact.map((v,i)=>v+ref.position[i]!) as Vec3);
+   ctx.strokeStyle='#ffb474';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ix,iy,6,0,Math.PI*2);ctx.stroke();
+   ctx.fillStyle='#ffb474';ctx.fillText('Impact',ix+10,iy+18);
+  }
+  if(target){
+   const [tx,ty]=project(target.position);
+   if(outsidePlane(target)){
+    ctx.fillStyle=colors[target.name]||'#ddd';ctx.fillText(target.name[0]!.toUpperCase()+target.name.slice(1)+' · outside orbital plane',20,182);
+   }else if(tx<20||ty<170||tx>availableW-20||ty>160+availableH-20){
+    const x=Math.max(50,Math.min(availableW-100,tx)),y=Math.max(180,Math.min(140+availableH,ty));
+    const angle=Math.atan2(ty-(160+availableH/2),tx-availableW/2);
+    const arrow=['→','↘','↓','↙','←','↖','↑','↗'][(Math.round(angle/(Math.PI/4))+8)%8];
+    ctx.fillStyle=colors[target.name]||'#ddd';ctx.fillText(arrow+' '+target.name[0]!.toUpperCase()+target.name.slice(1),x,y);
+   }
+  }
+  const [rx,ry]=project(s.position);ctx.fillStyle='#65c8ff';ctx.beginPath();ctx.moveTo(rx,ry-8);ctx.lineTo(rx-5,ry+5);ctx.lineTo(rx+5,ry+5);ctx.closePath();ctx.fill();const rocketLabel=s.grounded?'Rocket · on surface':'Rocket';ctx.fillText(rocketLabel,rx>availableW-120?rx-ctx.measureText(rocketLabel).width-12:rx+10,ry-14);
+  if(this.mode==='orbit'&&!s.grounded&&current.length>2){const ordered=current.map(p=>({p,r:Math.hypot(...p)})).sort((a,b)=>a.r-b.r);for(const [point,label] of [[ordered[0],'Pe'],[ordered.at(-1),'Ap']] as const){if(!point || label==='Ap' && (new Vector3(...v).lengthSq()/2-G*ref.mass/Math.hypot(...r)>=0||ordered.at(-1)!.r-ordered[0]!.r<ref.radius!*.001))continue;const [x,y]=project(point.p.map((v,i)=>v+ref.position[i]!) as Vec3);if(x<0||y<0||x>w||y>h)continue;ctx.fillStyle='#aab5c2';const text=`${label} ${distanceText(point.r-(ref.radius||0))}`;ctx.fillText(text,Math.max(10,Math.min(availableW-ctx.measureText(text).width-10,x+6)),y+20);}}
   const bar=10**Math.floor(Math.log10(scale*90));ctx.fillStyle='#9da7b4';ctx.fillRect(20,h-70,bar/scale,2);ctx.fillText(distanceText(bar),20,h-78);
 
  };
