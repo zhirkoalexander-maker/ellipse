@@ -1,3 +1,4 @@
+import { activeStageNodes } from './Stages';
 import { Assembly, type AssemblyNode } from './Assembly';
 
 export interface FuelTank {
@@ -27,11 +28,17 @@ export class Rocket {
 
   totalMass(): number { return this.dryMass() + this.totalFuelMass(); }
 
+  activeFuelMass(): number {
+    const nodes = new Set(activeStageNodes(this.assembly.roots));
+    return this.fuelTanks.reduce((sum,t) => sum + (nodes.has(t.node) ? t.remaining : 0),0);
+  }
+
   consumeFuel(rate: number, dt: number): number {
+    const active = new Set(activeStageNodes(this.assembly.roots));
     let consumed = 0;
     for (let i = this.fuelTanks.length - 1; i >= 0; i--) {
       const tank = this.fuelTanks[i]!;
-      if (tank.remaining <= 0) continue;
+      if (!active.has(tank.node) || tank.remaining <= 0) continue;
       const want = rate * dt - consumed;
       if (want <= 0) break;
       const take = Math.min(tank.remaining, want);

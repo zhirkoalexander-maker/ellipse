@@ -107,31 +107,31 @@ export class VABScene {
     this.root = document.createElement('div');
     this.root.style.cssText = 'position:fixed;inset:0;z-index:150;pointer-events:none;display:flex;';
     this.root.innerHTML = `
-      <div style="width:clamp(148px,40vw,260px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
-        <div id="vab-header" style="box-sizing:border-box;flex-shrink:0;overflow-y:auto;max-height:min(48vh,calc(100dvh - 250px));padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.15);">
+      <div class="vab-sidebar" style="width:clamp(168px,40vw,280px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
+        <div id="vab-header" style="box-sizing:border-box;flex-shrink:0;padding:12px;border-bottom:1px solid rgba(255,255,255,0.15);">
           <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Rocket build</div>
-          <div style="margin-top:6px;font:400 9px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose where to attach, then click a part.</div>
-          <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 11px system-ui;outline:none;">
+          <div style="margin-top:6px;font:400 12px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose where to attach, then click a part.</div>
+          <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 13px system-ui;outline:none;">
           <label style="display:block;margin-top:8px;font:11px system-ui;color:#ccd5df;">Attach
             <select id="vp-placement" style="width:100%;margin-top:4px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;">
               <option value="stack">On top</option><option value="side">Side pair · engines / decouplers</option>
             </select>
           </label>
           <select id="vp-host" aria-label="Tank for side engines" style="width:100%;margin-top:5px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;"></select>
-          <div id="vi" style="margin-top:10px;font:400 9px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">Nothing added yet</div>
+          <details id="vab-stack"><summary style="cursor:pointer;font:12px system-ui;color:#ced7e2;padding-top:8px;">Rocket parts</summary><div id="vi" style="margin-top:10px;font:400 12px/1.5 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.7);min-height:32px;">Nothing added yet</div></details>
         </div>
         <div id="vl" style="flex:1;min-height:0;overflow-y:auto;padding:8px 0;"></div>
-        <div style="flex-shrink:0;padding:12px 16px;border-top:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;gap:6px;">
+        <div class="vab-footer" style="flex-shrink:0;padding:8px 12px;border-top:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;gap:6px;">
           <button id="vg" style="width:100%;padding:12px;background:#c89542;color:#111827;border:1px solid #eacb8b;font:600 12px system-ui;letter-spacing:0.04em;cursor:pointer;transition:all 0.2s;">Take to pad</button>
           <div style="display:flex;gap:4px;">
-            <button id="vu" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 10px system-ui;cursor:pointer;">Undo</button>
-            <button id="vc" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 10px system-ui;cursor:pointer;">Clear</button>
+            <button id="vu" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 12px system-ui;cursor:pointer;">Undo</button>
+            <button id="vc" style="flex:1;padding:8px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.15);font:400 12px system-ui;cursor:pointer;">Clear</button>
           </div>
           <div style="display:flex;gap:4px;">
-            <button id="vs" style="flex:1;padding:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2);font:400 10px system-ui;cursor:pointer;">Save</button>
-            <button id="vlb" style="flex:1;padding:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2);font:400 10px system-ui;cursor:pointer;">Load</button>
+            <button id="vs" style="flex:1;padding:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2);font:400 12px system-ui;cursor:pointer;">Save</button>
+            <button id="vlb" style="flex:1;padding:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2);font:400 12px system-ui;cursor:pointer;">Load</button>
           </div>
-          <button id="vb" style="width:100%;padding:8px;background:transparent;color:#fff;border:none;font:400 10px system-ui;cursor:pointer;">Back</button>
+          <button id="vb" style="width:100%;padding:8px;background:transparent;color:#fff;border:none;font:400 12px system-ui;cursor:pointer;">Back</button>
         </div>
       </div>
       <div style="flex:1;"></div>
@@ -140,6 +140,21 @@ export class VABScene {
         <button id="vz-out" title="Zoom out" style="width:40px;height:40px;border-radius:8px;background:rgba(8,12,22,0.85);color:#fff;border:1px solid rgba(255,255,255,0.25);font:400 18px system-ui;cursor:pointer;">－</button>
       <button id="vz-fit" title="Fit whole rocket" style="width:40px;height:40px;border-radius:8px;background:rgba(200,152,56,0.25);color:#EACD9E;border:1px solid rgba(200,152,56,0.45);font:600 10px system-ui;cursor:pointer;">Fit</button>
       </div>`;
+    const style = document.createElement('style');
+    style.textContent = `
+      #vp-host { display:none; }
+      #vab-header:has(#vp-placement option[value="side"]:checked) #vp-host { display:block; }
+      #vab-stack[open] #vi { max-height:22vh; overflow:auto; }
+      @media (max-height:600px) {
+        #vab-header { padding:8px!important; }
+        #vab-header > div:first-child, #vab-header > div:nth-child(2) { display:none; }
+        #vp-search { margin-top:0!important; }
+        .vab-footer { display:grid!important;grid-template-columns:1fr 1fr;gap:4px!important;padding:6px!important; }
+        .vab-footer button { padding:6px!important; }
+        #vab-stack[open] #vi { position:absolute;left:min(40vw,280px);top:0;width:230px;background:#101a2a;padding:12px;max-height:60vh;pointer-events:auto; }
+      }
+    `;
+    this.root.appendChild(style);
     this.info = this.root.querySelector('#vi')!;
     this.partSearch = this.root.querySelector('#vp-search')!;
     this.partSearch.addEventListener('input', () => this.filterParts(this.partSearch.value));
@@ -174,11 +189,11 @@ export class VABScene {
     // ─── PRESETS ───
     const presetHeader = document.createElement('div');
     presetHeader.textContent = 'QUICK START';
-    presetHeader.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
+    presetHeader.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
-    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a rocket</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:9px;margin-top:1px;">4 parts</span>`;
-    presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
+    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a rocket</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:11px;margin-top:1px;">4 parts</span>`;
+    presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 13px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
     presetBtn.addEventListener('mouseenter', () => { presetBtn.style.background='rgba(255,255,255,0.05)'; });
     presetBtn.addEventListener('mouseleave', () => { presetBtn.style.background='transparent'; });
     presetBtn.addEventListener('click', () => this.buildStarterPreset());
@@ -194,15 +209,15 @@ export class VABScene {
       const h = document.createElement('div');
       const names: Record<string, string> = { capsule: 'Capsules', tank: 'Tanks', engine: 'Engines', decoupler: 'Decouplers', parachute: 'Parachutes', legs: 'Landing gear', heatshield: 'Heat shields', fairing: 'Fairings', rcs: 'RCS', solar: 'Solar panels' };
       h.textContent = names[kind] ?? kind;
-      h.style.cssText = 'font:400 8px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
+      h.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
       el.appendChild(h);
       for (const p of g.parts) {
         const b = document.createElement('button');
         const has = p.kind==='engine'?`${Number(p.thrust!.toFixed(1))} kN · Isp ${p.isp}`:p.kind==='tank'?`${(p.fuelCapacity!/1000).toFixed(0)}t`:p.kind==='capsule'?`${(p.mass/1000).toFixed(1)}t`:p.kind==='rcs'?`${p.thrust}kN`:p.kind==='fairing'?'aero':'';
         const thumbnail = thumbnails.get(p);
-        b.innerHTML = `${thumbnail ? `<img src="${thumbnail}" alt="" width="44" height="44" style="width:44px;height:44px;flex:none;object-fit:contain;background:rgba(255,255,255,0.025);border-radius:5px;">` : `<span style="width:3px;height:28px;flex:none;background:${g.color};border-radius:2px;"></span>`}<span style="min-width:0;flex:1;"><span style="display:block;color:#fff;line-height:1.3;">${p.name}</span><span style="display:block;color:rgba(255,255,255,0.6);font-size:9px;margin-top:4px;">${p.size}${has ? ' · '+has : ''}</span></span><span style="color:#eacb8b;font-size:17px;line-height:1;">＋</span>`;
+        b.innerHTML = `${thumbnail ? `<img src="${thumbnail}" alt="" width="44" height="44" style="width:44px;height:44px;flex:none;object-fit:contain;background:rgba(255,255,255,0.025);border-radius:5px;">` : `<span style="width:3px;height:28px;flex:none;background:${g.color};border-radius:2px;"></span>`}<span style="min-width:0;flex:1;"><span style="display:block;color:#fff;line-height:1.3;">${p.name}</span><span style="display:block;color:rgba(255,255,255,0.6);font-size:11px;margin-top:4px;">${p.size}${has ? ' · '+has : ''}</span></span><span style="color:#eacb8b;font-size:17px;line-height:1;">＋</span>`;
         b.title = `Add ${p.name}`;
-        b.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:5px 12px;background:transparent;color:#fff;border:none;font:400 11px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
+        b.style.cssText = 'display:flex;align-items:center;gap:9px;width:100%;padding:5px 12px;background:transparent;color:#fff;border:none;font:400 13px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
         b.addEventListener('mouseenter', () => { b.style.background='rgba(255,255,255,0.05)'; b.style.color='#fff'; });
         b.addEventListener('mouseleave', () => { b.style.background='transparent'; b.style.color='#fff'; });
         b.addEventListener('click', () => this.add(p));
@@ -271,7 +286,7 @@ export class VABScene {
     if (box.isEmpty()) { this.tg.set(0, PART_SCALE, 0); this.dt = 1.5; this.cam(); return; }
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    const sidebar = Math.max(148, Math.min(260, innerWidth * 0.4));
+    const sidebar = Math.max(168, Math.min(280, innerWidth * 0.4));
     const usableAspect = Math.max(80, innerWidth - sidebar - 24) / innerHeight;
     const halfFov = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const verticalDistance = size.y / (2 * halfFov);
@@ -346,7 +361,7 @@ export class VABScene {
     this.frame();
   }
   private cam(){
-    const sidebar = Math.max(148, Math.min(260, innerWidth * 0.4));
+    const sidebar = Math.max(168, Math.min(280, innerWidth * 0.4));
     this.camera.aspect = innerWidth / innerHeight;
     // Shift projection into the open area; keep orbit target at the rocket itself.
     this.camera.setViewOffset(innerWidth,innerHeight,-sidebar/2,0,innerWidth,innerHeight);

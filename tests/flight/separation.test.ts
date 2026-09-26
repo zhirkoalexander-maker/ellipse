@@ -10,6 +10,7 @@ import { addSidePair } from '../../src/rocket/SideAttachments';
 import { Rocket } from '../../src/rocket/Rocket';
 import { findPart } from '../../src/parts/PartCatalog';
 import { buildSystem } from './fixtures';
+import { loadFlightState } from '../../src/storage/SaveLoad';
 
 function create(radialTank = -1) {
  const a=new Assembly();
@@ -82,4 +83,23 @@ it('automatic staging drops the empty core stage without dropping upper side eng
  expect(f.rocket.assembly.roots).toHaveLength(2);expect(upper.children).toHaveLength(2);
  expect(f.debris).toHaveLength(1);
  }finally{f.dispose();}
+});
+it('does not change physical position or velocity when dropping a stage',()=>{
+ const f=create();try{const p=[...f.state.position],v=[...f.state.velocity];f.performStage();expect(f.state.position).toEqual(p);expect(f.state.velocity).toEqual(v);}finally{f.dispose();}
+});
+
+it('keeps the staged model in place on the next frame and after Continue',()=>{
+ const f=create();let next:any;
+ try {
+   f.performStage();
+   const pose=f.rocketGroup.position.clone();
+   f.syncVisualTransform();
+   expect(f.rocketGroup.position.distanceTo(pose)).toBeLessThan(.00001);
+   f.persistFlight();const save=loadFlightState();expect(save).not.toBeNull();
+   f.dispose();
+   next=new FlightScene(new Renderer(),new SceneManager(),buildSystem(),f.rocket,new Achievements(),new Missions(),save!);
+   next.syncVisualTransform();
+   expect(next.state.position).toEqual(f.state.position);
+   expect(next.rocketGroup.position.distanceTo(pose)).toBeLessThan(.00001);
+ }finally{f.dispose();next?.dispose();}
 });

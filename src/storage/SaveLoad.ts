@@ -84,7 +84,12 @@ const FLIGHT_KEY = () => storageKey('flight_save');
 
 export interface FlightSave {
   version?: 2 | 3;
-  mission?: { target: string; departure: string; autoWarp: boolean; phase?: 'landing' };
+  mission?: { target: string; departure: string; autoWarp: boolean; phase?: 'landing'; stats?: {startTime:number;startFuel:number;startMass:number} };
+  sasMode?: 'off' | 'hold' | 'prograde' | 'retrograde';
+  sasTargetQuat?: [number,number,number,number];
+  landingAssist?: boolean;
+  stagingOffset?: [number,number,number];
+  stagingOffsetAltitude?: number;
   fuelByPath?: Record<string, number>;
   bodyRadii?: Record<string, number>;
   parachuteDeployed?: boolean;
@@ -181,10 +186,14 @@ function validFlight(s: any): s is FlightSave {
       || !solidBodies.includes(m.target) || !allBodies.includes(m.departure)
       || typeof m.autoWarp !== 'boolean' || (m.phase !== undefined && m.phase !== 'landing')) return false;
   }
+  if (s.sasMode !== undefined && !['off','hold','prograde','retrograde'].includes(s.sasMode)) return false;
+  if (s.sasTargetQuat !== undefined && (!vector(s.sasTargetQuat,4) || Math.abs(Math.hypot(...s.sasTargetQuat)-1) > .1)) return false;
+  if (s.stagingOffset !== undefined && !vector(s.stagingOffset,3)) return false;
+  if (s.mission?.stats !== undefined && (!s.mission.stats || !['startTime','startFuel','startMass'].every(k => finite(s.mission.stats[k]) && s.mission.stats[k] >= 0))) return false;
   if (s.fuelByPath !== undefined && !numberMap(s.fuelByPath)) return false;
   if (s.bodyRadii !== undefined && !numberMap(s.bodyRadii)) return false;
-  for (const key of ['parachuteDeployed', 'gearDeployed']) if (s[key] !== undefined && typeof s[key] !== 'boolean') return false;
-  for (const key of ['heatEnergy', 'maxAlt', 'maxSpeed', 'stageSeparations']) if (s[key] !== undefined && (!finite(s[key]) || s[key] < 0)) return false;
+  for (const key of ['parachuteDeployed', 'gearDeployed', 'landingAssist']) if (s[key] !== undefined && typeof s[key] !== 'boolean') return false;
+  for (const key of ['heatEnergy', 'maxAlt', 'maxSpeed', 'stageSeparations', 'stagingOffsetAltitude']) if (s[key] !== undefined && (!finite(s[key]) || s[key] < 0)) return false;
   return true;
 }
 
