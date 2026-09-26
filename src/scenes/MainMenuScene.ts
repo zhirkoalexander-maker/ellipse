@@ -132,7 +132,7 @@ export class MainMenuScene {
       <button class="btn btn--primary" id="guide-tour" style="padding:10px 16px">Watch the tour</button>
       <ol class="quick-guide">
       <li><b>Start</b><span>Flight → Launch. Space works too.</span></li>
-      <li><b>Build</b><span>Vehicle assembly → engine → two tanks → capsule → Take to pad.</span></li>
+      <li><b>Build</b><span>Vehicle assembly → engine → two tanks → capsule → Take to pad. For side engines, choose Side pair and a tank, then add decouplers and engines. Space drops the side pair before the lower stage.</span></li>
       <li><b>Fly</b><span>↑ / ↓ throttle. W/S and A/D steer.</span></li>
       <li><b>Go to the Moon</b><span>Map → Moon → Autopilot to destination.</span></li>
       <li><b>Land</b><span>Watch Above surface. Press L for landing assist. Keep fuel for braking.</span></li>

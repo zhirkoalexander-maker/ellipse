@@ -8,7 +8,7 @@ const INDEX_KEY = () => storageKey('assemblies');
 const LAST_KEY = () => storageKey('assembly_last');
 
 function serializeNode(n: AssemblyNode): any {
-  return { partId: n.part.id, position: [...n.position], rotation: n.rotation, children: n.children.map(serializeNode) };
+  return { ...(n.radial ? {radial:true} : {}), partId: n.part.id, position: [...n.position], rotation: n.rotation, children: n.children.map(serializeNode) };
 }
 function deserializeNode(data: any): AssemblyNode | null {
   const part = findPart(data.partId);
@@ -17,6 +17,7 @@ function deserializeNode(data: any): AssemblyNode | null {
     part,
     position: [...data.position] as [number, number, number],
     rotation: data.rotation,
+    ...(data.radial ? {radial:true} : {}),
     children: (data.children ?? []).map(deserializeNode).filter((x: AssemblyNode | null): x is AssemblyNode => x !== null)
   };
 }
@@ -151,6 +152,7 @@ function vector(value: unknown, length: number): value is number[] {
 function validNode(node: any, depth = 0): boolean {
   return depth < 100 && node !== null && typeof node === 'object' && typeof node.partId === 'string'
     && vector(node.position, 3) && finite(node.rotation)
+    && (node.radial === undefined || (typeof node.radial === 'boolean' && (!node.radial || findPart(node.partId)?.kind === 'decoupler')))
     && (node.children === undefined || (Array.isArray(node.children) && node.children.every((n: any) => validNode(n, depth + 1))));
 }
 function numberMap(value: unknown): boolean {

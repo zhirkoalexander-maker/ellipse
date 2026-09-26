@@ -67,6 +67,14 @@ export class EngineFlame {
   private throttleLevel: number = 1;
   private inVacuum: boolean = false;
   private group: THREE.Group;
+  private nozzles = [new THREE.Vector3()];
+  private nozzleIndex = 0;
+
+  setNozzles(nozzles: THREE.Vector3[]): void {
+    this.nozzles = nozzles.map(n => n.clone());
+    this.nozzleIndex = 0;
+    this.stop();
+  }
 
   constructor() {
     this.active = false;
@@ -170,19 +178,20 @@ export class EngineFlame {
   update(dt: number): void {
     const vacMult = this.inVacuum ? 4.5 : 1;
 
-    if (this.active) {
+    if (this.active && this.nozzles.length) {
       const spawnCount = Math.ceil((5 + Math.random() * 4) * this.throttleLevel);
 
       for (let i = 0; i < spawnCount; i++) {
         const idx = this.nextIndex;
         this.nextIndex = (this.nextIndex + 1) % PARTICLE_COUNT;
 
+        const nozzle = this.nozzles[this.nozzleIndex++ % this.nozzles.length]!;
         // Wider spread in vacuum (plume expands dramatically in space)
         const spread = (0.06 + Math.random() * 0.12) * (this.inVacuum ? 4 : 1) / Math.max(0.2, this.throttleLevel);
 
-        this.positions[idx * 3]     = (Math.random() - 0.5) * spread * FLAME_SCALE;
-        this.positions[idx * 3 + 1] = -(Math.random() * 0.03) * FLAME_SCALE;
-        this.positions[idx * 3 + 2] = (Math.random() - 0.5) * spread * FLAME_SCALE;
+        this.positions[idx * 3]     = nozzle.x + (Math.random() - 0.5) * spread * FLAME_SCALE;
+        this.positions[idx * 3 + 1] = nozzle.y - (Math.random() * 0.03) * FLAME_SCALE;
+        this.positions[idx * 3 + 2] = nozzle.z + (Math.random() - 0.5) * spread * FLAME_SCALE;
 
         // Faster exhaust in vacuum, slower in atmosphere
         const speed = (5 + Math.random() * 8) * this.throttleLevel * vacMult;

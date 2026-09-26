@@ -1,5 +1,11 @@
 # Changes
 
+## 2.5.28
+
+- Add side-mounted engine pairs in Vehicle assembly, with optional side decouplers, tank selection and Undo.
+- Fit tapered joints to the adjoining parts, including the Mk1 capsule.
+- Keep separated stages intact, preserve their pose and advance them at the current simulation speed.
+
 ## 2.5.27
 
 - Rename the game to Challenger. Existing saves, designs and settings carry over.

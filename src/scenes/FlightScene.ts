@@ -1,3 +1,4 @@
+import { SIZE_DIMS } from '../parts/PartBuilder';
 import { loadSettings } from '../ui/Settings';
 import { dragArea, dragRetention } from '../flight/Aerodynamics';
 import { gameMetres } from '../flight/GameUnits';
@@ -9,7 +10,7 @@ import type { System } from '../physics/System';
 import type { Vec3 } from '../physics/Body';
 import { Body } from '../physics/Body';
 import type { Rocket } from '../rocket/Rocket';
-import type { AssemblyNode } from '../rocket/Assembly';
+import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Achievements } from '../core/Achievements';
 import type { Missions } from '../core/Missions';
 import { FlightState } from '../flight/FlightState';
@@ -25,7 +26,7 @@ import { predictOrbit } from '../physics/OrbitPredictor';
 import { OrbitMap } from '../ui/OrbitMap';
 import { buildDeployedParachute } from '../parts/PartBuilder';
 import { saveFlightState, clearFlightSave, captureFuel, restoreFuel, serializeAssembly, type FlightSave } from '../storage/SaveLoad';
-import { gravitationalAccelerationAt, totalGravityOn } from '../physics/Gravity';
+import { gravitationalAccelerationAt } from '../physics/Gravity';
 import { LaunchClamps } from '../flight/LaunchClamps';
 import { SurfaceView, magnifyPoint } from '../planets/SurfaceView';
 
@@ -712,9 +713,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
   }
 
   private countStages(nodes: AssemblyNode[]): number {
-    let count = 0;
+    let count = nodes.some(n => n.radial) ? 1 : 0;
     for (const n of nodes) {
-      if (n.part.kind === 'decoupler') count++;
+      if (n.part.kind === 'decoupler' && !n.radial) count++;
       count += this.countStages(n.children);
     }
     return count;
@@ -745,7 +746,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     for (let i = 0; i <= decouplerIndices.length; i++) {
       const endIdx = i < decouplerIndices.length ? decouplerIndices[i]! : roots.length;
       const chunk: AssemblyNode[] = [];
-      for (let j = startIdx; j < endIdx; j++) chunk.push(roots[j]!);
+      const collect = (n: AssemblyNode) => { chunk.push(n); n.children.forEach(collect); };
+      for (let j = startIdx; j < endIdx; j++) collect(roots[j]!);
       if (chunk.length > 0) {
         const spent = this.isChunkSpent(chunk);
         stages.push({ parts: chunk, active: !spent, spent });
@@ -928,7 +930,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // during warped autopilot ascent, otherwise a dry booster at 10x warp
     // leaves the rocket dead in the water. Allowed at warp during ascent.
     if ((!warpActive || (this.autopilotActive && this.autopilotPhase === 'ascent')) && !this.grounded && this.state.throttle > 0) {
-      const dec = this.findLowestDecoupler(this.rocket.assembly.roots);
+      const dec = this.findLowestDecoupler(this.rocket.assembly.roots, false);
       if (dec) {
         const decY = dec.position[1];
         const below = this.rocket.fuelTanks.filter(t => t.node.position[1] < decY);
@@ -937,7 +939,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         // Booster tanks dry but fuel remains above → drop the booster.
         // Everything dry → drop dead weight anyway.
         if ((below.length > 0 && belowFuel <= 0.01 && totalFuel > 0.1) || totalFuel <= 0.1) {
-          this.performStage();
+          this.performStage(dec);
         }
       }
     }
@@ -1305,7 +1307,18 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const coast = !this.grounded && this.timeWarp > 10
       ? propagateCoast(oldRelative, relativeVelocity, motionRef.mass, _dt, surfaceBefore + FlightScene.SPAWN_OFFSET_M)
       : null;
+    const debrisFrames = this.debris.map(d => {
+      const ref = getReferenceBody(d.body.position, this.system);
+      return { d, ref, position: [...ref.position] as Vec3, velocity: [...ref.velocity] as Vec3 };
+    });
+    this.advanceDebris(_dt);
     this.system.propagate(_dt, this.autopilotActive && this.missionGuidance ? 1 : FIXED_DT);
+    for (const {d, ref, position, velocity} of debrisFrames) {
+      for (let axis = 0; axis < 3; axis++) {
+        d.body.position[axis] = d.body.position[axis]! + ref.position[axis]! - position[axis]!;
+        d.body.velocity[axis] = d.body.velocity[axis]! + ref.velocity[axis]! - velocity[axis]!;
+      }
+    }
     if (!this.grounded) {
       const relativeEnd = coast?.position ?? oldRelative.map((x, i) => x + relativeVelocity[i]! * _dt) as Vec3;
       this.state.position = relativeEnd.map((x, i) => x + motionRef.position[i]!) as Vec3;
@@ -1408,43 +1421,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       (earthBody as any).updateClouds(baseDt, sunPosWC);
     }
 
-    // Update debris physics
-    if (this.debris.length > 0) {
-      const refBody = getReferenceBody(this.state.position, this.system);
-      for (let i = this.debris.length - 1; i >= 0; i--) {
-        const d = this.debris[i]!;
-        d.life -= baseDt;
-        if (d.life <= 0 || d.body.mass <= 0) {
-          this.sceneMgr.scene.remove(d.mesh);
-          releaseSceneObjects([d.mesh], [this.rocketGroup]);
-          this.debris.splice(i, 1);
-          continue;
-        }
-        // Apply gravity
-        const force = totalGravityOn(d.body, this.system.bodies);
-        d.body.applyForce(force, baseDt);
-        // Update mesh position
-        d.mesh.position.set(
-          d.body.position[0] * VISUAL_SCALE,
-          d.body.position[1] * VISUAL_SCALE,
-          d.body.position[2] * VISUAL_SCALE
-        );
-        // Tumble away — visible separation
-        d.mesh.rotation.x += 0.6 * baseDt;
-        d.mesh.rotation.z += 0.4 * baseDt;
-        // Check ground collision
-        const bdx = d.body.position[0] - refBody.position[0];
-        const bdy = d.body.position[1] - refBody.position[1];
-        const bdz = d.body.position[2] - refBody.position[2];
-        const bd = Math.sqrt(bdx * bdx + bdy * bdy + bdz * bdz);
-        const bodyR = (refBody as any).getSurfaceRadiusAt?.(d.body.position) ?? (refBody as any).radius ?? 6.371e6;
-        if (bd < bodyR) {
-          this.sceneMgr.scene.remove(d.mesh);
-          releaseSceneObjects([d.mesh], [this.rocketGroup]);
-          this.debris.splice(i, 1);
-        }
-      }
-    }
+    for (const d of this.debris) d.mesh.position.fromArray(d.body.position).multiplyScalar(VISUAL_SCALE);
     this.updateExplosion(baseDt);
 
     const camRefBody = this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system);
@@ -1479,18 +1456,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
       this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE)
         .addScaledVector(this.presentationUp,visualOffset);
-
-      // Stage separation pulse: scale overshoot then settle
-      if (this.stagePulseTimer > 0) {
-        this.stagePulseTimer -= baseDt;
-        const t = 1 - Math.max(0, this.stagePulseTimer / 0.35); // 0→1
-        // back-out: bump up to ~1.04 then back to 1
-        const c1 = 1.70158, c3 = c1 + 1;
-        const bump = 1 + (c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)) * 0.04;
-        this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE * Math.max(1, bump));
-      } else if (this.rocketGroup.scale.x !== ROCKET_VISUAL_SCALE) {
-        this.rocketGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
-      }
 
       if (this.cameraMode === 'free') {
         // Free camera: orbit around rocket - WASD keys + mouse/touch drag
@@ -1963,8 +1928,24 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.achievements.unlock('reach_space');
   }
 
-  private performStage(): void {
-    const decoupler = this.findLowestDecoupler(this.rocket.assembly.roots);
+  private advanceDebris(dt: number): void {
+    for (let i = this.debris.length - 1; i >= 0; i--) {
+      const d = this.debris[i]!;
+      const ref = getReferenceBody(d.body.position, this.system);
+      const relative = d.body.position.map((v, axis) => v - ref.position[axis]!) as Vec3;
+      const velocity = d.body.velocity.map((v, axis) => v - ref.velocity[axis]!) as Vec3;
+      const radius = (ref as any).getSurfaceRadiusAt?.(d.body.position) ?? (ref as any).radius ?? 0;
+      const coast = propagateCoast(relative, velocity, ref.mass, dt, radius);
+      d.life -= dt;
+      if (coast.impacted || d.life <= 0) {
+        d.mesh.removeFromParent(); releaseSceneObjects([d.mesh], [this.rocketGroup]); this.debris.splice(i, 1); continue;
+      }
+      d.body.position = coast.position.map((v, axis) => v + ref.position[axis]!) as Vec3;
+      d.body.velocity = coast.velocity.map((v, axis) => v + ref.velocity[axis]!) as Vec3;
+    }
+  }
+
+  private performStage(decoupler = this.findLowestDecoupler(this.rocket.assembly.roots)): void {
     if (!decoupler) {
       toast.show('No decouplers to stage.');
       return;
@@ -1973,121 +1954,69 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.lifetime.disposed || this.paused || this.crashed) return;
     this.sound.playStaging();
 
-    const decouplerMesh = this.rocketGroup.getObjectByName(decoupler.uid ?? decoupler.part.id);
-    if (decouplerMesh) {
-      // Capture world positions before detaching
-      const worldPositions: THREE.Vector3[] = [];
-      const meshes: THREE.Object3D[] = [];
-
-      // Staging particle burst (separation motors)
-      for (let i = 0; i < 16; i++) {
-        const size = 0.02 + Math.random() * 0.04;
-        const pGeom = new THREE.SphereGeometry(size, 4, 3);
-        const pMat = new THREE.MeshBasicMaterial({
-          color: i < 4 ? 0xff8844 : 0xaaaaaa, transparent: true, opacity: 0.9,
-          blending: THREE.AdditiveBlending, depthWrite: false
-        });
-        const pMesh = new THREE.Mesh(pGeom, pMat);
-        const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
-        const elev = (Math.random() - 0.5) * 0.8;
-        pMesh.position.copy(this.rocketGroup.position);
-        pMesh.position.x += Math.cos(angle) * 0.15;
-        pMesh.position.y += elev * 0.1;
-        pMesh.position.z += Math.sin(angle) * 0.15;
-        this.sceneMgr.scene.add(pMesh);
-        (pMesh as any)._life = 0.6 + Math.random() * 0.4;
-        (pMesh as any)._age = 0;
-        (pMesh as any)._vx = Math.cos(angle) * (0.8 + Math.random() * 1.5);
-        (pMesh as any)._vy = elev * 0.5;
-        (pMesh as any)._vz = Math.sin(angle) * (0.8 + Math.random() * 1.5);
-        this.explosionMeshes.push(pMesh);
+    const detached = this.rocket.stageRoots(decoupler);
+    const oldCom = new THREE.Vector3(...this.rocket.assembly.centerOfMass());
+    const oldPosition = this.rocketGroup.position.clone();
+    const oldBottom = this.rocketBottomY;
+    const stageRef = getReferenceBody(this.state.position, this.system);
+    const stageUp = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...stageRef.position)).normalize();
+    const renderLag = new THREE.Vector3(...this.state.position).multiplyScalar(VISUAL_SCALE)
+      .addScaledVector(stageUp, -oldBottom * ROCKET_VISUAL_SCALE).sub(oldPosition);
+    this.rocketGroup.updateWorldMatrix(true, true);
+    const ref = getReferenceBody(this.state.position, this.system);
+    const branches = decoupler.radial ? detached.map(node => [node]) : [detached];
+    for (const branch of branches) {
+      const ids = new Set<string>();
+      const collectBranch = (n: AssemblyNode) => { if (n.uid) ids.add(n.uid); n.children.forEach(collectBranch); };
+      branch.forEach(collectBranch);
+      const debrisGroup = new THREE.Group();
+      debrisGroup.position.copy(oldPosition);
+      debrisGroup.quaternion.copy(this.rocketGroup.quaternion);
+      debrisGroup.scale.copy(this.rocketGroup.scale);
+      this.sceneMgr.scene.add(debrisGroup);
+      debrisGroup.updateMatrixWorld(true);
+      for (const node of branch) {
+        const mesh = this.rocketGroup.getObjectByName(node.uid ?? node.part.id);
+        if (mesh) debrisGroup.attach(mesh);
       }
-      // Detach decoupler + everything physically BELOW it (Y < decoupler Y) — look up by unique uid.
-      // Position-based: works for both VAB (bottom-first) and Game (top-first) root orderings.
-      const roots = this.rocket.assembly.roots;
-      const decY = decoupler.position[1];
-      for (const r of roots) {
-        if (r !== decoupler && r.position[1] >= decY) continue;
-        const m = this.rocketGroup.getObjectByName(r.uid ?? r.part.id);
-        if (m) { const wp = new THREE.Vector3(); m.getWorldPosition(wp); worldPositions.push(wp); meshes.push(m); m.removeFromParent(); }
+      // A joint belongs to the stage below it; do not leave floating adapter rings.
+      for (const mesh of this.structuralRoots) {
+        if (mesh.parent === this.rocketGroup && mesh.userData.joint && ids.has(mesh.userData.lowerPart)) debrisGroup.attach(mesh);
       }
-      while (decouplerMesh.children.length > 0) {
-        const child = decouplerMesh.children[0]!;
-        const wp = new THREE.Vector3();
-        child.getWorldPosition(wp);
-        worldPositions.push(wp);
-        meshes.push(child);
-        child.removeFromParent();
-      }
-
-      // Create debris from detached parts with physics
-      const refBody = getReferenceBody(this.state.position, this.system);
-      const pos = [...this.state.position] as Vec3;
-      // Push downward/away from rocket
-      const pushDir: Vec3 = [
-        refBody.position[0] - pos[0],
-        refBody.position[1] - pos[1],
-        refBody.position[2] - pos[2],
-      ];
-      const pdm = Math.sqrt(pushDir[0]*pushDir[0] + pushDir[1]*pushDir[1] + pushDir[2]*pushDir[2]) || 1;
-
-      for (let i = 0; i < meshes.length; i++) {
-        const dm = meshes[i]!;
-        const debrisGroup = new THREE.Group();
-        debrisGroup.add(dm);
-        dm.position.set(0, 0, 0);
-        // CRITICAL: part meshes are built at PART_SCALE (~0.1 units) but the
-        // rocket renders at ROCKET_VISUAL_SCALE (×60). Without this the
-        // "separated booster" is an invisible speck — staging looked like
-        // nothing happened (or a tiny lump stuck under the rocket).
-        debrisGroup.scale.setScalar(ROCKET_VISUAL_SCALE);
-
-        const scene = this.sceneMgr.scene;
-        debrisGroup.position.copy(worldPositions[i]!);
-        // Small random spread
-        debrisGroup.position.x += (Math.random() - 0.5) * 0.5;
-        debrisGroup.position.y += (Math.random() - 0.5) * 0.5;
-        debrisGroup.position.z += (Math.random() - 0.5) * 0.5;
-
-        // Random rotation for tumbling
-        debrisGroup.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
-
-        scene.add(debrisGroup);
-
-        // Velocity: rocket velocity + the PLANET's orbital velocity (debris
-        // must co-move with the planet, or it races away at 17 km/s and they
-        // look like they "fly off into space" while still on the ground) +
-        // push toward planet + random
-        const pushForce = 5 + Math.random() * 5;
-        const refVel = refBody.velocity ?? [0, 0, 0];
-        const sepVel: Vec3 = [
-          this.state.velocity[0] + (this.grounded ? refVel[0] : 0) + pushDir[0] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[1] + (this.grounded ? refVel[1] : 0) + pushDir[1] / pdm * pushForce + (Math.random() - 0.5) * 2,
-          this.state.velocity[2] + (this.grounded ? refVel[2] : 0) + pushDir[2] / pdm * pushForce + (Math.random() - 0.5) * 2,
-        ];
-
-        const debrisBody = new Body('debris', 100, pos, sepVel);
-
-        this.debris.push({
-          mesh: debrisGroup,
-          body: debrisBody,
-          life: 60,
-        });
-      }
+      const push = decoupler.radial ? new THREE.Vector3(Math.sign(branch[0]!.position[0]) * 8,-1,0) : new THREE.Vector3(0,-5,0);
+      push.applyQuaternion(this.rocketQuat);
+      const velocity = new THREE.Vector3(...(this.grounded ? ref.velocity : this.state.velocity)).add(push);
+      const center = new THREE.Box3().setFromObject(debrisGroup).getCenter(new THREE.Vector3());
+      const localCenter = debrisGroup.worldToLocal(center.clone());
+      for (const child of debrisGroup.children) child.position.sub(localCenter);
+      debrisGroup.position.copy(center);
+      const stageAssembly = new Assembly(); stageAssembly.roots = branch;
+      const dryMass = stageAssembly.totalMass();
+      const fuelMass = this.rocket.fuelTanks.filter(t => ids.has(t.node.uid!)).reduce((sum,t) => sum + t.remaining,0);
+      this.debris.push({ mesh:debrisGroup,
+        body:new Body('stage',Math.max(1,dryMass+fuelMass),center.clone().add(renderLag).divideScalar(VISUAL_SCALE).toArray() as Vec3,velocity.toArray() as Vec3),life:600 });
     }
 
     this.rocket.removeStage(decoupler);
-    this.positionFlameAtNozzle();
+    const comShift = new THREE.Vector3(...this.rocket.assembly.centerOfMass()).sub(oldCom);
+    this.structuralRoots = this.structuralRoots.filter(root => root.parent === this.rocketGroup);
+    for (const root of this.structuralRoots) root.position.sub(comShift);
+    this.rocketGroup.position.copy(oldPosition).add(comShift.clone().multiplyScalar(ROCKET_VISUAL_SCALE).applyQuaternion(this.rocketGroup.quaternion));
+    this.positionFlameAtNozzle(false);
+    const up = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position)).normalize();
+    const shift = this.rocketGroup.position.clone().sub(oldPosition)
+      .addScaledVector(up, (this.rocketBottomY - oldBottom) * ROCKET_VISUAL_SCALE).divideScalar(VISUAL_SCALE);
+    this.state.position = new THREE.Vector3(...this.state.position).add(shift).toArray() as Vec3;
+    this.rocketGroup.updateMatrixWorld(true);
     this.achievements.unlock('stage_separate');
     this.missions.recordStageSeparation();
     this.stageSeparations++;
-    // Visual feedback: brief white flash + rocket scale pulse
+    // Brief feedback without changing the physical or displayed pose.
     this.triggerStageFlash();
-    this.stagePulseTimer = 0.35;
+
     toast.show('Stage separated!');
   }
 
-  private stagePulseTimer = 0;
 
   private triggerStageFlash(): void {
     const flash = document.createElement('div');
@@ -2098,18 +2027,21 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
   /** Bottom-most decoupler by PHYSICAL position (lowest Y) — stages drop bottom-first.
    *  Independent of root array order (VAB vs Game ordering differ). */
-  private findLowestDecoupler(nodes: AssemblyNode[]): AssemblyNode | null {
-    let best: AssemblyNode | null = null;
-    const walk = (ns: AssemblyNode[]) => {
+  private findLowestDecoupler(nodes: AssemblyNode[], includeRadial = true): AssemblyNode | null {
+    let best: AssemblyNode | null = null, radial: AssemblyNode | null = null;
+    let bestY = Infinity;
+    const walk = (ns: AssemblyNode[], parentY = 0) => {
       for (const n of ns) {
+        const y = parentY + n.position[1];
         if (n.part.kind === 'decoupler') {
-          if (!best || n.position[1] < best.position[1]) best = n;
+          if (n.radial) { if (includeRadial && !radial) radial = n; }
+          else if (y < bestY) { bestY = y; best = n; }
         }
-        walk(n.children);
+        walk(n.children,y);
       }
     };
     walk(nodes);
-    return best;
+    return radial ?? best;
   }
 
   private setPlayerWarp(index: number): void {
@@ -2605,7 +2537,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     return walk(this.rocket.assembly.roots);
   }
 
-private positionFlameAtNozzle(): void {
+private positionFlameAtNozzle(sync = true): void {
     this.rocketGroup.updateWorldMatrix(true, true);
     const inverse = this.rocketGroup.matrixWorld.clone().invert();
     const bounds = new THREE.Box3();
@@ -2620,9 +2552,25 @@ private positionFlameAtNozzle(): void {
     this.rocketRadius = bounds.isEmpty() ? 0.1 : Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x), Math.abs(bounds.min.z), Math.abs(bounds.max.z));
     this.rocketBottomY = bounds.isEmpty() ? -0.05 : bounds.min.y;
     this.rocketTopY = bounds.isEmpty() ? 0.05 : bounds.max.y;
-    this.engineFlame.getMesh().position.set(0, this.rocketBottomY - 0.002, 0);
+    const nozzles: THREE.Vector3[] = [];
+    const collectNozzles = (nodes: AssemblyNode[]) => {
+      for (const node of nodes) {
+        if (node.part.kind === 'engine') {
+          const mesh = this.rocketGroup.getObjectByName(node.uid ?? node.part.id);
+          if (mesh) {
+            // Use the engine's local slot bottom, transformed into rocket space.
+            const nozzle = new THREE.Vector3(0, -SIZE_DIMS[node.part.size].height / 2, 0);
+            nozzles.push(nozzle.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse));
+          }
+        }
+        collectNozzles(node.children);
+      }
+    };
+    collectNozzles(this.rocket.assembly.roots);
+    this.engineFlame.getMesh().position.set(0, 0, 0);
+    this.engineFlame.setNozzles(nozzles);
     this.engineFlame.getMesh().rotation.set(0, 0, 0);
-    this.syncVisualTransform();
+    if (sync) this.syncVisualTransform();
   }
 
   private syncVisualTransform(): void {
