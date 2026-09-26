@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.26
+
+- Keep only the Planets map view. Selecting destinations and adjusting course stay in that view.
+- Add the English keyboard layout reminder to the guide.
+
 ## 2.5.25
 
 - Keep the flight path on the map and remove the line from the flight view.
