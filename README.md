@@ -1,59 +1,40 @@
 # Ellipse
 
-A rocket game that runs in your browser. Build a rocket, launch it, and try to bring it down in one piece.
+[Play in the browser](https://zhirkoalexander-maker.github.io/ellipse/)
 
-**[Play Ellipse](https://zhirkoalexander-maker.github.io/ellipse/)**
+A spaceflight simulator built with TypeScript and Three.js.
 
-## First flight
-
-Choose **Flight** for a ready-made rocket. Press **Launch** or **Space** and wait for the countdown. The arrow buttons control throttle; W/S and A/D steer.
-
-For a trip to the Moon, open **Map**, choose **Moon**, then **Autopilot to destination**. It uses the rocket's engines and fuel, cruising at up to 40× time warp and slowing near the surface. Steering or changing throttle gives you control again.
-
-Want to build your own? Open **Vehicle assembly** and add an engine, tanks, then a capsule. The stack list lets you move or remove individual parts. Put a decoupler between stages, then choose **Take to pad**.
+**Flight** starts with a rocket on the pad. **Vehicle assembly** opens the builder. There’s a guide in the main menu.
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
+| Space | Launch / stage |
 | ↑ / ↓ | Throttle |
-| W / S, A / D | Steer |
+| W / S, A / D | Steering |
 | J / K | Roll |
-| Space | Launch or separate a stage |
+| M / Tab | Map |
 | L | Landing assist |
-| T | Cycle stability modes |
+| T | Stability mode |
 | P / G | Parachute / landing gear |
-| M / Tab | Open map |
-| Q / E or [ / ] | Change time warp |
+| Q / E | Time warp |
 | C / F | Free camera / reset view |
-| Esc | Close the map or pause flight |
+| Esc | Pause / close map |
 
-Drag to orbit the camera; scroll or pinch to zoom. High warp needs the engines off and at least 17.5 km altitude.
+Drag to move the camera. Scroll or pinch to zoom.
 
-The map opens on your flight path. Blue shows where the rocket is heading with engines off; an orange Impact marker shows a predicted collision. Planets opens the system overview. Pick a destination to see it beside your rocket. **Adjust course** opens the burn controls and a yellow preview. Applying a correction uses fuel; the preview only accounts for the current planet's gravity.
+Saves are stored in your browser. **Continue** loads the last flight; builds saved in the assembly screen have their own names.
 
-On descent, watch **Above surface** and the estimated time to the ground. **Landing view** points the camera down. Keep fuel for braking, or use **L** for landing assist. Parachutes work only in an atmosphere. Upright landings can survive up to 90 m/s; sideways or inverted impacts can still crash.
+## Development
 
-## Saves
-
-**Continue** resumes the last saved flight. **Restart** returns the original rocket to the pad, including stages dropped during flight. Saves from older versions may only contain the remaining stages.
-
-Flights save automatically unless you turn this off in Settings. Named designs are saved separately in Vehicle assembly. Everything stays in this browser; clearing site data removes it.
-
-## Run locally
-
-Requires Node.js 20 or newer.
+Node.js 20+.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-```sh
-npm test
-npm run build
-```
+`npm test` runs the tests. `npm run build` writes the production build to `dist/`.
 
-The app uses TypeScript, Three.js and Vite. Pushes to `main` run the tests, build the game and publish it to GitHub Pages.
-
-[Code layout and flight model](SPECIFICATION.md) · [Recent changes](DEVLOG.md)
+Source code is in [`src/`](src/). See [SPECIFICATION.md](SPECIFICATION.md) for the flight model and [DEVLOG.md](DEVLOG.md) for changes.
