@@ -24,11 +24,10 @@ it('keeps a quickly reopened pause overlay visible and cancels work on unmount',
  hud.setPaused(false); hud.unmount();
  expect(vi.getTimerCount()).toBe(0);
 });
-it('uses the same reduced distance scale for speed, altitude and delta-v',async()=>{
+it('uses the same reduced distance scale for speed and altitude',async()=>{
  const {gameMetres,simulationMetres}=await import('../../src/flight/GameUnits');
  expect(gameMetres(400)).toBe(100);expect(simulationMetres(90)).toBe(360);
- const hud=new HUD();hud.mount();hud.setDeltaV(40000);
- expect((hud as any).dvVal.textContent).toBe('10.0 km/s');
+ const hud=new HUD();hud.mount();
  const {buildDefaultRocket,buildSystem}=await import('./fixtures');
  const {FlightState}=await import('../../src/flight/FlightState');
  const state=new FlightState(buildDefaultRocket(),buildSystem(),[0,0,0],[0,0,0]);
@@ -36,6 +35,18 @@ it('uses the same reduced distance scale for speed, altitude and delta-v',async(
  expect((hud as any).speedVal.textContent).toBe('100.0');
  expect((hud as any).vsVal.textContent).toBe('+50');
  expect((hud as any).altVal.textContent).toBe('200');hud.unmount();
+});
+
+it('shows flight readings without delta-v and keeps time warp controls working',()=>{
+ const hud=new HUD();hud.mount();const action=vi.fn();hud.onAction=action;
+ const panel=document.querySelector('.flight-readouts')!;
+ expect(panel.textContent).not.toContain('Δv');
+ expect(panel.querySelector('.dv-val')).toBeNull();
+ for(const name of ['warpDown','warpUp','warp100']){
+  panel.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!.click();
+  expect(action).toHaveBeenLastCalledWith(name);
+ }
+ hud.unmount();
 });
 
 it('does not replace unchanged telemetry text nodes and still updates changing values',async()=>{

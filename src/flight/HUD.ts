@@ -1,4 +1,5 @@
 import { gameMetres } from './GameUnits';
+import { formatReadout } from './Readout';
 import { surfaceReadout } from './SurfaceReadout';
 import type { FlightState } from './FlightState';
 import type { System } from '../physics/System';
@@ -9,6 +10,11 @@ import { getReferenceBody } from '../physics/SoiResolver';
 /** Keep existing text nodes when the displayed value has not changed. */
 function setText(element: Node, value: string): void {
   if (element.textContent !== value) element.textContent = value;
+}
+
+function setReading(element: HTMLElement, reading: [string, string]): void {
+  setText(element, reading[0]);
+  setText(element.nextElementSibling!, reading[1]);
 }
 
 export class HUD {
@@ -44,7 +50,6 @@ export class HUD {
   private twrVal!: HTMLSpanElement;
   private twrFill!: HTMLDivElement;
   private sasModeEl!: HTMLSpanElement;
-  private dvVal!: HTMLSpanElement;
   private orbitAp!: HTMLSpanElement;
   private orbitPe!: HTMLSpanElement;
   private orbitTta!: HTMLSpanElement;
@@ -217,73 +222,31 @@ export class HUD {
   }
 
   mount(parent: HTMLElement = document.body): void {
-    // Compact top-right panel
-    const panel = document.createElement('div');
+    const panel = document.createElement('section');
     panel.classList.add('hud-panel-in-left', 'flight-readouts');
-    panel.style.cssText = `
-      position:fixed;top:16px;left:16px;z-index:100;pointer-events:auto;
-      font-family:monospace;font-size:11px;
-      display:flex;flex-direction:column;gap:4px;
-      background:rgba(8,10,24,0.75);border:1px solid rgba(200,152,56,0.15);
-      border-radius:6px;padding:8px 10px;min-width:130px;
-      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    `;
+    panel.setAttribute('aria-label', 'Flight instruments');
     panel.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span class="hud-speed-label" style="color:rgba(244,245,242,0.5);">SPD</span>
-        <span class="speed-val" style="color:#ddd;">0</span>
-        <span style="font-size:9px;color:rgba(244,245,242,0.3);">m/s</span>
+      <div class="telemetry-group telemetry-primary">
+        <div class="telemetry-row telemetry-main"><span class="telemetry-label">Speed</span><span class="speed-val">0.0</span><span class="telemetry-unit">m/s</span></div>
+        <div class="telemetry-row telemetry-main"><span class="telemetry-label">Altitude</span><span class="alt-val">0</span><span class="telemetry-unit">m</span></div>
+        <div class="telemetry-row"><span class="telemetry-label" title="Vertical speed">Vertical</span><span class="vs-val">0</span><span class="telemetry-unit">m/s</span></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="color:rgba(244,245,242,0.5);">ALT</span>
-        <span class="alt-val" style="color:#ddd;">0</span>
-        <span style="font-size:9px;color:rgba(244,245,242,0.3);">m</span>
+      <div class="telemetry-group">
+        <div class="telemetry-row"><span class="telemetry-label">Fuel</span><span class="fuel-val">—</span><span class="telemetry-unit">kg</span></div>
+        <div class="telemetry-row"><span class="telemetry-label">Mass</span><span class="mass-val">—</span><span class="telemetry-unit">t</span></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="color:rgba(244,245,242,0.5);">V/S</span>
-        <span class="vs-val" style="color:#88ccff;">0</span>
-        <span style="font-size:9px;color:rgba(244,245,242,0.3);">m/s</span>
+      <div class="telemetry-group">
+        <div class="telemetry-row telemetry-meter"><span class="telemetry-label">Heat</span><span class="heat-pct">0%</span><span class="telemetry-track"><span class="heat-fill"></span></span></div>
+        <div class="telemetry-row telemetry-meter"><span class="telemetry-label">Throttle</span><span class="throt-pct">0%</span><span class="telemetry-track"><span class="throt-fill"></span></span></div>
+        <div class="telemetry-row telemetry-meter"><span class="telemetry-label" title="Thrust-to-weight ratio">TWR</span><span class="twr-val">0.00</span><span class="telemetry-track"><span class="twr-fill"></span></span></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="color:rgba(244,245,242,0.5);">FUEL</span>
-        <span class="fuel-val" style="color:#ffaa44;">—</span>
-        <span style="font-size:9px;color:rgba(244,245,242,0.3);">kg</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="color:rgba(244,245,242,0.5);">MASS</span>
-        <span class="mass-val" style="color:#aaaacc;">—</span>
-        <span style="font-size:9px;color:rgba(244,245,242,0.3);">t</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:rgba(244,245,242,0.5);">HEAT</span>
-        <span style="font-size:9px;"><span class="heat-pct" style="color:#44FF44;">0%</span></span>
-        <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="heat-fill" style="width:0%;height:100%;background:#44FF44;border-radius:2px;display:block;"></span></span></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:rgba(244,245,242,0.5);">THR</span>
-        <span style="font-size:9px;"><span class="throt-pct" style="color:#aaaacc;">0%</span></span>
-        <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="throt-fill" style="width:0%;height:100%;background:#4488ff;border-radius:2px;display:block;"></span></span></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:rgba(244,245,242,0.5);">TWR</span>
-        <span class="twr-val" style="color:#ff6644;font-size:10px;">0.0</span>
-        <div class="data-bar" style="width:50px;height:4px;"><span class="data-bar__track"><span class="twr-fill" style="width:0%;height:100%;background:#ff6644;border-radius:2px;display:block;"></span></span></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:rgba(244,245,242,0.5);">Δv</span>
-        <span class="dv-val" style="color:#88ccff;font-size:10px;">0 m/s</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
-        <span style="color:rgba(244,245,242,0.5);">SAS</span>
-        <span class="sas-mode" style="color:#8888cc;font-size:10px;">OFF</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;">
-        <span style="color:rgba(244,245,242,0.5);">WARP</span>
-        <span class="warp-val" style="color:#c89838;font-size:10px;">x1</span>
+      <div class="telemetry-group">
+        <div class="telemetry-row telemetry-status"><span class="telemetry-label">Stability</span><span class="sas-mode">OFF</span></div>
+        <div class="telemetry-row telemetry-status"><span class="telemetry-label">Time warp</span><span class="warp-val">x1</span></div>
       </div>
     `;
     const warpControls = document.createElement('div');
-    warpControls.style.cssText = 'display:flex;gap:4px;margin-top:4px;';
+    warpControls.className = 'telemetry-warp-controls';
     for (const [label, action, title] of [
       ['−', 'warpDown', 'Slower time warp ([ / Q)'],
       ['+', 'warpUp', 'Faster time warp (] / E)'],
@@ -292,7 +255,7 @@ export class HUD {
       const button = document.createElement('button');
       button.textContent = label!; button.dataset.action = action!; button.title = title!;
       button.setAttribute('aria-label', title!);
-      button.style.cssText = 'flex:1;min-width:0;padding:6px 3px;background:#172335;color:#eacd9e;border:1px solid #394759;border-radius:4px;font:11px monospace;cursor:pointer;';
+
       warpControls.appendChild(button);
     }
     panel.appendChild(warpControls);
@@ -311,7 +274,6 @@ export class HUD {
     this.twrVal = panel.querySelector('.twr-val')!;
     this.twrFill = panel.querySelector('.twr-fill')!;
     this.sasModeEl = panel.querySelector('.sas-mode')!;
-    this.dvVal = panel.querySelector('.dv-val')!;
 
     this.lifetime.listen(panel, 'click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
@@ -407,10 +369,10 @@ setFreeCamera(active: boolean): void {
   setTwr(twr: number): void {
     if (!this.twrVal) return;
     setText(this.twrVal, twr.toFixed(2));
-    this.twrVal.style.color = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
+    this.twrVal.style.color = twr >= 1.0 ? '#a8d1b8' : twr >= 0.5 ? '#eacd9e' : '#ed9681';
     const pct = Math.min(100, (twr / 2) * 100);
     this.twrFill.style.width = `${pct}%`;
-    this.twrFill.style.background = twr >= 1.0 ? '#44ff88' : twr >= 0.5 ? '#ffcc44' : '#ff6644';
+    this.twrFill.style.background = twr >= 1.0 ? '#a8d1b8' : twr >= 0.5 ? '#eacd9e' : '#ed9681';
     // Pulse warning when insufficient thrust to lift off
     if (twr > 0 && twr < 1.0) this.twrVal.classList.add('twr-warn');
     else this.twrVal.classList.remove('twr-warn');
@@ -423,19 +385,11 @@ setFreeCamera(active: boolean): void {
     };
     setText(this.sasModeEl, labels[mode]!);
     this.sasModeEl.style.color =
-      mode === 'off' ? '#666' :
-      mode === 'prograde' ? '#44ff88' :
-      mode === 'retrograde' ? '#ff8844' : '#8888cc';
+      mode === 'off' ? '#a2b1bc' :
+      mode === 'prograde' ? '#a8d1b8' :
+      mode === 'retrograde' ? '#ed9681' : '#adbedc';
     if (mode !== 'off') this.sasModeEl.classList.add('sas-active');
     else this.sasModeEl.classList.remove('sas-active');
-  }
-
-  setDeltaV(dv: number): void {
-    if (!this.dvVal) return;
-    dv = gameMetres(dv);
-    if (dv >= 10000) setText(this.dvVal, `${(dv / 1000).toFixed(1)} km/s`);
-    else setText(this.dvVal, `${dv.toFixed(0)} m/s`);
-    this.dvVal.style.color = dv > 3000 ? '#44ff88' : dv > 1000 ? '#ffcc44' : '#ff6644';
   }
 
   setOrbit(o: {
@@ -670,13 +624,13 @@ setFreeCamera(active: boolean): void {
 
     const heatPct = Math.min(100, (heat / 300000) * 100);
 
-    setText(this.speedVal, speed > 1000 ? (speed/1000).toFixed(1)+'k' : speed.toFixed(1));
-    this.speedVal.style.color = speed > 3000 ? '#ff6644' : speed > 1000 ? '#ffaa44' : '#ddd';
-    const nearestAltKm = nearestAlt / 1000; setText(this.altVal, nearestAlt > 10000 ? nearestAltKm.toFixed(1)+'k' : nearestAlt.toFixed(0));
+    setReading(this.speedVal, formatReadout(speed, 'm/s', 1));
+    this.speedVal.style.color = speed > 3000 ? '#ed9681' : speed > 1000 ? '#eacd9e' : '#edf2f5';
+    setReading(this.altVal, formatReadout(nearestAlt, 'm'));
     // Vertical speed
     const vs = gameMetres(values.verticalSpeed);
-    setText(this.vsVal, vs > 0 ? '+' + vs.toFixed(0) : vs.toFixed(0));
-    this.vsVal.style.color = vs > 0 ? '#88ff88' : vs < 0 ? '#ff6644' : '#88ccff';
+    setReading(this.vsVal, formatReadout(vs, 'm/s', 0, true));
+    this.vsVal.style.color = vs > 0 ? '#a8d1b8' : vs < 0 ? '#ed9681' : '#a5c5da';
     const fuelKg = state.rocket.totalFuelMass();
     if (fuelKg > 1000) {
       setText(this.fuelVal, (fuelKg / 1000).toFixed(1));
@@ -693,11 +647,11 @@ setFreeCamera(active: boolean): void {
     if (this._fuelRKg) setText(this._fuelRKg, fKg > 1000 ? `${(fKg/1000).toFixed(1)} t` : `${fKg.toFixed(0)} kg`);
     if (this._fuelRBar) this._fuelRBar.style.width = `${maxF > 0 ? (fKg/maxF)*100 : 0}%`;
     this.throttleFill.style.width = `${tPct}%`;
-    this.throttleFill.style.background = tPct > 80 ? '#ff4444' : tPct > 40 ? '#ffaa00' : '#4488ff';
+    this.throttleFill.style.background = tPct > 80 ? '#ed9681' : tPct > 40 ? '#eacd9e' : '#a5c5da';
     setText(this.heatPct, `${heatPct.toFixed(0)}%`);
-    this.heatPct.style.color = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
+    this.heatPct.style.color = heatPct > 70 ? '#ed9681' : heatPct > 40 ? '#eacd9e' : '#a8d1b8';
     this.heatFill.style.width = `${heatPct}%`;
-    this.heatFill.style.background = heatPct > 70 ? '#FF3333' : heatPct > 40 ? '#FFCC00' : '#44FF44';
+    this.heatFill.style.background = heatPct > 70 ? '#ed9681' : heatPct > 40 ? '#eacd9e' : '#a8d1b8';
   }
 
   setLandingStatus(text: string, active: boolean): void {

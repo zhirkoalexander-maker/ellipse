@@ -226,16 +226,54 @@
   height: 100%;
 }
 
+/* Flight instruments */
+.flight-readouts {
+  position: fixed; top: 16px; left: 16px; z-index: 100; pointer-events: auto;
+  box-sizing: border-box; width: 184px; padding: 10px 12px;
+  background: #111d2b; color: #edf2f5; border: 1px solid #405161; border-radius: 8px;
+  font: 12px/1.35 Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+}
+.telemetry-group + .telemetry-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid #304151; }
+.telemetry-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) 24px; gap: 4px; align-items: baseline; min-height: 22px; }
+.telemetry-row > :nth-child(2) { text-align: right; white-space: nowrap; }
+.telemetry-label { font: 11px/1.4 system-ui, sans-serif; color: #a2b1bc; }
+.telemetry-unit { color: #91a6b7; font: 10px/1.4 system-ui, sans-serif; text-align: right; }
+.telemetry-main { min-height: 30px; }
+.telemetry-main > :nth-child(2) { font-size: 21px; letter-spacing: -.06em; }
+.telemetry-meter { grid-template-columns: 58px minmax(0, 1fr) 34px; align-items: center; }
+.telemetry-track { height: 3px; background: #304151; border-radius: 2px; overflow: hidden; }
+.telemetry-track > span { display: block; width: 0; height: 100%; background: #a5c5da; }
+.telemetry-status { grid-template-columns: 1fr auto; }
+.telemetry-status .warp-val, .fuel-val { color: #eacd9e; }
+.telemetry-warp-controls { display: flex; gap: 5px; margin-top: 5px; }
+.telemetry-warp-controls button {
+  flex: 1; min-width: 0; padding: 6px 3px; cursor: pointer;
+  background: #203044; color: #eacd9e; border: 1px solid #475b6e; border-radius: 4px;
+  font: 12px/1.2 Menlo, Consolas, monospace;
+}
+.telemetry-warp-controls button:hover { background: #2c4055; }
+.telemetry-warp-controls button:focus-visible { outline: 2px solid #eacd9e; outline-offset: 2px; }
+
 /* Keep flight controls clear of the vehicle on narrow displays. */
 .toast-stack { max-width: min(90vw, 560px); }
 .toast { white-space: normal; overflow-wrap: anywhere; }
 @media (max-width: 640px) {
-  .flight-hud .flight-readouts { left: 8px !important; top: 8px !important; min-width: 94px !important; padding: 6px !important; font-size: 9px !important; }
+  .flight-hud .flight-readouts { left: 8px; top: 8px; width: 170px; padding: 8px; }
   .flight-hud .flight-actions { bottom: 12px !important; width: calc(100vw - 24px) !important; gap: 6px !important; display: grid !important; grid-template-columns: repeat(4, 1fr); }
   .flight-hud .flight-actions button { min-height: 40px; padding: 6px 4px !important; font-size: 10px !important; }
   .flight-hud .flight-landing-status { bottom: 110px !important; width: calc(100vw - 48px); padding: 6px !important; font-size: 10px !important; }
   .flight-hud .flight-navball { right: 12px !important; bottom: 155px !important; }
   .flight-hud .flight-navball canvas { width: 76px !important; height: 76px !important; }
+}
+
+@media (max-height: 500px) {
+  .flight-hud .flight-readouts { top: 8px; left: 8px; width: 170px; padding: 6px 8px; font-size: 10px; }
+  .telemetry-group + .telemetry-group { margin-top: 3px; padding-top: 3px; }
+  .telemetry-row { min-height: 17px; }
+  .telemetry-main { min-height: 23px; }
+  .telemetry-main > :nth-child(2) { font-size: 17px; }
+  .telemetry-label, .telemetry-unit { font-size: 10px; }
+  .telemetry-warp-controls button { padding: 5px 3px; font-size: 10px; }
 }
 
 @media (max-width: 640px) and (pointer: coarse) {
