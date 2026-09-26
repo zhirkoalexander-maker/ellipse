@@ -70,6 +70,10 @@ describe('FlightScene launch from KSC pad', () => {
     expect(anyFlight.crashed).toBe(false);
     expect(anyFlight.launched).toBe(true);
     expect(anyFlight.grounded).toBe(false);
+    // Trajectory belongs on the map, not as a thread through the flight view.
+    const flightLines: THREE.Object3D[] = [];
+    sceneMgr.scene.traverse(object => { if (object instanceof THREE.Line) flightLines.push(object); });
+    expect(flightLines).toHaveLength(0);
 
     // Rocket must have climbed above its spawn altitude on the pad.
     const earth = system.bodies.find((b) => (b as any).name === 'earth') as any;
