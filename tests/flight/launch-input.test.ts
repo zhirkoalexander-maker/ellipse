@@ -120,3 +120,11 @@ describe('launch through player input', () => {
     expect(f.timeWarp).toBe(1);
   });
 });
+
+it('pauses and resumes from visible buttons without a keyboard', () => {
+  const f = create();
+  document.querySelector<HTMLButtonElement>('[data-action="pause"]')?.click();
+  expect(f.paused).toBe(true);
+  document.querySelector<HTMLButtonElement>('[data-action="resume"]')?.click();
+  expect(f.paused).toBe(false);
+});

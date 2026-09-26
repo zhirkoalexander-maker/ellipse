@@ -1,3 +1,4 @@
+import { navballFrame, pitchDirection } from './Navball';
 import { gameMetres } from './GameUnits';
 import { formatReadout } from './Readout';
 import { surfaceReadout } from './SurfaceReadout';
@@ -106,6 +107,7 @@ export class HUD {
     bar.appendChild(this.stageButton);
     this.setGrounded(true);
     bar.appendChild(addBtn('Map', 'map', '#4488ff'));
+    bar.appendChild(addBtn('Pause', 'pause', '#b7c4d4'));
     bar.appendChild(addBtn('Stability', 'sas', '#8888cc'));
     bar.appendChild(addBtn('Parachute', 'parachute', '#44cc88'));
     bar.appendChild(addBtn('Landing', 'landing', '#8fb6cf', 'Landing assist'));
@@ -467,7 +469,8 @@ setFreeCamera(active: boolean): void {
     velocityDir: [number, number, number],
     upDir: [number, number, number],
     orbitNormal?: [number, number, number],
-    bodyDirs?: Array<{ name: string; dir: [number, number, number]; color: string }>
+    bodyDirs?: Array<{ name: string; dir: [number, number, number]; color: string }>,
+    screenUp: [number,number,number] = upDir
   ): void {
     const ctx = this.navballCtx;
     const cw = 140, ch = 140, cx = 70, cy = 70, R = 66;
@@ -480,30 +483,11 @@ setFreeCamera(active: boolean): void {
     const fwdLen = Math.sqrt(fwd[0]*fwd[0] + fwd[1]*fwd[1] + fwd[2]*fwd[2]) || 1;
     fwd[0] /= fwdLen; fwd[1] /= fwdLen; fwd[2] /= fwdLen;
 
-    const dotFU = fwd[0]*upDir[0] + fwd[1]*upDir[1] + fwd[2]*upDir[2];
-    let refUp: [number, number, number] = [
-      upDir[0] - fwd[0] * dotFU,
-      upDir[1] - fwd[1] * dotFU,
-      upDir[2] - fwd[2] * dotFU,
-    ];
-    const refUpLen = Math.sqrt(refUp[0]*refUp[0] + refUp[1]*refUp[1] + refUp[2]*refUp[2]) || 1;
-    refUp[0] /= refUpLen; refUp[1] /= refUpLen; refUp[2] /= refUpLen;
-
-    const right: [number, number, number] = [
-      fwd[1]*refUp[2] - fwd[2]*refUp[1],
-      fwd[2]*refUp[0] - fwd[0]*refUp[2],
-      fwd[0]*refUp[1] - fwd[1]*refUp[0],
-    ];
-
-    const project = (dir: [number, number, number]) => {
-      const m = Math.sqrt(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]) || 1;
-      const dx = dir[0]/m, dy = dir[1]/m, dz = dir[2]/m;
-      const lx = dx*right[0] + dy*right[1] + dz*right[2];
-      const ly = dx*refUp[0] + dy*refUp[1] + dz*refUp[2];
-      const lz = dx*fwd[0] + dy*fwd[1] + dz*fwd[2];
-      const inFront = lz > 0;
-      const d = lz > 0 ? R / (1 + lz) : R * 0.5;
-      return { x: cx + lx * d, y: cy - ly * d, inFront, lx, ly, lz };
+    const frame = navballFrame(rocketFwd, screenUp);
+    const project = (dir: [number,number,number]) => {
+      const {x:lx,y:ly,z:lz} = frame.project(dir);
+      const d = R / Math.max(.001,1+lz);
+      return {x:cx+lx*d,y:cy-ly*d,inFront:lz>=-1e-8,lx,ly,lz};
     };
 
     const r2 = R * R;
@@ -511,66 +495,44 @@ setFreeCamera(active: boolean): void {
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.clip();
 
-    const upProj = project(upDir);
-    const nadProj = project([-upDir[0], -upDir[1], -upDir[2]]);
-
-    const skyGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    skyGrad.addColorStop(0, '#0a0a22');
-    skyGrad.addColorStop(0.4, '#1a2a4a');
-    skyGrad.addColorStop(1, '#224488');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-
-    if (nadProj.inFront) {
-      const earthGrad = ctx.createRadialGradient(nadProj.x, nadProj.y, 0, nadProj.x, nadProj.y, R * 1.2);
-      earthGrad.addColorStop(0, '#6a4a2a');
-      earthGrad.addColorStop(0.3, '#5a3a1a');
-      earthGrad.addColorStop(0.7, '#3a2a12');
-      earthGrad.addColorStop(1, 'rgba(10,10,40,0)');
-      ctx.fillStyle = earthGrad;
-      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    ctx.fillStyle = '#244971';
+    ctx.fillRect(cx-R,cy-R,R*2,R*2);
+    const u = frame.project(upDir);
+    ctx.fillStyle = '#795436';
+    ctx.beginPath();
+    if (Math.abs(u.z) < .0001) {
+      const angle = Math.atan2(-u.y,u.x);
+      const tx = -Math.sin(angle)*R*3, ty = Math.cos(angle)*R*3;
+      const dx = -Math.cos(angle)*R*3, dy = -Math.sin(angle)*R*3;
+      ctx.moveTo(cx+tx,cy+ty); ctx.lineTo(cx-tx,cy-ty);
+      ctx.lineTo(cx-tx+dx,cy-ty+dy);ctx.lineTo(cx+tx+dx,cy+ty+dy);ctx.closePath();
+    } else {
+      if(u.z>0) ctx.rect(cx-R,cy-R,R*2,R*2);
+      ctx.arc(cx+R*u.x/u.z,cy-R*u.y/u.z,R/Math.abs(u.z),0,Math.PI*2);
     }
-
-    for (let deg = -80; deg <= 80; deg += 10) {
-      const rad = deg * Math.PI / 180;
-      const cosP = Math.cos(rad);
-      const sinP = Math.sin(rad);
-      const dir: [number, number, number] = [
-        fwd[0]*cosP + refUp[0]*sinP,
-        fwd[1]*cosP + refUp[1]*sinP,
-        fwd[2]*cosP + refUp[2]*sinP,
-      ];
-      const p = project(dir);
-      if (!p.inFront) continue;
-      if ((p.x-cx)*(p.x-cx) + (p.y-cy)*(p.y-cy) > r2) continue;
-      const lineW = deg === 0 ? 26 : deg % 20 === 0 ? 18 : 10;
-      ctx.beginPath();
-      ctx.moveTo(cx - lineW * (1 - Math.abs(sinP) * 0.3), p.y);
-      ctx.lineTo(cx + lineW * (1 - Math.abs(sinP) * 0.3), p.y);
-      ctx.strokeStyle = deg === 0 ? '#FFCC44' : 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = deg === 0 ? 1.5 : 0.6;
-      ctx.stroke();
-      if (deg % 20 === 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.font = '7px sans-serif';
-        ctx.fillText(`${Math.abs(deg)}`, cx + lineW + 3, p.y + 2);
+    ctx.fill('evenodd');
+    const heading = pitchDirection(upDir,rocketFwd,0);
+    const tangent: [number,number,number] = [
+      upDir[1]*heading[2]-upDir[2]*heading[1],
+      upDir[2]*heading[0]-upDir[0]*heading[2],
+      upDir[0]*heading[1]-upDir[1]*heading[0],
+    ];
+    for(let deg=-80;deg<=80;deg+=10) {
+      ctx.beginPath(); let drawing=false;
+      const span = deg===0?180:deg%20===0?24:14;
+      for(let yaw=-span;yaw<=span;yaw+=2) {
+        const a=yaw*Math.PI/180;
+        const h = heading.map((v,i)=>v*Math.cos(a)+tangent[i]!*Math.sin(a)) as [number,number,number];
+        const p=project(pitchDirection(upDir,h,deg));
+        if(!p.inFront) {drawing=false;continue;}
+        if(drawing) ctx.lineTo(p.x,p.y);else ctx.moveTo(p.x,p.y);
+        drawing=true;
       }
-    }
-
-    for (let h = 0; h < 360; h += 45) {
-      const hr = h * Math.PI / 180;
-      const hx = right[0]*Math.cos(hr) + refUp[0]*Math.sin(hr);
-      const hy = right[1]*Math.cos(hr) + refUp[1]*Math.sin(hr);
-      const hz = right[2]*Math.cos(hr) + refUp[2]*Math.sin(hr);
-      const hDir: [number, number, number] = [hx - fwd[0]*dotFU, hy - fwd[1]*dotFU, hz - fwd[2]*dotFU];
-      const hm = Math.sqrt(hDir[0]*hDir[0] + hDir[1]*hDir[1] + hDir[2]*hDir[2]) || 1;
-      const hp = project([hDir[0]/hm, hDir[1]/hm, hDir[2]/hm]);
-      if (hp.inFront) {
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.font = '6px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${h}°`, hp.x, hp.y + 2);
-        ctx.textAlign = 'start';
+      ctx.strokeStyle=deg===0?'#ffcc44':'rgba(255,255,255,.45)';
+      ctx.lineWidth=deg===0?1.5:.7;ctx.stroke();
+      const p=project(pitchDirection(upDir,heading,deg));
+      if(deg && deg%20===0 && p.inFront && (p.x-cx)**2+(p.y-cy)**2<r2) {
+        ctx.fillStyle='#e0e7ee';ctx.font='8px system-ui';ctx.fillText(String(deg),p.x+12,p.y+3);
       }
     }
 

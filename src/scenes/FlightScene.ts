@@ -1,3 +1,4 @@
+import { activeStageNodes } from '../rocket/Stages';
 import { SIZE_DIMS } from '../parts/PartBuilder';
 import { loadSettings } from '../ui/Settings';
 import { dragArea, dragRetention } from '../flight/Aerodynamics';
@@ -142,6 +143,8 @@ private hudVisible = true;
   private sonicBoomLife = 0;
   private reentryGlowMesh: THREE.Mesh | null = null;
   private rocketRadius = 0.1;
+  private stagingOffset = new THREE.Vector3();
+  private stagingOffsetAltitude = 1;
   private rocketBottomY = 0; // lowest point of rocket mesh in local space
   private _debugMarker: THREE.Mesh | null = null;
   private _spawnProtectionTimer = 0;
@@ -426,6 +429,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
       else if (action === 'map') { this.orbitMap.toggle(); }
+      else if (action === 'pause') {
+        this.paused = true;
+        this.hud.setPaused(true);
+        this.sound.stopEngine();
+      }
       else if (action === 'resume') {
         this.paused = false;
         this.hud.setPaused(false);
@@ -552,7 +560,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.updateSurfaceView(0);
     const initialRef = getReferenceBody(this.state.position, this.system);
     const initialUp = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...initialRef.position)).normalize();
-    const cameraOffset = initialUp.clone().multiplyScalar(-this.rocketBottomY * ROCKET_VISUAL_SCALE);
+    const cameraOffset = initialUp.clone().multiplyScalar(-this.rocketBottomY * ROCKET_VISUAL_SCALE).add(this.currentStagingOffset());
     cameraOffset.add(new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5, 0).applyQuaternion(this.rocketQuat));
     this.chase.initialiseAt(this.state, this.rocketQuat, initialUp, cameraOffset);
     this.ownedSceneObjects = sceneMgr.scene.children.filter(obj => !existingSceneObjects.has(obj));
@@ -604,6 +612,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.maxSpeed = save.maxSpeed ?? 0;
       this.heatEnergy = save.heatEnergy ?? 0;
       this.stageSeparations = save.stageSeparations ?? 0;
+      this.landingAssist = save.landingAssist ?? false;
+      this.sasMode = save.sasMode ?? 'off';
+      this.sasTargetQuat.fromArray(save.sasTargetQuat ?? save.quat).normalize();
+      this.stagingOffset.fromArray(save.stagingOffset ?? [0,0,0]);
+      this.stagingOffsetAltitude = Math.max(1,save.stagingOffsetAltitude ?? 1);
       for (let i = 0; i < this.stageSeparations; i++) this.missions.recordStageSeparation();
       if (save.parachuteDeployed) this.toggleParachute();
       if (save.gearDeployed) this.toggleGear();
@@ -617,9 +630,12 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (save.mission && !this.grounded && !this.crashed) {
       const departure = this.system.bodyByName(save.mission.departure);
       const target = this.system.bodyByName(save.mission.target);
-      if (departure && target && departure.name !== target.name && this.rocket.totalFuelMass() > 0 && totalThrust(this.rocket.assembly.roots) > 0) {
+      if (departure && target && this.rocket.totalFuelMass() > 0 && totalThrust(this.rocket.assembly.roots) > 0) {
         this.autopilotActive = true;
         this.autopilotTarget = target.name;
+        this.autopilotStartMissionTime = save.mission.stats?.startTime ?? this.missionTime;
+        this.autopilotStartFuel = save.mission.stats?.startFuel ?? this.rocket.totalFuelMass();
+        this.autopilotStartMass = save.mission.stats?.startMass ?? this.rocket.totalMass();
         this.autopilotPhase = save.mission.phase === 'landing' ? 'landing' : 'cruise';
         this.missionGuidance = new MissionGuidance(this.navigationBody(departure), this.navigationBody(target));
         this.missionDirection.set(0, 1, 0).applyQuaternion(this.rocketQuat).normalize();
@@ -932,8 +948,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if ((!warpActive || (this.autopilotActive && this.autopilotPhase === 'ascent')) && !this.grounded && this.state.throttle > 0) {
       const dec = this.findLowestDecoupler(this.rocket.assembly.roots, false);
       if (dec) {
-        const decY = dec.position[1];
-        const below = this.rocket.fuelTanks.filter(t => t.node.position[1] < decY);
+        const stageNodes = new Set(activeStageNodes(this.rocket.assembly.roots));
+        const below = this.rocket.fuelTanks.filter(t => stageNodes.has(t.node));
         const belowFuel = below.reduce((s, t) => s + t.remaining, 0);
         const totalFuel = this.state.rocket.totalFuelMass();
         // Booster tanks dry but fuel remains above → drop the booster.
@@ -949,7 +965,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // engineFiring: throttle up AND fuel remains — thrust, flame and sound
     // require fuel, otherwise rockets accelerated forever on empty tanks.
     const engineActive = this.state.throttle > 0;
-    const engineFiring = engineActive && this.state.rocket.totalFuelMass() > 0.01;
+    const engineFiring = engineActive && this.rocket.activeFuelMass() > 0.01 && totalThrust(this.rocket.assembly.roots) > 0;
     const pitchInput = warpActive ? 0 : this.controls.getPitch();
     const yawInput = warpActive ? 0 : this.controls.getYaw();
     const rollInput = warpActive ? 0 : this.controls.getRoll();
@@ -995,7 +1011,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       aimAttitude(this.rocketQuat, targetDir, baseDt, 0.25);
     }
     if (this.maneuverRemaining.lengthSq() > 0) {
-      if (steering || this.grounded || this.rocket.totalFuelMass() <= 0) this.stopMapBurn();
+      if (steering || this.grounded || this.rocket.activeFuelMass() <= 0) this.stopMapBurn();
       else {
         aimAttitude(this.rocketQuat, this.maneuverRemaining, baseDt, 1.4);
         const alignment = new THREE.Vector3(0,1,0).applyQuaternion(this.rocketQuat).dot(this.maneuverRemaining.clone().normalize());
@@ -1078,7 +1094,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       if (this.maneuverRemaining.lengthSq() > 0) {
         const delivered = new THREE.Vector3(...this.state.velocity).sub(beforeBurn);
         this.maneuverRemaining.sub(delivered);
-        if (this.maneuverRemaining.length() < 0.05 || this.rocket.totalFuelMass() <= 0) this.stopMapBurn();
+        if (this.maneuverRemaining.length() < 0.05 || this.rocket.activeFuelMass() <= 0) this.stopMapBurn();
       }
       this.sanitize(this.state.velocity);
     }
@@ -1455,7 +1471,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
       this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE)
-        .addScaledVector(this.presentationUp,visualOffset);
+        .addScaledVector(this.presentationUp,visualOffset).add(this.currentStagingOffset());
 
       if (this.cameraMode === 'free') {
         // Free camera: orbit around rocket - WASD keys + mouse/touch drag
@@ -1476,7 +1492,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.sceneMgr.camera.up.copy(upVec);
         this.sceneMgr.camera.lookAt(rocketWorld);
       } else {
-        const lookOffset = this.presentationUp.clone().multiplyScalar(visualOffset);
+        const lookOffset = this.presentationUp.clone().multiplyScalar(visualOffset).add(this.currentStagingOffset());
         // Follow the centre of the displayed, eased attitude to keep the craft framed.
         const modelCenter = new THREE.Vector3(0, (this.rocketTopY + this.rocketBottomY) * ROCKET_VISUAL_SCALE * 0.5).applyQuaternion(this.rocketGroup.quaternion);
         lookOffset.x += modelCenter.x; lookOffset.y += modelCenter.y; lookOffset.z += modelCenter.z;
@@ -1708,7 +1724,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       velDir,
       [upX / upNorm, upY / upNorm, upZ / upNorm],
       [normX / normLen, normY / normLen, normZ / normLen],
-      bodyDirs
+      bodyDirs,
+      new THREE.Vector3(0,0,-1).applyQuaternion(this.rocketQuat).toArray() as [number,number,number]
     );
   }
 
@@ -1810,7 +1827,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.grounded) return 'Launch before executing a burn.';
     if (this.paused || this.crashed) return 'Resume flight before executing a burn.';
     if (!dv.every(Number.isFinite) || Math.hypot(...dv) < 0.05) return 'Set a course correction first.';
-    if (this.rocket.totalFuelMass() <= 0 || totalThrust(this.rocket.assembly.roots) <= 0) return 'An engine and fuel are required.';
+    if (this.rocket.activeFuelMass() <= 0 || totalThrust(this.rocket.assembly.roots) <= 0) return 'The current stage needs an engine and fuel.';
     if (this.autopilotActive) this.abortAutopilot('Course correction');
     this.landingAssist = false; this.manualAttitude = true; this.sasMode = 'off';
     this.timeWarp = 1; this.warpIndex = 0; this.state.throttle = 0;
@@ -1958,10 +1975,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const oldCom = new THREE.Vector3(...this.rocket.assembly.centerOfMass());
     const oldPosition = this.rocketGroup.position.clone();
     const oldBottom = this.rocketBottomY;
+    const previousOffset = this.currentStagingOffset();
     const stageRef = getReferenceBody(this.state.position, this.system);
     const stageUp = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...stageRef.position)).normalize();
     const renderLag = new THREE.Vector3(...this.state.position).multiplyScalar(VISUAL_SCALE)
-      .addScaledVector(stageUp, -oldBottom * ROCKET_VISUAL_SCALE).sub(oldPosition);
+      .addScaledVector(stageUp, -oldBottom * ROCKET_VISUAL_SCALE).add(previousOffset).sub(oldPosition);
     this.rocketGroup.updateWorldMatrix(true, true);
     const ref = getReferenceBody(this.state.position, this.system);
     const branches = decoupler.radial ? detached.map(node => [node]) : [detached];
@@ -2005,8 +2023,10 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.positionFlameAtNozzle(false);
     const up = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position)).normalize();
     const shift = this.rocketGroup.position.clone().sub(oldPosition)
-      .addScaledVector(up, (this.rocketBottomY - oldBottom) * ROCKET_VISUAL_SCALE).divideScalar(VISUAL_SCALE);
-    this.state.position = new THREE.Vector3(...this.state.position).add(shift).toArray() as Vec3;
+      .addScaledVector(up, (this.rocketBottomY - oldBottom) * ROCKET_VISUAL_SCALE);
+    this.stagingOffset.copy(previousOffset).add(shift);
+    const radius = (ref as any).getSurfaceRadiusAt?.(this.state.position) ?? (ref as any).radius ?? 0;
+    this.stagingOffsetAltitude = Math.max(1,new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...ref.position))-radius);
     this.rocketGroup.updateMatrixWorld(true);
     this.achievements.unlock('stage_separate');
     this.missions.recordStageSeparation();
@@ -2235,6 +2255,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.sasTargetQuat.copy(this.rocketQuat);
     this.sound.stopEngine(); this.sound.playLand(); this.engineFlame.stop();
     this.screenShake = outcome === 'rough' ? 0.2 : 0;
+    this.stagingOffset.set(0,0,0);
     this.landingStatus = `Landed on ${body.name.toUpperCase()} · throttle up to launch again`;
     this.achievements.unlock(`land_${body.name}`);
     if (Math.abs(vertical) < 3) this.achievements.unlock('first_landing');
@@ -2553,9 +2574,10 @@ private positionFlameAtNozzle(sync = true): void {
     this.rocketBottomY = bounds.isEmpty() ? -0.05 : bounds.min.y;
     this.rocketTopY = bounds.isEmpty() ? 0.05 : bounds.max.y;
     const nozzles: THREE.Vector3[] = [];
+    const activeNodes = new Set(activeStageNodes(this.rocket.assembly.roots));
     const collectNozzles = (nodes: AssemblyNode[]) => {
       for (const node of nodes) {
-        if (node.part.kind === 'engine') {
+        if (node.part.kind === 'engine' && activeNodes.has(node)) {
           const mesh = this.rocketGroup.getObjectByName(node.uid ?? node.part.id);
           if (mesh) {
             // Use the engine's local slot bottom, transformed into rocket space.
@@ -2573,11 +2595,20 @@ private positionFlameAtNozzle(sync = true): void {
     if (sync) this.syncVisualTransform();
   }
 
+  /** Visual continuity after staging must never alter the simulated orbit. Fade the offset on approach to the surface. */
+  private currentStagingOffset(): THREE.Vector3 {
+    if (this.stagingOffset.lengthSq() === 0) return this.stagingOffset;
+    const ref = getReferenceBody(this.state.position,this.system);
+    const radius = (ref as any).getSurfaceRadiusAt?.(this.state.position) ?? (ref as any).radius ?? 0;
+    const altitude = new THREE.Vector3(...this.state.position).distanceTo(new THREE.Vector3(...ref.position))-radius;
+    return this.stagingOffset.clone().multiplyScalar(Math.max(0,Math.min(1,altitude/this.stagingOffsetAltitude)));
+  }
+
   private syncVisualTransform(): void {
     const ref = getReferenceBody(this.state.position, this.system);
     const up = new THREE.Vector3(...this.state.position).sub(new THREE.Vector3(...ref.position)).normalize();
     this.rocketGroup.quaternion.copy(this.rocketQuat);
-    this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE).addScaledVector(up, -this.rocketBottomY * ROCKET_VISUAL_SCALE);
+    this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE).addScaledVector(up, -this.rocketBottomY * ROCKET_VISUAL_SCALE).add(this.currentStagingOffset());
     this.rocketGroup.updateMatrixWorld(true);
   }
 
@@ -2587,10 +2618,13 @@ private positionFlameAtNozzle(sync = true): void {
     if (!loadSettings().autoSave) return;
     saveFlightState({
       version: 3,
+      sasMode:this.sasMode, sasTargetQuat:this.sasTargetQuat.toArray() as [number,number,number,number], landingAssist:this.landingAssist,
+      stagingOffset:this.stagingOffset.toArray() as Vec3, stagingOffsetAltitude:this.stagingOffsetAltitude,
       mission: this.autopilotActive && this.missionGuidance ? {
         target: this.autopilotTarget,
         departure: this.missionGuidance.departure.name,
         autoWarp: this.missionAutoWarp,
+        stats:{startTime:this.autopilotStartMissionTime,startFuel:this.autopilotStartFuel,startMass:this.autopilotStartMass},
         ...(this.autopilotPhase === 'landing' ? { phase: 'landing' as const } : {}),
       } : undefined,
       assembly: serializeAssembly(this.rocket.assembly), launchAssembly: this.launchAssembly,

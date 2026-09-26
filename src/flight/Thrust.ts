@@ -1,3 +1,4 @@
+import { activeStageNodes } from '../rocket/Stages';
 import type { FlightState } from './FlightState';
 import { G0, FUEL_FLOW_MULT } from '../config/constants';
 
@@ -5,7 +6,7 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
   if (state.throttle <= 0) return;
   const engines = findAllEngines(state.rocket.assembly.roots);
   if (engines.length === 0) return;
-  const available = state.rocket.totalFuelMass();
+  const available = state.rocket.activeFuelMass();
   if (available <= 0) return; // tanks dry — NO thrust
   let totalForceN = 0;
   let totalMassFlow = 0;
@@ -33,58 +34,21 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
 }
 
 export function findFirstEngine(nodes: any[]): { thrust: number; isp: number } | null {
-  for (const n of nodes) {
-    if (n.part.thrust && n.part.isp) {
-      return { thrust: n.part.thrust, isp: n.part.isp };
-    }
-    if (n.children?.length) {
-      const found = findFirstEngine(n.children);
-      if (found) return found;
-    }
-  }
-  return null;
+  return findAllEngines(nodes)[0] ?? null;
 }
 
-/** Sum of all engine thrusts (kN) — used for TWR calculation. */
+/** Available thrust from the current stage, including its side engines. */
 export function totalThrust(nodes: any[]): number {
-  let total = 0;
-  const walk = (ns: any[]) => {
-    for (const n of ns) {
-      if (n.part.thrust && n.part.isp) total += n.part.thrust;
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(nodes);
-  return total;
+  return findAllEngines(nodes).reduce((sum, part) => sum + part.thrust, 0);
 }
 
-/** Average Isp weighted by thrust — for delta-V calculations with mixed engines. */
 export function weightedIsp(nodes: any[]): number {
-  let totalThrustVal = 0;
-  let weighted = 0;
-  const walk = (ns: any[]) => {
-    for (const n of ns) {
-      if (n.part.thrust && n.part.isp) {
-        totalThrustVal += n.part.thrust;
-        weighted += n.part.isp * n.part.thrust;
-      }
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(nodes);
-  return totalThrustVal > 0 ? weighted / totalThrustVal : 0;
+  const engines = findAllEngines(nodes);
+  const thrust = engines.reduce((sum, part) => sum + part.thrust, 0);
+  return thrust > 0 ? engines.reduce((sum, part) => sum + part.thrust * part.isp, 0) / thrust : 0;
 }
 
 function findAllEngines(nodes: any[]): { thrust: number; isp: number }[] {
-  const result: { thrust: number; isp: number }[] = [];
-  const walk = (ns: any[]) => {
-    for (const n of ns) {
-      if (n.part.thrust && n.part.isp) {
-        result.push({ thrust: n.part.thrust, isp: n.part.isp });
-      }
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(nodes);
-  return result;
+  return activeStageNodes(nodes).filter(n => n.part.kind === 'engine' && n.part.thrust && n.part.isp)
+    .map(n => ({thrust: n.part.thrust!, isp: n.part.isp!}));
 }

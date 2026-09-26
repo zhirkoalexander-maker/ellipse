@@ -108,9 +108,16 @@ export class Assembly {
   toMesh(): THREE.Group {
     const group = new THREE.Group();
     const walk = (n: AssemblyNode, parent: THREE.Object3D) => {
-      const model = buildPartMesh(n.part);
-      const mesh = n.radial ? new THREE.Group() : model;
-      if (n.radial) { model.scale.y = .2; model.rotation.z = Math.PI / 2; mesh.add(model); }
+      const mesh = n.radial ? new THREE.Group() : buildPartMesh(n.part);
+      if (n.radial) {
+        const d = SIZE_DIMS[n.part.size];
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(d.height*.2,d.height*.32,d.radius*.72),
+          new THREE.MeshStandardMaterial({color:0xaab2b5,metalness:.55,roughness:.5}));
+        mesh.add(plate);
+        const latch = new THREE.Mesh(new THREE.BoxGeometry(d.height*.22,d.height*.1,d.radius*.4),
+          new THREE.MeshStandardMaterial({color:0xc4974e,metalness:.45,roughness:.5}));
+        mesh.add(latch);
+      }
       mesh.name = n.uid ?? n.part.id;
       mesh.position.set(n.position[0], n.position[1], n.position[2]);
       mesh.rotation.y = n.rotation;
@@ -132,6 +139,22 @@ export class Assembly {
       const top = sorted[i]!, bottom = sorted[i + 1]!;
       const dt = SIZE_DIMS[top.part.size], db = SIZE_DIMS[bottom.part.size];
       const rTop = Assembly.endRadius(top.part, 'bottom'), rBottom = Assembly.endRadius(bottom.part, 'top');
+      if (bottom.part.kind === 'decoupler' && !bottom.radial && top.part.kind === 'engine') {
+        const radius = dt.radius;
+        const height = dt.height;
+        const wall = radius*.035;
+        const shroud = new THREE.Mesh(new THREE.LatheGeometry([
+          new THREE.Vector2(radius-wall,-height/2),new THREE.Vector2(radius,-height/2),
+          new THREE.Vector2(radius,height/2),new THREE.Vector2(radius-wall,height/2),
+          new THREE.Vector2(radius-wall,-height/2),
+        ],24),new THREE.MeshStandardMaterial({color:0xf2f2e9,roughness:.48,metalness:.08,side:THREE.DoubleSide}));
+        shroud.position.fromArray(top.position);
+        shroud.userData.joint = true;
+        shroud.userData.lowerPart = bottom.uid;
+        shroud.userData.upperPart = top.uid;
+        shroud.name = 'interstage';
+        group.add(shroud);
+      }
       if (Math.abs(rTop - rBottom) < .001) continue;
       if (Math.hypot(top.position[0] - bottom.position[0], top.position[2] - bottom.position[2]) > .001) continue;
       const lowerEdge = bottom.position[1] + db.height / 2;

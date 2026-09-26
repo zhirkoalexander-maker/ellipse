@@ -58,9 +58,9 @@ describe('Launch gate — default rocket', () => {
     const thrust = totalThrust(r.assembly.roots); // kN
     const g = surfaceGravity();
     const twr = (thrust * 1000 * 1.0) / (r.totalMass() * g);
-    expect(thrust).toBeCloseTo((5500 + 4500) * 1.12 * 1.5 * 1.5 + 120 * 1.12, 8);
-    expect(twr).toBeGreaterThan(3.7);
-    expect(twr).toBeLessThan(4.1); // not absurdly overpowered either
+    expect(thrust).toBeCloseTo(5500 * 1.12 * 1.5 * 1.5, 8);
+    expect(twr).toBeGreaterThan(2.0);
+    expect(twr).toBeLessThan(2.3); // not absurdly overpowered either
   });
 
   it('engines actually accelerate the rocket (simulated 10s burn)', () => {

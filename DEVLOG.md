@@ -1,5 +1,13 @@
 # Changes
 
+## 2.5.29
+
+- Separating a stage no longer changes the rocket’s altitude or orbit. Upper-stage engines wait until their stage is exposed.
+- Continue remembers stability, landing assistance and automatic trips back to the same planet, including trip statistics.
+- Fix the attitude indicator’s horizon and roll. Add a Pause button.
+- Replace the large side separator discs with compact mounts and cover upper-stage engines with a detachable interstage.
+- Increase assembly text sizes and keep attachment controls accessible on short screens.
+
 ## 2.5.28
 
 - Add side-mounted engine pairs in Vehicle assembly, with optional side decouplers, tank selection and Undo.
