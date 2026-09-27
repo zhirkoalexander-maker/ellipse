@@ -31,7 +31,7 @@ export class MissionGuidance {
     const altitude=distance-targetRadius;
     const relativeTargetVelocity=sub(s.velocity,this.target.velocity);
     if(altitude<15000 && norm(relativeTargetVelocity)<60 && !s.grounded) {
-      return {direction:unit(sub(s.position,this.target.position)),throttle:0,phase:'landing',status:'Arrival complete — controlled descent',readyToLand:true,targetSpeed:0};
+      return {direction:unit(sub(s.position,this.target.position)),throttle:0,phase:'landing',status:'Starting landing',readyToLand:true,targetSpeed:0};
     }
     const clearance=Math.max(100000,this.departure.radius*0.03);
     const shell=this.departure.radius+clearance;
@@ -62,6 +62,6 @@ export class MissionGuidance {
     const velocity=s.grounded ? this.departure.velocity : s.velocity;
     const demand=add(mul(sub(desired,velocity),1/Math.max(2,Math.min(10,s.dt*2))),gravityCompensation);
     const magnitude=norm(demand);
-    return {direction:unit(demand),throttle:Math.min(1,magnitude/accel),phase,status:phase==='ascent'?'Climbing to departure altitude':phase==='departure'?'Clearing departure planet':phase==='arrival'?'Braking for destination':'Powered transfer to '+this.target.name.toUpperCase(),readyToLand:false,targetSpeed};
+    return {direction:unit(demand),throttle:Math.min(1,magnitude/accel),phase,status:phase==='ascent'?'Climbing':phase==='departure'?'Leaving the surface':phase==='arrival'?'Slowing for landing':'Flying to '+this.target.name[0]!.toUpperCase()+this.target.name.slice(1),readyToLand:false,targetSpeed};
   }
 }

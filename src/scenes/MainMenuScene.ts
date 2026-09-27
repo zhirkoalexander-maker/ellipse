@@ -64,7 +64,7 @@ export class MainMenuScene {
     this.root.appendChild(btn('Flight', 'primary', this.onPlay));
     const continueButton = btn('Continue', 'secondary', () => this.onContinue?.());
     continueButton.disabled = !this.onContinue;
-    continueButton.title = this.onContinue ? 'Resume your last flight or saved build' : 'No saved flight yet — start with FLIGHT';
+    continueButton.title = this.onContinue ? 'Open your last flight or build' : 'No saved flight yet. Choose Flight to start.';
     if (!this.onContinue) { continueButton.style.opacity = '0.45'; continueButton.style.cursor = 'default'; }
     this.root.appendChild(continueButton);
     this.root.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
@@ -127,23 +127,34 @@ export class MainMenuScene {
     const card = document.createElement('div');
     card.className = 'guide-card';
     card.style.cssText = 'width:min(560px,calc(100vw - 24px));box-sizing:border-box;max-height:90dvh;overflow:auto;padding:24px;font:14px/1.6 system-ui;color:#ddd;';
-    card.innerHTML = `<h2>Quick guide</h2>
-      <p>Switch your keyboard to English before playing so the letter keys work correctly.</p>
-      <button class="btn btn--primary" id="guide-tour" style="padding:10px 16px">Watch the tour</button>
-      <ol class="quick-guide">
-      <li><b>Start</b><span>Flight → Launch. Space works too.</span></li>
-      <li><b>Build</b><span>Vehicle assembly → engine → two tanks → capsule → Take to pad. For side engines, choose Side pair and a tank, then add decouplers and engines. Space drops the side pair before the lower stage.</span></li>
-      <li><b>Fly</b><span>↑ / ↓ throttle. W/S and A/D steer.</span></li>
-      <li><b>Go to the Moon</b><span>Map → Moon → Autopilot to destination.</span></li>
-      <li><b>Land</b><span>Watch Above surface. Press L for landing assist. Keep fuel for braking.</span></li>
-      <li><b>Return</b><span>Keep fuel. Map → Earth → Autopilot to destination.</span></li>
-      </ol>
+    card.classList.add('flight-guide');
+    card.innerHTML = `<h2>Guide</h2>
+      <p class="guide-note">Use an English keyboard layout for the letter keys.</p>
+      <h3>First flight</h3>
+      <p>Choose <b>Flight</b> in the menu, then press <b>Launch</b> or Space. The engines start after the countdown.</p>
+      <p>↑ and ↓ change throttle. W/S and A/D steer. Drag to move the camera; scroll or pinch to zoom.</p>
+      <button class="btn btn--secondary" id="guide-tour" style="padding:10px 16px">Show me</button>
+      <details><summary>Build a rocket</summary>
+        <p>Open <b>Vehicle assembly</b>. Start with an S engine, two 5 t tanks and an S capsule. Add them in that order, then choose <b>Take to pad</b>.</p>
+        <p>For side engines, select <b>Side pair</b> and the tank they attach to. Add an engine pair and decouplers. Either can go on first. If there is no tank yet, choose one from the parts list.</p>
+        <p>Space releases the side decouplers first, then the lowest main stage. Both capsules have a parachute built in.</p>
+      </details>
+      <details><summary>Fly to the Moon</summary>
+        <p>Open <b>Map</b>, select <b>Moon</b>, then <b>Autopilot to destination</b>. Autopilot uses your engines and fuel to fly there and land.</p>
+        <p>Steering or changing throttle takes back control. Leave <b>Manual warp</b> off to let autopilot adjust time warp.</p>
+        <p>For the return trip, select <b>Earth</b> in the map and start autopilot again. You will need fuel left for the journey.</p>
+      </details>
+      <details><summary>Land</summary>
+        <p><b>Above surface</b> shows the distance to the ground. Use <b>Landing view</b> to look down.</p>
+        <p>Point the engine toward the ground and use throttle to slow your descent. Start braking before you get close. Press <b>L</b> if you want landing assist to handle it.</p>
+        <p><b>P</b> opens the parachute. It needs an atmosphere, so use your engine to land on the Moon.</p>
+      </details>
       <details><summary>Keyboard controls</summary><table>
       <tr><td>↑ / ↓</td><td>Throttle</td></tr><tr><td>W / S · A / D</td><td>Steer</td></tr><tr><td>J / K</td><td>Roll</td></tr>
       <tr><td>Space</td><td>Launch or separate a stage</td></tr><tr><td>L · T</td><td>Landing assist · stability mode</td></tr>
       <tr><td>P · G</td><td>Parachute · landing gear</td></tr><tr><td>M / Tab</td><td>Open map</td></tr><tr><td>Q / E or [ / ]</td><td>Time warp</td></tr>
       <tr><td>C · F</td><td>Free camera · reset view</td></tr><tr><td>Esc</td><td>Close map or pause</td></tr></table></details>
-      <p>Drag to look around. Scroll or pinch to zoom.</p>
+      <p class="guide-note">Continue opens your last flight or build. Saves stay in this browser.</p>
       <button class="btn btn--primary" style="margin-top:12px;width:100%;padding:12px" id="help-close">Close</button>`;
     card.querySelector('#guide-tour')!.addEventListener('click',()=>{overlay.remove();this.helpOverlay=null;this.showTutorial('Guide');});
     const closeBtn = card.querySelector('#help-close') as HTMLButtonElement;
