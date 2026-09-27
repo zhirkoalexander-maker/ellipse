@@ -32,7 +32,7 @@ export class MainMenuScene {
     this.root.style.cssText = `
       position: fixed; inset: 0; z-index: 500;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(6,8,20,0.95);
+      background: rgba(16,19,22,0.97);
       border: none; border-radius: 0;
     `;
 
@@ -40,16 +40,8 @@ export class MainMenuScene {
     logo.className = 'menu-logo';
     logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
-      <svg viewBox="0 0 120 40" fill="none" style="width:100px;height:36px;display:block;margin:0 auto var(--space-2);">
-        <ellipse class="orbit-ring" cx="60" cy="20" rx="52" ry="16" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="1.2" opacity="0.4"/>
-        <ellipse class="orbit-ring" cx="60" cy="20" rx="36" ry="10" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.8" opacity="0.25"/>
-        <ellipse class="orbit-ring" cx="60" cy="20" rx="18" ry="5" transform="rotate(-15 60 20)" stroke="var(--accent-gold)" stroke-width="0.6" opacity="0.15"/>
-        <circle cx="60" cy="20" r="2.5" fill="var(--accent-gold)"/>
-        <line x1="10" y1="20" x2="110" y2="20" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
-        <line x1="60" y1="4" x2="60" y2="36" stroke="var(--accent-gold)" stroke-width="0.3" opacity="0.15"/>
-      </svg>
-      <div class="text-display" style="font-size:clamp(26px, 7vw, 52px);letter-spacing:0.1em;color:var(--accent-gold);">CHALLENGER</div>
-      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0.08em;">Rocket simulator</div>
+      <div class="text-display" style="font-size:clamp(28px, 7vw, 44px);letter-spacing:0;color:var(--text-primary);">CHALLENGER</div>
+      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0;">Rocket simulator</div>
     `;
     this.root.appendChild(logo);
 
@@ -86,11 +78,11 @@ export class MainMenuScene {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.9);';
     const card = document.createElement('div');
     card.className = 'guide-card';
-    card.style.cssText = 'max-width:520px;max-height:80vh;overflow-y:auto;padding:28px;font-family:system-ui,sans-serif;color:#ddd;background:#0c1020;border:1px solid rgba(200,152,56,0.2);border-radius:8px;';
+    card.style.cssText = 'max-width:520px;max-height:80vh;overflow-y:auto;padding:28px;font-family:system-ui,sans-serif;color:#ddd;background:#191e23;border:1px solid rgba(200,152,56,0.2);border-radius:8px;';
     const completed = new Set(this.missions.getCompleted());
     card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;">
-        <div style="color:#c89838;font-size:18px;letter-spacing:0.05em;">Missions</div>
-        <div style="color:#c89838;font-size:12px;">${completed.size} / ${MISSIONS.length} completed</div>
+        <div style="color:#eceee9;font-size:18px;">Missions</div>
+        <div style="color:#aeb8c1;font-size:12px;">${completed.size} / ${MISSIONS.length} completed</div>
       </div>`;
     const list = document.createElement('div');
     list.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
