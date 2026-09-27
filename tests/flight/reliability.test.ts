@@ -223,6 +223,17 @@ it('gives manual throttle priority over landing assist',()=>{
  f.hud._throttleBtn=true;f.updateInner(1/60);
  expect(f.landingAssist).toBe(false);expect(f.state.throttle).toBeGreaterThan(.2);
 });
+it('survives the reported low descent with moderate drift in actual surface contact', () => {
+ const {f} = create(); const b=f.system.bodyByName('earth');
+ const point=[b.position[0], b.position[1]+b.radius,b.position[2]];
+ const radius=b.getSurfaceRadiusAt(point)+f.constructor.SPAWN_OFFSET_M;
+ f.grounded=false; f.groundedDir=null;
+ f.rocketQuat.setFromAxisAngle(new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(4));
+ f.state.velocity=[b.velocity[0]+68,b.velocity[1]-20,b.velocity[2]];
+ f.resolveSurfaceContact(b,[0,radius+10,0],[0,radius,0],false);
+ expect(f.crashed).toBe(false); expect(f.grounded).toBe(true);
+ expect(f.state.throttle).toBe(0);
+});
 it.each([90,90.01])('applies the touchdown limit in displayed units at %s m/s',speed=>{
  const {f}=create(),b=f.system.bodyByName('moon');
  const radius=b.getSurfaceRadiusAt([b.position[0],b.radius,b.position[2]]);

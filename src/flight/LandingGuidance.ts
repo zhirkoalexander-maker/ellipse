@@ -28,6 +28,7 @@ export function landingCommand(s: LandingInput) {
 export function landingOutcome(verticalSpeed: number, lateralSpeed: number, tiltDegrees: number, supported: boolean): 'soft' | 'rough' | 'crash' {
   if (![verticalSpeed, lateralSpeed, tiltDegrees].every(Number.isFinite)) return 'crash';
   // Allow round-off when subtracting a planet's orbital velocity at the boundary.
-  if (Math.abs(verticalSpeed) > 90 + 1e-6 || lateralSpeed > (supported ? 8 : 4) || tiltDegrees > (supported ? 35 : 22)) return 'crash';
+  // Moderate sideways motion makes a rough landing, not an instant explosion.
+  if (Math.abs(verticalSpeed) > 90 + 1e-6 || lateralSpeed > (supported ? 45 : 30) || tiltDegrees > (supported ? 35 : 22)) return 'crash';
   return Math.abs(verticalSpeed) <= 6 && lateralSpeed <= 3 ? 'soft' : 'rough';
 }
