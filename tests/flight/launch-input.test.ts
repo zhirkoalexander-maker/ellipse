@@ -54,6 +54,18 @@ describe('launch through player input', () => {
     expect(f.grounded).toBe(true);
   });
 
+  it('zooms freely with the free-camera buttons and F restores the chase view', () => {
+    const f = create(); f.cameraMode = 'free';
+    for(let i = 0; i < 90; i++) f.hud.onAction('cameraZoomOut');
+    step(f, 1 / 60);
+    expect(f.freeCamDist).toBeGreaterThan(1e7);
+    expect(f.sceneMgr.camera.far).toBeGreaterThan(f.freeCamDist);
+    for(let i = 0; i < 120; i++) f.hud.onAction('cameraZoomIn');
+    expect(f.freeCamDist).toBeLessThan(.1);
+    window.dispatchEvent(new KeyboardEvent('keydown', {key:'f'}));
+    expect(f.cameraMode).toBe('chase');
+  });
+
   it.each(['button', 'Space'])('an explicit %s launch completes a partial-throttle countdown at full power', input => {
     const f = create();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
@@ -74,15 +86,17 @@ describe('launch through player input', () => {
     expect(f.crashed).toBe(false);
   });
 
-  it('explains insufficient thrust immediately without a repeating countdown', () => {
+  it('launches an overweight fueled rocket slowly instead of rejecting it', () => {
     const f = create();
-    vi.spyOn(f.rocket, 'totalMass').mockReturnValue(1e8);
+    vi.spyOn(f.rocket, 'totalMass').mockReturnValue(1e6);
     f.hud.onAction('stage');
-    expect(f.state.throttle).toBe(0);
-    expect(document.querySelector('.flight-landing-status')?.textContent).toContain('thrust');
+    expect(f.state.throttle).toBe(1);
     step(f, 8);
     expect(f.countdownActive).toBe(false);
-    expect(f.grounded).toBe(true);
+    expect(f.grounded).toBe(false);
+    expect(f.crashed).toBe(false);
+    expect(f.relSpeed()).toBeGreaterThan(1);
+    expect(f.relSpeed()).toBeLessThan(50);
   });
 
   it.each(['off', 'burn', 'coast'])('lets a player select 100x coast with autopilot %s and advances the clock at 100x', phase => {

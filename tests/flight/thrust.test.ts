@@ -5,6 +5,37 @@ import { System } from '../../src/physics/System';
 import { Rocket } from '../../src/rocket/Rocket';
 import { Assembly } from '../../src/rocket/Assembly';
 import { findPart } from '../../src/parts/PartCatalog';
+import { G0, FUEL_FLOW_MULT } from '../../src/config/constants';
+
+function heavyState(tanks: number, engine = 'engine_mammoth') {
+  const a = new Assembly();
+  for (const id of [engine, ...Array<string>(tanks).fill('tank_xl_lfo')]) {
+    a.addRoot({ part: findPart(id)!, position: [0, 0, 0], rotation: 0, children: [] });
+  }
+  const state = new FlightState(new Rocket(a), new System(), [0, 0, 0], [0, 0, 0]);
+  state.throttle = 1;
+  return state;
+}
+
+it('gives heavy stacks enough real acceleration to lift, with less acceleration for more mass', () => {
+  const medium = heavyState(5), heavy = heavyState(20);
+  for (const state of [medium, heavy]) applyThrust(state, 1);
+  expect(heavy.velocity[1]).toBeGreaterThan(18 * 1.1);
+  expect(heavy.velocity[1]).toBeLessThan(medium.velocity[1]);
+});
+
+it('scales fuel flow with delivered thrust and still respects throttle and empty tanks', () => {
+  const full = heavyState(10, 'engine_ant'), half = heavyState(10, 'engine_ant');
+  const fuel = full.rocket.totalFuelMass(), mass = full.rocket.totalMass();
+  half.throttle = .5;
+  applyThrust(full, 1); applyThrust(half, 1);
+  expect(full.velocity[1]).toBeGreaterThan(18);
+  expect(half.velocity[1]).toBeCloseTo(full.velocity[1] / 2);
+  expect(fuel - full.rocket.totalFuelMass()).toBeCloseTo(full.velocity[1] * mass / (findPart('engine_ant')!.isp! * G0) * FUEL_FLOW_MULT);
+  full.rocket.fuelTanks.forEach(t => t.remaining = 0);
+  const before = [...full.velocity]; applyThrust(full, 1);
+  expect(full.velocity).toEqual(before);
+});
 
 describe('applyThrust', () => {
   it('with throttle 1, accelerates rocket along +Y', () => {

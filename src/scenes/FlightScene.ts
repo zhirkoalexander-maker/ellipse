@@ -15,10 +15,10 @@ import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Achievements } from '../core/Achievements';
 import type { Missions } from '../core/Missions';
 import { FlightState } from '../flight/FlightState';
-import { ChaseCamera } from '../flight/ChaseCamera';
+import { ChaseCamera, zoomDistance } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
-import { applyThrust, findFirstEngine, totalThrust } from '../flight/Thrust';
+import { applyThrust, availableThrust, totalThrust } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
@@ -423,8 +423,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
       else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
       else if (action === 'lookDown') { this.cameraMode = 'chase'; this.hud.setFreeCamera(false); this.chase.setPolar(0.55); }
-      else if (action === 'cameraZoomIn') this.chase.zoom(0.82);
-      else if (action === 'cameraZoomOut') this.chase.zoom(1.22);
+      else if (action === 'cameraZoomIn') this.zoomCamera(0.82);
+      else if (action === 'cameraZoomOut') this.zoomCamera(1.22);
       else if (action === 'stage') this.stageOrLaunch();
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
@@ -480,6 +480,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.cycleSasMode();
         e.preventDefault();
       } else if (e.key === 'f') {
+        this.cameraMode = 'chase'; this.hud.setFreeCamera(false);
         this.chase.reset();
         toast.show('Camera view reset');
         e.preventDefault();
@@ -544,8 +545,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.lifetime.listen(dom, 'wheel', (e) => {
       if (this.cameraMode === 'free') {
         e.preventDefault();
-        this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
-        this.freeCamDist = Math.max(0.5, Math.min(500, this.freeCamDist));
+        this.zoomCamera(e.deltaY > 0 ? 1.1 : 0.9);
       }
     }, { passive: false });
 
@@ -1015,7 +1015,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else {
         aimAttitude(this.rocketQuat, this.maneuverRemaining, baseDt, 1.4);
         const alignment = new THREE.Vector3(0,1,0).applyQuaternion(this.rocketQuat).dot(this.maneuverRemaining.clone().normalize());
-        const acceleration = totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass();
+        const acceleration = availableThrust(this.state) * 1000 / this.rocket.totalMass();
         this.state.throttle = alignment > .999 ? Math.min(1, this.maneuverRemaining.length() / Math.max(.00001, acceleration * _dt)) : 0;
       }
     }
@@ -1055,7 +1055,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           this.launched = true;
           // Check thrust-to-weight ratio using actual local gravity
           // Sum ALL engines' thrust (not just first found)
-          const sumThrust = totalThrust(this.state.rocket.assembly.roots);
+          const sumThrust = availableThrust(this.state);
           const refBody = getReferenceBody(this.state.position, this.system);
           const gdx = this.state.position[0] - refBody.position[0];
           const gdy = this.state.position[1] - refBody.position[1];
@@ -1063,7 +1063,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (sumThrust > 0 && localGrav > 0) {
-            const fuelNow = this.state.rocket.totalFuelMass();
+            const fuelNow = this.state.rocket.activeFuelMass();
             if (fuelNow <= 0.01) {
               toast.show('No fuel left to launch.');
               this.launched = false;
@@ -1481,6 +1481,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
         if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
 
+        this.chase.setClippingDistance(this.freeCamDist);
         const rocketWorld = this.rocketGroup.position.clone();
         const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
         const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
@@ -1583,7 +1584,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       const tgdz = this.state.position[2] - twrRefBody.position[2];
       const tgr = Math.sqrt(tgdx*tgdx + tgdy*tgdy + tgdz*tgdz) || 1;
       const localG = (G * (twrRefBody as any).mass) / (tgr * tgr);
-      const sumThrustLive = totalThrust(this.state.rocket.assembly.roots);
+      const sumThrustLive = availableThrust(this.state);
       const mass = this.state.rocket.totalMass();
       if (sumThrustLive > 0 && localG > 0 && mass > 0) {
         twr = (sumThrustLive * 1000 * this.state.throttle) / (mass * localG);
@@ -1879,7 +1880,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     const command = this.missionGuidance.update({ position: this.state.position, velocity: this.state.velocity,
       reference: this.navigationBody(this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system)),
-      mass: this.rocket.totalMass(), maxAcceleration: totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass(),
+      mass: this.rocket.totalMass(), maxAcceleration: availableThrust(this.state) * 1000 / this.rocket.totalMass(),
       dt, grounded: this.grounded, fuel: this.rocket.totalFuelMass() });
     if (command.phase === 'blocked') { this.abortAutopilot(command.status); return; }
     this.autopilotPhase = command.phase;
@@ -2107,6 +2108,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
   }
 
+  private zoomCamera(factor: number): void {
+    if (this.cameraMode === 'free') this.freeCamDist = zoomDistance(this.freeCamDist, factor);
+    else this.chase.zoom(factor);
+  }
+
   private stageOrLaunch(): void {
     if (this.paused || this.crashed || this.lifetime.disposed) return;
     if (!this.grounded) {
@@ -2114,13 +2120,13 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else toast.show('Return time warp to ×1 before staging.');
       return;
     }
-    const thrust = totalThrust(this.rocket.assembly.roots) * 1000;
+    const thrust = availableThrust(this.state) * 1000;
     const body = getReferenceBody(this.state.position, this.system);
     const radiusSq = new THREE.Vector3(...this.state.position).distanceToSquared(new THREE.Vector3(...body.position));
     const gravity = G * body.mass / Math.max(1, radiusSq);
     const twr = thrust / (this.rocket.totalMass() * gravity);
     const reason = thrust <= 0 ? 'No engine — add an engine in Vehicle Assembly.'
-      : this.rocket.totalFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
+      : this.rocket.activeFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
       : twr <= 1 ? `Insufficient thrust (TWR ${twr.toFixed(2)}). Use a stronger engine or reduce mass.`
       : '';
     if (reason) {
@@ -2181,7 +2187,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.landingStatus = 'Landing assist off';
       return;
     }
-    const maxAcceleration = this.rocket.totalFuelMass() > 0 ? totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass() : 0;
+    const maxAcceleration = this.rocket.activeFuelMass() > 0 ? availableThrust(this.state) * 1000 / this.rocket.totalMass() : 0;
     const command = landingCommand({ altitude, verticalSpeed, horizontalSpeed: lateral.length(), gravity: G * ref.mass / (radius * radius), maxAcceleration });
     const desiredLandingDirection = up.clone().multiplyScalar(command.verticalAcceleration);
     if (lateral.lengthSq() > 1e-8) desiredLandingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);

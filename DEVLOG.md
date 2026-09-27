@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.34
+
+Heavy rockets now get enough thrust to leave the pad at full throttle, with slower ascent as mass increases. Fuel use, instruments and guidance share the adjusted thrust. Flight zoom has a much wider range, including free-camera buttons; F returns to the fitted view. Moderate sideways drift now produces a rough landing instead of an immediate crash.
+
 ## 2.5.33
 
 - Replace the illustrated tutorial with screenshots of the actual game, highlighted controls and close-ups on phones. Playback and first-visit dismissal still work as before.
