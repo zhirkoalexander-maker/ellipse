@@ -10,7 +10,7 @@ import { releaseSceneObjects } from '../core/disposeObject';
 import { serializeAssembly, deserializeAssembly, saveAssembly, loadAssembly, listAssemblies, deleteAssembly, saveLastAssembly } from '../storage/SaveLoad';
 import { toast } from '../ui/Toast';
 
-// Part stacking heights — MUST match PartBuilder SIZE_DIMS heights (×PART_SCALE)
+// Stacking heights match PartBuilder SIZE_DIMS (×PART_SCALE).
 const PH: Record<string,number> = { S:1.4, M:2.0, L:2.8, XL:3.6 };
 
 export class VABScene {
@@ -54,8 +54,7 @@ export class VABScene {
     };
     this._onMove = (e:MouseEvent) => { if(!this.dr)return; this.az-=(e.clientX-this.pr.x)*0.005; this.po=Math.max(0.05,Math.min(Math.PI-0.05,this.po+(e.clientY-this.pr.y)*0.005)); this.pr={x:e.clientX,y:e.clientY}; this.cam(); };
     this._onUp = () => this.dr=false;
-    // Wheel zoom — v3.9 accidentally froze the camera at a fixed distance
-    // while rockets kept getting taller, making everything tiny on screen.
+    // Zoom only over the model, not the parts list.
     this._onWheel = (e:WheelEvent) => {
       if (this.root && !this.root.isConnected) return;
       // Only zoom when the wheel is over the 3D view — scrolling the PARTS
@@ -109,7 +108,7 @@ export class VABScene {
     this.root.innerHTML = `
       <div class="vab-sidebar" style="width:clamp(168px,40vw,280px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
         <div id="vab-header" style="box-sizing:border-box;flex-shrink:0;padding:12px;border-bottom:1px solid rgba(255,255,255,0.15);">
-          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Vehicle assembly</div>
+          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;">Vehicle assembly</div>
           <div style="margin-top:6px;font:400 12px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose a part to add.</div>
           <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 13px system-ui;outline:none;">
           <label style="display:block;margin-top:8px;font:11px system-ui;color:#ccd5df;">Attach
@@ -175,7 +174,7 @@ export class VABScene {
     this.root.querySelector('#vs')!.addEventListener('click', () => this.showSaveDialog());
     this.root.querySelector('#vlb')!.addEventListener('click', () => this.showLoadDialog());
     this.root.querySelector('#vb')!.addEventListener('click', () => this.ob());
-    // On-screen zoom controls — bulletproof against wheel/touch/event-target quirks
+    // On-screen zoom controls.
     this.root.querySelector('#vz-in')!.addEventListener('click', () => {
       this.dt = Math.max(0.12, this.dt * 0.8); this.cam();
     });
@@ -189,13 +188,13 @@ export class VABScene {
     const el = this.root.querySelector('#vl')!;
     const thumbnails = new PartThumbnails();
 
-    // ─── PRESETS ───
+    // Starter assembly
     const presetHeader = document.createElement('div');
-    presetHeader.textContent = 'QUICK START';
+    presetHeader.textContent = 'Starter rocket';
     presetHeader.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
-    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a rocket</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:11px;margin-top:1px;">4 parts</span>`;
+    presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Use starter</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:11px;margin-top:1px;">4 parts</span>`;
     presetBtn.style.cssText = 'display:block;width:100%;padding:7px 16px;background:transparent;color:#fff;border:none;font:400 13px system-ui;cursor:pointer;text-align:left;transition:all 0.15s;';
     presetBtn.addEventListener('mouseenter', () => { presetBtn.style.background='rgba(255,255,255,0.05)'; });
     presetBtn.addEventListener('mouseleave', () => { presetBtn.style.background='transparent'; });
@@ -270,7 +269,7 @@ export class VABScene {
       this.st += height; this.nm.push(part.name);
     }
     this.assembly.restack(); this.rf(); this.up();
-    toast.show('Rocket built. Choose Take to pad.', 3000);
+    toast.show('Starter loaded.', 3000);
   }
   private remember(): void {
     this.history.push(deserializeAssembly(serializeAssembly(this.assembly)) ?? new Assembly());
@@ -398,11 +397,11 @@ export class VABScene {
     if (!this.assembly.roots.length) { toast.show('Add a part before saving.'); return; }
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
-    card.className = 'guide-card';
+    card.className = 'guide-card game-dialog';
     card.style.cssText = 'max-width:380px;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#191e23;border:1px solid rgba(255,255,255,0.2);border-radius:8px;';
     card.innerHTML = `
       <div style="color:#fff;font-size:14px;letter-spacing:0;margin-bottom:12px;">Save rocket</div>
-      <input id="save-name" placeholder="rocket name" style="width:100%;padding:10px;background:#06080f;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:#fff;font:400 13px monospace;box-sizing:border-box;margin-bottom:12px;" />
+      <input id="save-name" placeholder="Rocket name" style="width:100%;padding:10px;background:#06080f;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:#fff;font:400 13px monospace;box-sizing:border-box;margin-bottom:12px;" />
       <div style="display:flex;gap:8px;">
         <button id="save-ok" class="btn btn--primary" style="flex:1;padding:10px;font-size:12px;">Save</button>
         <button id="save-cancel" class="btn btn--ghost" style="flex:1;padding:10px;font-size:12px;">Cancel</button>
@@ -415,7 +414,7 @@ export class VABScene {
     const doSave = () => {
       const name = input.value.trim() || `Rocket ${new Date().toLocaleDateString()}`;
       if (!saveAssembly(name, this.assembly)) { toast.show("Could not save. Browser storage may be full."); return; }
-      toast.show(`Saved: "${name}"`);
+      toast.show(`Saved ${name}`);
       close();
     };
     card.querySelector('#save-ok')!.addEventListener('click', doSave);
@@ -426,7 +425,7 @@ export class VABScene {
     const names = listAssemblies().filter(n => n !== storageKey('assembly_last'));
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
-    card.className = 'guide-card';
+    card.className = 'guide-card game-dialog';
     card.style.cssText = 'max-width:380px;max-height:60vh;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#191e23;border:1px solid rgba(255,255,255,0.2);border-radius:8px;display:flex;flex-direction:column;';
     card.innerHTML = `
       <div style="color:#fff;font-size:14px;letter-spacing:0;margin-bottom:12px;">Load rocket</div>
@@ -455,7 +454,7 @@ export class VABScene {
             this.st = a.roots.reduce((s, r) => s + (PH[r.part.size] || 0.6), 0);
             this.nm = a.roots.map(r => r.part.name);
             this.rf(); this.up();
-            toast.show(`Loaded: "${name}"`);
+            toast.show(`Loaded ${name}`);
             overlay.remove();
           } else {
             toast.show('Could not load this rocket.');
@@ -467,7 +466,7 @@ export class VABScene {
         delBtn.addEventListener('click', () => {
           if (!deleteAssembly(name)) { toast.show("Could not delete this save."); return; }
           row.remove();
-          toast.show(`Deleted: "${name}"`);
+          toast.show(`Deleted ${name}`);
         });
         btns.appendChild(loadBtn);
         btns.appendChild(delBtn);

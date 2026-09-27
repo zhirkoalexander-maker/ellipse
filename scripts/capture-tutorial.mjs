@@ -30,7 +30,7 @@ try {
  await page.evaluate(()=>[...document.querySelectorAll('.menu-btn')].find(b=>b.textContent==='Flight').id='tour-flight');
  await capture('menu','#tour-flight');
  await page.evaluate(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Vehicle assembly').click());await page.waitForSelector('#vp-placement');
- await page.evaluate(()=>[...document.querySelectorAll('#vl button')].find(b=>b.textContent.includes('Build a rocket')).click());
+ await page.evaluate(()=>[...document.querySelectorAll('#vl button')].find(b=>b.textContent.includes('Use starter')).click());
  await capture('assembly','#vg');await page.click('#vg');await page.waitForSelector('.flight-readouts');
  await capture('launch','.flight-actions [data-action="stage"]');
  await page.click('[data-action="map"]');await page.select('#transfer-target','moon');await capture('moon','#transfer-go');

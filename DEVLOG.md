@@ -1,5 +1,9 @@
 # Changes
 
+## 2.5.35
+
+New title screen using a frame from the game. Shorter guide and walkthrough, matching dialog styles and quieter flight controls. Removed the unused app scaffold and design preview; updated the README and GitHub project description.
+
 ## 2.5.34
 
 Heavy rockets now get enough thrust to leave the pad at full throttle, with slower ascent as mass increases. Fuel use, instruments and guidance share the adjusted thrust. Flight zoom has a much wider range, including free-camera buttons; F returns to the fitted view. Moderate sideways drift now produces a rough landing instead of an immediate crash.
