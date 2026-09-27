@@ -1,6 +1,7 @@
 import { storageKey } from '../storage/MigrateLegacySaves';
 import { Lifetime } from '../core/Lifetime';
 import './Tutorial.css';
+import frames from './TutorialFrames.json';
 
 const KEY = () => storageKey('tutorial_seen');
 let seenThisSession=false;
@@ -8,17 +9,14 @@ export function shouldShowTutorial():boolean {
   if(seenThisSession)return false;
   try {return localStorage.getItem(KEY())!=='1';} catch {return true;}
 }
-const rocket=`<g class="tour-rocket"><path d="M-11 25 L0 65 L11 25" fill="#ff993e" class="tour-flame"/><path d="M-13 15 L-24 32 L-13 30 M13 15 L24 32 L13 30" fill="#738396"/><rect x="-13" y="-25" width="26" height="53" rx="3" fill="#e4e7eb"/><path d="M-13-25 Q-12-48 0-57 Q12-48 13-25" fill="#f8f8f5"/><rect x="-13" y="5" width="26" height="7" fill="#d37c38"/><circle cx="0" cy="-29" r="5" fill="#48acd7"/></g>`;
-const earth='<circle cx="125" cy="225" r="57" fill="#286ca1"/><path d="M88 186l34-10 20 22-24 18 5 29-26 7-17-32z" fill="#64985b"/>';
-const moon='<circle cx="465" cy="90" r="31" fill="#c8c6be"/><circle cx="458" cy="83" r="8" fill="#a8a69f"/><circle cx="477" cy="100" r="5" fill="#aaa89f"/>';
-const route=(home=false)=>`<svg viewBox="0 0 600 320" aria-hidden="true">${earth}${moon}<path d="M160 180 Q280 0 442 107" fill="none" stroke="#73d9ff" stroke-width="2" stroke-dasharray="6 7"/><g class="${home?'tour-return':'tour-transfer'}">${rocket}</g><text x="104" y="303">Earth</text><text x="446" y="43">Moon</text></svg><div class="tour-map-choice">Map → ${home?'Earth':'Moon'}<span>Autopilot to destination</span></div>`;
-const steps=[
-  {title:'Start here',text:'Choose Flight to try the starter rocket, or Vehicle assembly to build one.',scene:`<div class="tour-menu"><span>CHALLENGER</span><div>Flight</div><div class="tour-highlight">Vehicle assembly</div><div>Guide</div></div>`},
-  {title:'Build a rocket',text:'Start with an S engine, two 5 t tanks and an S capsule, in that order. Then choose Take to pad.',scene:`<div class="tour-builder"><div class="tour-parts"><span>Engine</span><span>Fuel tank ×2</span><span>Capsule</span></div><svg viewBox="0 0 300 320" aria-hidden="true"><g transform="translate(150 260)"><path class="tour-part tour-engine" d="M-18-20H18L27 5H-27Z" fill="#8e9ba9"/><rect class="tour-part tour-tank" x="-20" y="-110" width="40" height="88" rx="4" fill="#e1e5e7"/><path class="tour-part tour-capsule" d="M-20-114Q-19-157 0-174Q19-157 20-114Z" fill="#f2f1eb"/><rect x="-20" y="-73" width="40" height="7" fill="#d37c38"/></g></svg><div class="tour-pad-button">Take to pad →</div></div>`},
-  {title:'Lift off',text:'Press Launch or Space and wait for the countdown. Use ↑ / ↓ for throttle and W/S or A/D to steer.',scene:`<svg viewBox="0 0 600 320" aria-hidden="true"><path d="M0 285Q100 257 240 282T600 280V320H0Z" fill="#506b3d"/><rect x="235" y="279" width="130" height="10" fill="#79828b"/><g class="tour-launch">${rocket}</g><text x="34" y="52">Launch / Space</text><text x="34" y="82">↑ Throttle</text></svg>`},
-  {title:'Fly to the Moon',text:'In Map, select Moon and press Autopilot to destination. Leave the engines and steering to it until you land.',scene:route()},
-  {title:'Landing',text:'Watch Above surface as you descend. Use Landing view to look down, or press L for help with braking.',scene:`<svg viewBox="0 0 600 320" aria-hidden="true"><path d="M0 275Q130 240 250 280T600 270V320H0Z" fill="#8c8c85"/><g class="tour-landing">${rocket}</g><text x="30" y="52">Above surface</text><text x="30" y="87" class="tour-height">Keep fuel for braking</text></svg><div class="tour-map-choice">L · Landing assist</div>`},
-  {title:'Return to Earth',text:'Once landed, choose Earth in Map and start autopilot again. Check your fuel before leaving.',scene:route(true)},
+type Lesson = {title:string;text:string;frame:keyof typeof frames;alt:string;note?:string};
+const steps: Lesson[] = [
+  {title:'Start here',text:'Flight opens a starter on the pad. Vehicle assembly is where you build your own.',frame:'menu',alt:'The game menu, with Flight selected.',note:'Use an English keyboard layout for the letter keys.'},
+  {title:'Build a rocket',text:'Add an S engine, two 5 t tanks and an S capsule. Then choose Take to pad.',frame:'assembly',alt:'A four-part rocket in Vehicle assembly, beside the parts list and Take to pad button.'},
+  {title:'Lift off',text:'Press Launch or Space and wait for the countdown. ↑ / ↓ change throttle; W/S and A/D steer.',frame:'launch',alt:'The starter rocket on its launch pad, with the Launch button below.'},
+  {title:'Fly to the Moon',text:'Choose Moon in Map, then Autopilot to destination. Leave the controls alone while it flies and lands.',frame:'moon',alt:'The map destination panel with Moon selected and the autopilot button below.'},
+  {title:'Landing',text:'Above surface tells you how far away the ground is. Start braking early, or press L for landing assist.',frame:'landing',alt:'A descending rocket and its Above surface readout, showing height and descent speed.'},
+  {title:'Return to Earth',text:'On the Moon, pick Earth in Map and start autopilot again. Keep enough fuel for the trip home.',frame:'return',alt:'The map destination panel with Earth selected for the return flight.'},
 ];
 
 export class Tutorial {
@@ -30,7 +28,7 @@ export class Tutorial {
   private previousFocus=document.activeElement as HTMLElement|null;
   constructor(private onClose:()=>void) {
     this.root.className='tutorial';this.root.setAttribute('role','dialog');this.root.setAttribute('aria-modal','true');this.root.setAttribute('aria-labelledby','tour-title');
-    this.root.innerHTML='<div class="tour-card"><header><span>Flight basics</span><button data-tutorial="skip">Skip</button></header><div class="tour-screen"></div><div class="tour-caption" aria-live="polite"><small></small><h2 id="tour-title"></h2><p></p></div><footer><button data-tutorial="back">Back</button><button data-tutorial="pause">Pause</button><button data-tutorial="next">Next</button></footer></div>';
+    this.root.innerHTML='<div class="tour-card"><header><span>How to play</span><button data-tutorial="skip">Close</button></header><div class="tour-screen"></div><div class="tour-caption" aria-live="polite"><small></small><h2 id="tour-title"></h2><p></p><div class="tour-note"></div></div><footer><button data-tutorial="back">Back</button><button data-tutorial="pause">Pause</button><button data-tutorial="next">Next</button></footer></div>';
     this.life.append(this.root);
     this.life.listen(this.root,'click',e=>{
       const action=(e.target as HTMLElement).closest<HTMLElement>('[data-tutorial]')?.dataset.tutorial;
@@ -56,12 +54,19 @@ export class Tutorial {
   private render(updateScene=true):void {
     clearTimeout(this.timer);
     const step=steps[this.index]!;
-    if(updateScene)this.root.querySelector('.tour-screen')!.innerHTML=step.scene;
+    if(updateScene) {
+      const base = `${import.meta.env.BASE_URL}tutorial/${step.frame}`;
+      const focus = (rect:number[]) => `left:${rect[0]}%;top:${rect[1]}%;width:${rect[2]}%;height:${rect[3]}%`;
+      const screen = this.root.querySelector('.tour-screen')!;
+      screen.innerHTML = `<picture><source media="(max-width:600px)" srcset="${base}-close.webp"><img src="${base}.webp" width="960" height="640" alt="" decoding="async"></picture><span aria-hidden="true" class="tour-focus tour-focus-wide" style="${focus(frames[step.frame].wide)}"></span><span aria-hidden="true" class="tour-focus tour-focus-close" style="${focus(frames[step.frame].close)}"></span>`;
+      screen.querySelector('img')!.alt=step.alt;
+    }
     this.root.querySelector('h2')!.textContent=step.title;
     this.root.querySelector('.tour-caption p')!.textContent=step.text;
+    this.root.querySelector('.tour-note')!.textContent=step.note ?? '';
     this.root.querySelector('small')!.textContent=`${this.index+1} / ${steps.length}`;
     this.root.classList.toggle('tour-paused',!this.playing);
-    if(updateScene&&!this.playing)for(const animation of this.root.getAnimations?.({subtree:true})??[])animation.currentTime=4000;
+
     this.root.querySelector<HTMLButtonElement>('[data-tutorial=back]')!.disabled=this.index===0;
     this.root.querySelector('[data-tutorial=pause]')!.textContent=this.playing?'Pause':'Play';
     this.root.querySelector('[data-tutorial=next]')!.textContent=this.index===steps.length-1?'Done':'Next';

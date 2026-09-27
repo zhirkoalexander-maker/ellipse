@@ -22,7 +22,7 @@ export class SettingsPanel {
   private life=new Lifetime();
   constructor(current: Settings, onClose:()=>void) {
     this.root.className='settings-overlay';
-    this.root.style.cssText='position:fixed;inset:0;z-index:9999;background:#060814e0;display:grid;place-items:center';
+    this.root.style.cssText='position:fixed;inset:0;z-index:9999;background:#101316ed;display:grid;place-items:center';
     const card=document.createElement('div');card.className='panel panel--elevated';
     card.style.cssText='width:min(360px,calc(100vw - 24px));box-sizing:border-box;padding:24px;max-height:90dvh;overflow:auto';
     card.innerHTML='<h2>Settings</h2><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Save flights automatically<input type="checkbox" id="settings-autosave"></label><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Sound effects<input type="checkbox" id="settings-sound"></label><p style="font-size:13px;color:#aab5c2">Saves stay in this browser. Switching autosave off keeps your last save. Use Save in Vehicle assembly to keep a rocket design.</p><button class="btn btn--primary" style="width:100%;padding:12px">Done</button>';

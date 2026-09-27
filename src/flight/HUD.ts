@@ -155,9 +155,9 @@ export class HUD {
     style.textContent = `
       .autopilot-picker[hidden],.autopilot-mission[hidden]{display:none!important}
       .autopilot-picker{position:fixed;inset:0;z-index:450;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,9,17,.78);pointer-events:auto}
-      .autopilot-dialog{width:min(360px,100%);max-height:85dvh;overflow:auto;border:1px solid #536273;border-radius:12px;background:#111d2b;color:#ecf0f3;padding:24px;font:14px/1.5 system-ui;box-shadow:0 20px 80px #0008}
-      .autopilot-dialog select{display:block;width:100%;margin:6px 0 18px;padding:12px;border:1px solid #566577;border-radius:5px;background:#1b2b3c;color:#fff;font:inherit}
-      .autopilot-dialog button,.autopilot-mission button{padding:10px 12px;border:1px solid #536273;border-radius:5px;background:#233549;color:#eaf1f8;font:11px system-ui;cursor:pointer}
+      .autopilot-dialog{width:min(360px,100%);max-height:85dvh;overflow:auto;border:1px solid #536273;border-radius:5px;background:#1b2025;color:#ecf0f3;padding:24px;font:14px/1.5 system-ui;box-shadow:0 8px 24px #0005}
+      .autopilot-dialog select{display:block;width:100%;margin:6px 0 18px;padding:12px;border:1px solid #566577;border-radius:5px;background:#252c32;color:#fff;font:inherit}
+      .autopilot-dialog button,.autopilot-mission button{padding:10px 12px;border:1px solid #536273;border-radius:5px;background:#2b343c;color:#eaf1f8;font:11px system-ui;cursor:pointer}
       .autopilot-dialog [data-action=autopilotStart]{background:#eacd9e;color:#142233;border-color:#eacd9e;font-weight:600}
       .autopilot-mission{position:fixed;top:16px;left:50%;transform:translateX(-50%);width:min(340px,calc(100vw - 360px));box-sizing:border-box;z-index:180;padding:10px 12px;background:rgba(13,25,39,.94);border:1px solid #788d9f;border-radius:7px;color:#e8f0f4;font:11px/1.45 system-ui;pointer-events:auto}
       .autopilot-mission button{padding:5px 8px;margin-top:7px;font-size:9px}

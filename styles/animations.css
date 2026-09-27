@@ -23,7 +23,8 @@
   color: var(--text-primary);
   box-shadow: var(--shadow-md);
   animation: toast-in 140ms ease-out;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   max-width: 80vw;
 }
 
@@ -57,19 +58,6 @@
   to   { opacity: 1; }
 }
 
-/* Logo ellipse rings — very slow subtle drift */
-.orbit-ring {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: orbit-drift 60s linear infinite;
-}
-.orbit-ring:nth-child(2) { animation-direction: reverse; animation-duration: 90s; }
-.orbit-ring:nth-child(3) { animation-duration: 120s; }
-
-@keyframes orbit-drift {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
 
 /* ─── GUIDE OVERLAY (quick fade) ─── */
 .guide-overlay { animation: fade-in 160ms ease-out; }
@@ -172,20 +160,4 @@
   50%      { opacity: 0.6; }
 }
 
-/* ─── SAS ACTIVE (subtle glow) ─── */
-.sas-active {
-  animation: sas-glow 3s ease-in-out infinite;
-}
-@keyframes sas-glow {
-  0%, 100% { text-shadow: 0 0 3px currentColor; }
-  50%      { text-shadow: 0 0 6px currentColor; }
-}
-
-/* ─── WARP CHANGE PULSE (quick) ─── */
-.warp-pulse {
-  animation: warp-pulse 220ms ease-out;
-}
-@keyframes warp-pulse {
-  0%   { transform: scale(1.2); }
-  100% { transform: scale(1); }
-}
+.sas-active{font-weight:600}

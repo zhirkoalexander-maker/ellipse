@@ -27,3 +27,20 @@ it('cleans up playback when its menu is removed',async()=>{
  vi.useFakeTimers();const tutorial=new Tutorial(()=>{});tutorial.dispose();
  expect(vi.getTimerCount()).toBe(0);expect(document.querySelector('.tutorial')).toBeNull();
 });
+
+it('shows real game screenshots with readable alternatives on every step',async()=>{
+ const { Tutorial }=await import('../../src/ui/Tutorial');
+ const tutorial=new Tutorial(()=>{});
+ try {
+  for(let i=0;i<6;i++) {
+   const image=document.querySelector<HTMLImageElement>('.tour-screen img');
+   expect(image).not.toBeNull();
+   expect(image!.alt.length).toBeGreaterThan(10);
+   expect(image!.getAttribute('src')).toMatch(/tutorial\/.+\.webp$/);
+   expect(document.querySelector('.tour-screen source')?.getAttribute('srcset')).toMatch(/-close\.webp$/);
+   expect(document.querySelector('.tour-screen svg')).toBeNull();
+   document.querySelector<HTMLButtonElement>('[data-tutorial=next]')!.click();
+  }
+  expect(document.querySelector('.tutorial')).toBeNull();
+ }finally{tutorial.dispose();}
+});

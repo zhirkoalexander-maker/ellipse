@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.33
+
+- Replace the illustrated tutorial with screenshots of the actual game, highlighted controls and close-ups on phones. Playback and first-visit dismissal still work as before.
+- Simplify the menu and dialog styling, remove the orbit logo and decorative status glow, and use local system fonts.
+
 ## 2.5.32
 
 - Shorten the guide and put building, Moon trips, landing and controls in separate expandable sections. Update it for the S/XL parts.

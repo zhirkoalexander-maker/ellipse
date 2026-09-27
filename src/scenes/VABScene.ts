@@ -192,7 +192,7 @@ export class VABScene {
     // ─── PRESETS ───
     const presetHeader = document.createElement('div');
     presetHeader.textContent = 'QUICK START';
-    presetHeader.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
+    presetHeader.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0;padding:10px 16px 4px;opacity:0.7;';
     el.appendChild(presetHeader);
     const presetBtn = document.createElement('button');
     presetBtn.innerHTML = `<span style="width:2px;height:12px;background:#EACD9E;border-radius:1px;display:inline-block;vertical-align:middle;margin-right:8px;opacity:0.8;"></span><span style="vertical-align:middle;color:#fff;">Build a rocket</span><span style="float:right;color:rgba(255,255,255,0.6);font-size:11px;margin-top:1px;">4 parts</span>`;
@@ -212,7 +212,7 @@ export class VABScene {
       const h = document.createElement('div');
       const names: Record<string, string> = { capsule: 'Capsules', tank: 'Tanks', engine: 'Engines', decoupler: 'Decouplers', parachute: 'Parachutes', legs: 'Landing gear', heatshield: 'Heat shields', fairing: 'Fairings', rcs: 'RCS', solar: 'Solar panels' };
       h.textContent = names[kind] ?? kind;
-      h.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.15em;padding:10px 16px 4px;opacity:0.7;';
+      h.style.cssText = 'font:400 11px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0;padding:10px 16px 4px;opacity:0.7;';
       el.appendChild(h);
       for (const p of g.parts) {
         const b = document.createElement('button');
@@ -399,9 +399,9 @@ export class VABScene {
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
     card.className = 'guide-card';
-    card.style.cssText = 'max-width:380px;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#0c1020;border:1px solid rgba(255,255,255,0.2);border-radius:8px;';
+    card.style.cssText = 'max-width:380px;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#191e23;border:1px solid rgba(255,255,255,0.2);border-radius:8px;';
     card.innerHTML = `
-      <div style="color:#fff;font-size:14px;letter-spacing:0.1em;margin-bottom:12px;">Save rocket</div>
+      <div style="color:#fff;font-size:14px;letter-spacing:0;margin-bottom:12px;">Save rocket</div>
       <input id="save-name" placeholder="rocket name" style="width:100%;padding:10px;background:#06080f;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:#fff;font:400 13px monospace;box-sizing:border-box;margin-bottom:12px;" />
       <div style="display:flex;gap:8px;">
         <button id="save-ok" class="btn btn--primary" style="flex:1;padding:10px;font-size:12px;">Save</button>
@@ -427,9 +427,9 @@ export class VABScene {
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
     card.className = 'guide-card';
-    card.style.cssText = 'max-width:380px;max-height:60vh;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#0c1020;border:1px solid rgba(255,255,255,0.2);border-radius:8px;display:flex;flex-direction:column;';
+    card.style.cssText = 'max-width:380px;max-height:60vh;padding:24px;font-family:system-ui,sans-serif;color:#fff;background:#191e23;border:1px solid rgba(255,255,255,0.2);border-radius:8px;display:flex;flex-direction:column;';
     card.innerHTML = `
-      <div style="color:#fff;font-size:14px;letter-spacing:0.1em;margin-bottom:12px;">Load rocket</div>
+      <div style="color:#fff;font-size:14px;letter-spacing:0;margin-bottom:12px;">Load rocket</div>
       <div id="load-list" style="flex:1;overflow-y:auto;margin-bottom:12px;"></div>
       <button id="load-cancel" class="btn btn--ghost" style="padding:10px;font-size:12px;color:#fff;">Cancel</button>`;
     overlay.appendChild(card);
