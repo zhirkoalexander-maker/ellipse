@@ -1,5 +1,10 @@
 # Changes
 
+## 2.5.32
+
+- Shorten the guide and put building, Moon trips, landing and controls in separate expandable sections. Update it for the S/XL parts.
+- Rewrite tutorial captions, mission names and flight messages in plain English. Remove shouty headings and decorative button emoji.
+
 ## 2.5.31
 
 - Trim Vehicle assembly to 16 parts in S and XL sizes. Old builds still load with their original parts.

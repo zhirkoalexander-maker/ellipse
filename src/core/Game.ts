@@ -79,7 +79,7 @@ export class Game {
       const card = document.createElement('div');
       card.className = 'achievement-pop';
       card.style.cssText = 'position:fixed;top:80px;right:16px;z-index:310;background:rgba(8,10,24,0.92);border:1px solid var(--accent-gold);border-radius:8px;padding:10px 14px;box-shadow:var(--shadow-glow-gold);font-family:system-ui,sans-serif;max-width:240px;pointer-events:none;';
-      card.innerHTML = `<div style="color:var(--accent-gold);font-size:9px;letter-spacing:0.15em;margin-bottom:2px;">★ ACHIEVEMENT</div><div style="color:var(--text-primary);font-size:13px;font-weight:600;">${name}</div>`;
+      card.innerHTML = `<div style="color:var(--accent-gold);font-size:9px;letter-spacing:0.15em;margin-bottom:2px;">Achievement</div><div style="color:var(--text-primary);font-size:13px;font-weight:600;">${name}</div>`;
       document.body.appendChild(card);
       setTimeout(() => {
         card.style.transition = 'opacity 300ms ease-in, transform 300ms ease-in';

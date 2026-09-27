@@ -977,7 +977,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (!this.grounded && !warpActive) {
       if (steering) {
         this.manualAttitude = true;
-        if (this.landingAssist) { this.landingAssist = false; this.landingStatus = 'Manual control · L: landing assist'; }
+        if (this.landingAssist) { this.landingAssist = false; this.landingStatus = 'Landing assist off'; }
         steerAttitude(this.rocketQuat, this.angularVel, pitchInput, yawInput, rollInput, baseDt);
         this.sasTargetQuat.copy(this.rocketQuat);
       } else if (this.landingAssist) {
@@ -1065,7 +1065,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           if (sumThrust > 0 && localGrav > 0) {
             const fuelNow = this.state.rocket.totalFuelMass();
             if (fuelNow <= 0.01) {
-              toast.show('No fuel — cannot launch!');
+              toast.show('No fuel left to launch.');
               this.launched = false;
               this.countdownTimer = 0;
               this.countdownCooldown = 5;
@@ -1074,7 +1074,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
               if (twr >= 1.0) {
                 canLiftOff = true;
               } else {
-                toast.show(`TWR ${twr.toFixed(2)} — need more throttle!`);
+                toast.show(`TWR ${twr.toFixed(2)} — increase throttle to lift off.`);
                 this.launched = false;
                 this.countdownTimer = 0;
                 this.countdownCooldown = 5; // 5s cooldown before retry
@@ -1915,25 +1915,25 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.timeWarp = 1;
     this.hud.setWarp(1);
     this.hideAutopilotStatus();
-    toast.show(`Automatic flight cancelled: ${reason}`, 5000);
+    toast.show(`Autopilot stopped: ${reason}`, 5000);
   }
 
   private showArrivalOverlay(target: string, timeS: number, fuelKg: number, massKg: number): void {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.7);opacity:0;transition:opacity 400ms ease-out;';
     const card = document.createElement('div');
-    card.style.cssText = 'max-width:420px;padding:32px;background:#0c1020;border:1px solid rgba(124,255,178,0.4);border-radius:10px;text-align:center;font-family:system-ui,sans-serif;box-shadow:0 0 40px rgba(124,255,178,0.15);';
+    card.style.cssText = 'max-width:420px;padding:32px;background:#0c1020;border:1px solid rgba(124,255,178,0.4);border-radius:10px;text-align:center;font-family:system-ui,sans-serif;';
     const days = timeS / 86400;
     const timeStr = days >= 1 ? `${days.toFixed(1)} days` : `${(timeS/3600).toFixed(1)} hours`;
     card.innerHTML = `
-      <div style="font-size:28px;font-weight:700;color:#7CFFB2;letter-spacing:0.05em;margin-bottom:6px;text-shadow:0 0 20px rgba(124,255,178,0.4);">YOU HAVE ARRIVED</div>
+      <div style="font-size:28px;font-weight:500;color:#b5d8c2;margin-bottom:6px;">Landed</div>
       <div style="font-size:14px;color:#ddd;margin-bottom:20px;">Destination: <b style="color:#88ccff;">${target.toUpperCase()}</b></div>
       <div style="display:flex;justify-content:center;gap:24px;margin-bottom:24px;">
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">TRAVEL TIME</div><div style="font-size:18px;color:#c89838;font-weight:600;margin-top:4px;">${timeStr}</div></div>
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">FUEL USED</div><div style="font-size:18px;color:#ffaa44;font-weight:600;margin-top:4px;">${(fuelKg/1000).toFixed(1)} t</div></div>
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">MASS LOST</div><div style="font-size:18px;color:#ff6644;font-weight:600;margin-top:4px;">${(massKg/1000).toFixed(1)} t</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Flight time</div><div style="font-size:18px;color:#c89838;font-weight:600;margin-top:4px;">${timeStr}</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Fuel used</div><div style="font-size:18px;color:#ffaa44;font-weight:600;margin-top:4px;">${(fuelKg/1000).toFixed(1)} t</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Mass lost</div><div style="font-size:18px;color:#ff6644;font-weight:600;margin-top:4px;">${(massKg/1000).toFixed(1)} t</div></div>
       </div>
-      <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">CONTINUE</button>
+      <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">Continue</button>
     `;
     overlay.appendChild(card);
     this.lifetime.append(overlay);
@@ -2034,7 +2034,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Brief feedback without changing the physical or displayed pose.
     this.triggerStageFlash();
 
-    toast.show('Stage separated!');
+    toast.show('Stage separated');
   }
 
 
@@ -2152,7 +2152,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     } else {
       this.landingAssist = false;
     }
-    this.landingStatus = this.landingAssist ? 'Landing assist · braking toward the surface' : 'Manual control · L: landing assist';
+    this.landingStatus = this.landingAssist ? 'Landing assist on' : 'Landing assist off';
     toast.show(this.landingStatus);
   }
 
@@ -2178,7 +2178,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     if (this.controls.getPitch() || this.controls.getYaw() || this.controls.getRoll()) {
       this.landingAssist = false;
-      this.landingStatus = 'Manual control · L: landing assist';
+      this.landingStatus = 'Landing assist off';
       return;
     }
     const maxAcceleration = this.rocket.totalFuelMass() > 0 ? totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass() : 0;
@@ -2293,7 +2293,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.deployedChuteMesh = null;
         this.chuteDeployProgress = 0;
       }
-      toast.show(this.parachuteDeployed ? 'Parachute deployed!' : 'Parachute cut.');
+      toast.show(this.parachuteDeployed ? 'Parachute deployed' : 'Parachute cut.');
     }
   }
 
@@ -2351,7 +2351,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.achievements.unlock('crash');
     this.sound.playCrash();
     this.sound.stopEngine();
-    toast.show(`CRASH! ${reason}`);
+    toast.show(`Crash: ${reason}`);
 
     this.rocketGroup.visible = false;
     this.engineFlame.stop();
@@ -2393,17 +2393,17 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       position:fixed;top:0;left:0;width:100%;height:100%;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       background:rgba(0,0,0,0.7);z-index:9999;
-      font-family:system-ui,sans-serif;color:#ff0;
+      font-family:system-ui,sans-serif;color:#f1f3f5;
       opacity:0;transition:opacity 360ms ease-out;
     `;
     overlay.innerHTML = `
       <div class="crash-shake" style="text-align:center;">
-        <div style="font-size:48px;font-weight:bold;color:#ff4444;margin-bottom:8px;text-shadow:0 0 24px rgba(255,68,68,0.6);">CRASH!</div>
+        <div style="font-size:36px;font-weight:600;color:#ed9681;margin-bottom:8px;">Crashed</div>
         <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
       </div>
       <div style="display:flex;gap:16px;">
-        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#ff0;cursor:pointer;transition:all 0.15s;">MENU</button>
-        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#ff0;cursor:pointer;transition:all 0.15s;">LAUNCH AGAIN</button>
+        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#f1f3f5;cursor:pointer;transition:all 0.15s;">Menu</button>
+        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#fff;cursor:pointer;transition:all 0.15s;">Restart</button>
       </div>
     `;
     this.lifetime.append(overlay);

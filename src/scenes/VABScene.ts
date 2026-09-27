@@ -109,8 +109,8 @@ export class VABScene {
     this.root.innerHTML = `
       <div class="vab-sidebar" style="width:clamp(168px,40vw,280px);flex-shrink:0;background:rgba(8,12,22,0.98);border-right:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;pointer-events:auto;">
         <div id="vab-header" style="box-sizing:border-box;flex-shrink:0;padding:12px;border-bottom:1px solid rgba(255,255,255,0.15);">
-          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Rocket build</div>
-          <div style="margin-top:6px;font:400 12px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose where to attach, then click a part.</div>
+          <div style="font:200 15px/1 system-ui,-apple-system,sans-serif;color:#fff;letter-spacing:0.08em;">Vehicle assembly</div>
+          <div style="margin-top:6px;font:400 12px/1.4 system-ui,-apple-system,sans-serif;color:rgba(255,255,255,0.55);">Choose a part to add.</div>
           <input id="vp-search" aria-label="Search parts" placeholder="Find a part" style="width:100%;box-sizing:border-box;margin-top:10px;padding:8px 9px;background:#101a2a;color:#f4f6f8;border:1px solid rgba(255,255,255,0.16);border-radius:5px;font:400 13px system-ui;outline:none;">
           <label style="display:block;margin-top:8px;font:11px system-ui;color:#ccd5df;">Attach
             <select id="vp-placement" style="width:100%;margin-top:4px;padding:6px;background:#101a2a;color:white;border:1px solid #354253;">
@@ -167,7 +167,7 @@ export class VABScene {
         if (!saveLastAssembly(this.assembly)) toast.show("Could not save this build. You can still fly it.");
         this.ol(this.assembly);
       } else {
-        toast.show('Add parts first!');
+        toast.show('Add a part before going to the pad.');
       }
     });
     this.root.querySelector('#vu')!.addEventListener('click', () => this.undo());
@@ -270,7 +270,7 @@ export class VABScene {
       this.st += height; this.nm.push(part.name);
     }
     this.assembly.restack(); this.rf(); this.up();
-    toast.show('Ready. Take to pad to launch.', 3000);
+    toast.show('Rocket built. Choose Take to pad.', 3000);
   }
   private remember(): void {
     this.history.push(deserializeAssembly(serializeAssembly(this.assembly)) ?? new Assembly());
@@ -313,7 +313,7 @@ export class VABScene {
     host.disabled = !host.options.length;
     this.root.querySelector('#vp-hint')!.textContent = host.disabled
       ? 'First choose a fuel tank below for the centre. Then add side engines or decouplers.'
-      : 'Choose an engine or decoupler below. A matching pair attaches to this tank.';
+      : 'Choose an engine or decoupler below. Both sides attach to this tank.';
     if (host.disabled) host.add(new Option('No central tank yet', ''));
 
 
@@ -395,7 +395,7 @@ export class VABScene {
   }
 
   private showSaveDialog(): void {
-    if (!this.assembly.roots.length) { toast.show('Nothing to save — build first!'); return; }
+    if (!this.assembly.roots.length) { toast.show('Add a part before saving.'); return; }
     const overlay = this.makeOverlay();
     const card = document.createElement('div');
     card.className = 'guide-card';
@@ -458,7 +458,7 @@ export class VABScene {
             toast.show(`Loaded: "${name}"`);
             overlay.remove();
           } else {
-            toast.show('Failed to load');
+            toast.show('Could not load this rocket.');
           }
         });
         const delBtn = document.createElement('button');

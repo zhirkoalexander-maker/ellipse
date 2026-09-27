@@ -68,9 +68,9 @@ export class HUD {
     this.pauseOverlay.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(6,8,20,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;opacity:0;transition:opacity 220ms ease-out;';
     this.pauseOverlay.innerHTML = `
       <div style="width:280px;display:flex;flex-direction:column;gap:8px;align-items:center;">
-        <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:center;">▶ Resume</button>
+        <button class="btn btn--primary pause-btn" data-action="resume" style="width:100%;padding:14px;font-size:16px;text-align:center;">Resume</button>
         <button class="btn btn--secondary pause-btn" data-action="menu" style="width:100%;padding:14px;font-size:16px;text-align:center;">Menu</button>
-        <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:center;">🔄 Restart</button>
+        <button class="btn btn--danger pause-btn" data-action="restart" style="width:100%;padding:14px;font-size:16px;text-align:center;">Restart</button>
       </div>
     `;
     document.body.appendChild(this.pauseOverlay);
@@ -168,8 +168,8 @@ export class HUD {
     this.autopilotPicker.className = 'autopilot-picker'; this.autopilotPicker.hidden = true;
     this.autopilotPicker.innerHTML = `
       <section class="autopilot-dialog" role="dialog" aria-modal="true" aria-label="Autopilot mission">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Fly & land</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
-        <p style="color:#a6b8c9;margin:0 0 20px">Choose a destination. Autopilot handles the flight and touchdown.</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Autopilot</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
+        <p style="color:#a6b8c9;margin:0 0 20px">Choose where to land. Autopilot will use the rocket’s engines and fuel.</p>
         <label>Destination<select aria-label="Destination"><option value="moon">Moon</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth</option><option value="mars">Mars</option><option value="pluto">Pluto</option></select></label>
         <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px" title="On: choose time warp yourself. Off: autopilot adjusts it."><input type="checkbox" style="width:18px;height:18px;accent-color:#eacd9e">Manual warp</label>
         <button type="button" data-action="autopilotStart" style="width:100%">Start flight</button>
