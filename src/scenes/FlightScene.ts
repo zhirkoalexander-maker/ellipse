@@ -180,8 +180,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.countdownEl = document.createElement('div');
       this.countdownEl.style.cssText = `
         position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
-        font-size:120px;font-weight:bold;color:#ff0;z-index:9999;
-        text-shadow:0 0 30px rgba(255,136,0,0.8);
+        font-size:72px;font-weight:600;color:#fff;z-index:9999;
+        text-shadow:0 2px 4px #0008;
         font-family:system-ui,sans-serif;pointer-events:none;
         transition:opacity 0.2s;
       `;
@@ -201,9 +201,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.countdownEl.classList.remove('countdown-pulse');
     // Force reflow to restart the keyframe animation
     void this.countdownEl.offsetWidth;
-    if (text === 'LIFTOFF!') {
-      this.countdownEl.style.color = '#FF8844';
-      this.countdownEl.style.fontSize = '48px';
+    if (text === 'Liftoff') {
+      this.countdownEl.style.color = '#eeeae2';
+      this.countdownEl.style.fontSize = '28px';
     } else {
       this.countdownEl.style.color = '#FFFFFF';
       this.countdownEl.style.fontSize = '72px';
@@ -1082,7 +1082,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
             }
           }
           if (canLiftOff) {
-            this.showCountdown('LIFTOFF!');
+            this.showCountdown('Liftoff');
             this.lifetime.timeout(() => this.hideCountdown(), 1500);
           }
         }
@@ -1923,18 +1923,18 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.7);opacity:0;transition:opacity 400ms ease-out;';
     const card = document.createElement('div');
-    card.style.cssText = 'max-width:420px;padding:32px;background:#0c1020;border:1px solid rgba(124,255,178,0.4);border-radius:10px;text-align:center;font-family:system-ui,sans-serif;';
+    card.className = 'game-dialog flight-result';
+    card.style.cssText = 'width:min(420px,calc(100vw - 32px));padding:24px;';
     const days = timeS / 86400;
     const timeStr = days >= 1 ? `${days.toFixed(1)} days` : `${(timeS/3600).toFixed(1)} hours`;
     card.innerHTML = `
-      <div style="font-size:28px;font-weight:500;color:#b5d8c2;margin-bottom:6px;">Landed</div>
-      <div style="font-size:14px;color:#ddd;margin-bottom:20px;">Destination: <b style="color:#88ccff;">${target.toUpperCase()}</b></div>
-      <div style="display:flex;justify-content:center;gap:24px;margin-bottom:24px;">
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Flight time</div><div style="font-size:18px;color:#c89838;font-weight:600;margin-top:4px;">${timeStr}</div></div>
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Fuel used</div><div style="font-size:18px;color:#ffaa44;font-weight:600;margin-top:4px;">${(fuelKg/1000).toFixed(1)} t</div></div>
-        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Mass lost</div><div style="font-size:18px;color:#ff6644;font-weight:600;margin-top:4px;">${(massKg/1000).toFixed(1)} t</div></div>
-      </div>
-      <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">Continue</button>
+      <h2>Landed on ${target[0]!.toUpperCase() + target.slice(1)}</h2>
+      <dl class="flight-result-stats">
+        <dt>Flight time</dt><dd>${timeStr}</dd>
+        <dt>Fuel used</dt><dd>${(fuelKg/1000).toFixed(1)} t</dd>
+        <dt>Mass lost</dt><dd>${(massKg/1000).toFixed(1)} t</dd>
+      </dl>
+      <button class="btn btn--primary" style="width:100%;padding:12px" id="arrival-close">Continue</button>
     `;
     overlay.appendChild(card);
     this.lifetime.append(overlay);
@@ -2178,7 +2178,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     if (!this.landingAssist || this.grounded) {
       if (!this.grounded && altitude < 20000 && verticalSpeed < 0) {
-        this.landingStatus = `GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(-verticalSpeed).toFixed(1)} m/s · DRIFT ${gameMetres(lateral.length()).toFixed(1)} m/s · L: assist`;
+        this.landingStatus = `Ground ${gameMetres(altitude).toFixed(0)} m · descent ${gameMetres(-verticalSpeed).toFixed(1)} m/s · DRIFT ${gameMetres(lateral.length()).toFixed(1)} m/s · L: assist`;
       }
       return;
     }
@@ -2213,7 +2213,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Point the engine in the useful direction before applying descent thrust.
     const aligned = Math.max(0, nose.dot(this.landingDirection));
     this.state.throttle = aligned > 0.55 ? command.throttle : 0;
-    this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(Math.max(0, -verticalSpeed)).toFixed(1)} m/s · L: cancel`;
+    this.landingStatus = `${command.insufficientThrust ? 'Low thrust · ' : 'Landing · '}Ground ${gameMetres(altitude).toFixed(0)} m · descent ${gameMetres(Math.max(0, -verticalSpeed)).toFixed(1)} m/s · L: cancel`;
   }
 
   /** Test the travelled segment, not only the next endpoint: fast falls must not tunnel. */
@@ -2262,7 +2262,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.sound.stopEngine(); this.sound.playLand(); this.engineFlame.stop();
     this.screenShake = outcome === 'rough' ? 0.2 : 0;
     this.stagingOffset.set(0,0,0);
-    this.landingStatus = `Landed on ${body.name.toUpperCase()} · throttle up to launch again`;
+    this.landingStatus = `Landed on ${body.name[0]!.toUpperCase() + body.name.slice(1)}`;
     this.achievements.unlock(`land_${body.name}`);
     if (Math.abs(vertical) < 3) this.achievements.unlock('first_landing');
     if (this.parachuteDeployed) this.achievements.unlock('parachute_landing');
@@ -2270,7 +2270,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.autopilotActive && body.name === this.autopilotTarget) {
       this.autopilotActive = false; this.autopilotPhase = 'arrived';
       this.missionGuidance = null; this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
-      this.hud.setAutopilotStatus('LANDED', body.name, 'Mission complete — engines shut down');
+      this.hud.setAutopilotStatus('LANDED', body.name, 'Engines off');
       this.showArrivalOverlay(body.name, this.missionTime - this.autopilotStartMissionTime,
         this.autopilotStartFuel - this.rocket.totalFuelMass(), this.autopilotStartMass - this.rocket.totalMass());
     }
@@ -2403,14 +2403,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       opacity:0;transition:opacity 360ms ease-out;
     `;
     overlay.innerHTML = `
-      <div class="crash-shake" style="text-align:center;">
-        <div style="font-size:36px;font-weight:600;color:#ed9681;margin-bottom:8px;">Crashed</div>
-        <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
-      </div>
-      <div style="display:flex;gap:16px;">
-        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#f1f3f5;cursor:pointer;transition:all 0.15s;">Menu</button>
-        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#fff;cursor:pointer;transition:all 0.15s;">Restart</button>
-      </div>
+      <section class="game-dialog flight-result" style="width:min(420px,calc(100vw - 32px));padding:24px;">
+        <h2>Crashed</h2>
+        <p style="margin:0 0 24px;line-height:1.6;color:#c4c9cc;">${reason}</p>
+        <div style="display:flex;gap:12px;">
+          <button id="crash-menu" class="btn btn--secondary" style="flex:1;padding:12px;">Menu</button>
+          <button id="crash-restart" class="btn btn--primary" style="flex:1;padding:12px;">Restart</button>
+        </div>
+      </section>
     `;
     this.lifetime.append(overlay);
     this.crashOverlay = overlay;

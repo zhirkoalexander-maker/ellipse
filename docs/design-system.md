@@ -1,9 +1,11 @@
-# Interface notes
+# Interface
 
-Keep flight controls short and in English. Use the same names in the guide, menu and buttons. Explain an action where the player chooses it; avoid permanent keyboard hints over the flight view.
+The title screen uses a still of the starter rocket. Keep it static: the menu should not need another 3D scene running in the background.
 
-The map uses pale paths for the current trajectory, yellow for a burn preview and blue for the selected destination. The system overview is schematic; route and orbit views use simulation positions.
+Menus and dialogs share dark grey panels, light text and a tan primary button. Green, amber and red indicate flight state or a warning. Ordinary controls do not need their own colors.
 
-Menus use the existing dark panels and system fonts. Dialogs must fit a narrow phone screen, scroll when needed and remain closable with touch or keyboard. Opening a dialog must not pass its input to the rocket.
+Use the same action names in buttons and instructions. Keep keyboard shortcuts in the guide and tooltips. Instructions should fit in a few steps; extra detail goes in the guide’s expandable sections.
 
-The main flight layout is in `src/flight/HUD.ts`; map styles are in `src/ui/OrbitMap.css`.
+Check narrow and short windows. The player must always be able to reach Close, Back or Cancel.
+
+Menu layout: `src/scenes/MainMenu.css`. Flight controls: `src/flight/HUD.ts`. Map: `src/ui/OrbitMap.css`.

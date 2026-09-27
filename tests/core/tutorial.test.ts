@@ -6,14 +6,14 @@ it('plays through the lesson, pauses, and remembers dismissal',async()=>{
  vi.useFakeTimers();localStorage.removeItem('challenger_tutorial_seen');
  expect(shouldShowTutorial()).toBe(true);
  const closed=vi.fn(),tutorial=new Tutorial(closed);
- expect(document.querySelector('.tutorial h2')!.textContent).toBe('Start here');
+ expect(document.querySelector('.tutorial h2')!.textContent).toBe('Pick a rocket');
  vi.advanceTimersByTime(9000);
- expect(document.querySelector('.tutorial h2')!.textContent).toBe('Build a rocket');
+ expect(document.querySelector('.tutorial h2')!.textContent).toBe('Four parts to start');
  document.querySelector<HTMLButtonElement>('[data-tutorial=pause]')!.click();
  vi.advanceTimersByTime(18000);
- expect(document.querySelector('.tutorial h2')!.textContent).toBe('Build a rocket');
+ expect(document.querySelector('.tutorial h2')!.textContent).toBe('Four parts to start');
  document.querySelector<HTMLButtonElement>('[data-tutorial=next]')!.click();
- expect(document.querySelector('.tutorial h2')!.textContent).toBe('Lift off');
+ expect(document.querySelector('.tutorial h2')!.textContent).toBe('Start the engines');
  document.querySelector<HTMLButtonElement>('[data-tutorial=skip]')!.click();
  expect(closed).toHaveBeenCalledOnce();expect(shouldShowTutorial()).toBe(false);
  expect(document.querySelector('.tutorial')).toBeNull();

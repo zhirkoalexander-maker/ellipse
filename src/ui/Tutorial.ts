@@ -11,12 +11,12 @@ export function shouldShowTutorial():boolean {
 }
 type Lesson = {title:string;text:string;frame:keyof typeof frames;alt:string;note?:string};
 const steps: Lesson[] = [
-  {title:'Start here',text:'Flight opens a starter on the pad. Vehicle assembly is where you build your own.',frame:'menu',alt:'The game menu, with Flight selected.',note:'Use an English keyboard layout for the letter keys.'},
-  {title:'Build a rocket',text:'Add an S engine, two 5 t tanks and an S capsule. Then choose Take to pad.',frame:'assembly',alt:'A four-part rocket in Vehicle assembly, beside the parts list and Take to pad button.'},
-  {title:'Lift off',text:'Press Launch or Space and wait for the countdown. ↑ / ↓ change throttle; W/S and A/D steer.',frame:'launch',alt:'The starter rocket on its launch pad, with the Launch button below.'},
-  {title:'Fly to the Moon',text:'Choose Moon in Map, then Autopilot to destination. Leave the controls alone while it flies and lands.',frame:'moon',alt:'The map destination panel with Moon selected and the autopilot button below.'},
-  {title:'Landing',text:'Above surface tells you how far away the ground is. Start braking early, or press L for landing assist.',frame:'landing',alt:'A descending rocket and its Above surface readout, showing height and descent speed.'},
-  {title:'Return to Earth',text:'On the Moon, pick Earth in Map and start autopilot again. Keep enough fuel for the trip home.',frame:'return',alt:'The map destination panel with Earth selected for the return flight.'},
+  {title:'Pick a rocket',text:'Choose Flight to use the ready-made rocket. To build one, open Vehicle assembly.',frame:'menu',alt:'The game menu, with Flight selected.',note:'Use an English keyboard layout for the letter keys.'},
+  {title:'Four parts to start',text:'Start with an S engine, two 5 t tanks and an S capsule, in that order. Press Take to pad.',frame:'assembly',alt:'A four-part rocket in Vehicle assembly, beside the parts list and Take to pad button.'},
+  {title:'Start the engines',text:'Press Launch or Space. After the countdown, ↑ / ↓ adjust power. W/S and A/D steer.',frame:'launch',alt:'The starter rocket on its launch pad, with the Launch button below.'},
+  {title:'Next stop: Moon',text:'Open Map, select Moon and press Autopilot to destination. It handles the flight and landing.',frame:'moon',alt:'The map destination panel with Moon selected and the autopilot button below.'},
+  {title:'Watch the ground',text:'Above surface shows the gap to the ground. Point the engine down and brake early. L switches on landing assist.',frame:'landing',alt:'A descending rocket and its Above surface readout, showing height and descent speed.'},
+  {title:'Come home',text:'Select Earth in Map, then start autopilot again. Check your fuel before leaving the Moon.',frame:'return',alt:'The map destination panel with Earth selected for the return flight.'},
 ];
 
 export class Tutorial {

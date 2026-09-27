@@ -141,7 +141,7 @@ it('treats saved rocket names as text and fits when the canvas is double-clicked
 it('quick start builds only game parts and releases the old preview on rebuild and exit',()=>{
  const vab=new VABScene(()=>{},()=>{});vab.mount();
  try{
-  const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Build a rocket'));
+  const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Use starter'));
   expect(preset).toBeDefined();preset!.click();
   expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(['engine_ant','tank_s_lfo','tank_s_lfo','capsule_s']);
   const group=(vab as any).rg as THREE.Group;
