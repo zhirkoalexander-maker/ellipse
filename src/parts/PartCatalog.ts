@@ -60,8 +60,7 @@ export const PART_CATALOG: Part[] = [
     kind: 'engine',
     size: 'S',
     mass: 50,
-    // Tuned for a lively but controllable starter: about 5.7 TWR with the
-    // default two-tank stack on the enlarged Earth.
+    // Rated thrust; availableThrust applies the mass-dependent launch minimum.
     thrust: 930.0,
     isp: 350,
     fuelType: 'LFO'

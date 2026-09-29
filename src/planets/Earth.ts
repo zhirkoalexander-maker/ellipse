@@ -153,10 +153,7 @@ export class Earth extends Planet {
     this.mesh.add(this.cloudMesh);
   }
 
-  /** Terrain displacement at world direction, in VISUAL units. Flattens the
-   *  KSC launch pad so the rocket spawns on flat ground (sea level) instead
-   *  of buried inside a mountain. Physics (getSurfaceRadiusAt) calls this
-   *  exact same function, keeping the visual mesh and collision surface in sync. */
+  /** Shared terrain height in scene units, including the raised, flat launch pad. */
   protected override getTerrainHeightVisual(nx: number, ny: number, nz: number): number {
     return this.visualRadius * rockyTerrain('earth', nx, ny, nz);
   }

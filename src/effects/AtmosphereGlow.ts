@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 
-/* ------------------------------------------------------------------ */
-/*  Vertex shader – shared by inner & outer shells                     */
-/* ------------------------------------------------------------------ */
+// Vertex shader – shared by inner & outer shells
 const vertexShader = `
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -17,9 +15,7 @@ void main() {
 }
 `;
 
-/* ------------------------------------------------------------------ */
-/*  Fragment shader with full scattering model                         */
-/* ------------------------------------------------------------------ */
+// Inner-shell scattering approximation
 const fragmentShader = `
 uniform vec3  uSunDir;           // normalised world-space direction planet→sun
 uniform vec3  uPlanetCenter;     // world-space centre of the planet
@@ -98,9 +94,7 @@ void main() {
 }
 `;
 
-/* ------------------------------------------------------------------ */
-/*  Outer / glow shell fragment shader (softer, fainter)              */
-/* ------------------------------------------------------------------ */
+// Outer / glow shell fragment shader (softer, fainter)
 const glowFragmentShader = `
 uniform vec3  uSunDir;
 uniform vec3  uPlanetCenter;
@@ -139,9 +133,7 @@ void main() {
 }
 `;
 
-/* ------------------------------------------------------------------ */
-/*  AtmosphereGlow class – dual shell (inner + outer)                  */
-/* ------------------------------------------------------------------ */
+// AtmosphereGlow class – dual shell (inner + outer)
 export class AtmosphereGlow {
   private group = new THREE.Group();
   private innerMesh: THREE.Mesh;

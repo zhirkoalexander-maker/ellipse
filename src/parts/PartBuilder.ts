@@ -15,7 +15,7 @@ import {
 } from '../effects/ProceduralTextures';
 
 export const SIZE_DIMS = {
-  // Shared dimensions for part meshes and assembly joints (height/radius ≈ 2.4).
+  // Shared model dimensions and attachment spacing; height/radius is about 2.4.
   S: { radius: 0.60 * PART_SCALE, height: 1.4 * PART_SCALE },
   M: { radius: 0.85 * PART_SCALE, height: 2.0 * PART_SCALE },
   L: { radius: 1.15 * PART_SCALE, height: 2.8 * PART_SCALE },
@@ -189,7 +189,7 @@ function buildCapsule(group: THREE.Group, d: { radius: number; height: number },
   const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.88, r*0.97, h*0.45, Q), bodyMat);
   body.position.y = -h * 0.01; group.add(body);
 
-  // Heat shield — short lip (was a 0.37h black bucket — ugly)
+  // Short heat-shield lip below the capsule.
   const hs = new THREE.Mesh(new THREE.CylinderGeometry(r*0.97, r*0.90, h*0.10, Q), darkMat);
   hs.position.y = -h * 0.30; group.add(hs);
 
@@ -422,8 +422,7 @@ function buildDecoupler(group: THREE.Group, d: { radius: number; height: number 
   const r = d.radius, h = d.height;
 
   const tex = getTextureSet('decoupler', generateDecouplerTexture);
-  // Dark interstage — must contrast with the white tanks, otherwise the
-  // full-height decoupler is invisible between them ("where are my decouplers?")
+  // Dark casing keeps the separator visible between white tanks.
   const bodyMat = createMaterialFromTextureSet(tex, {
     color: 0x23252e, roughness: 0.6, metalness: 0.55,
   });

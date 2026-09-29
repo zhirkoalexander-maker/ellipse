@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// Helpers
 
 function createCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const canvas = document.createElement('canvas');
@@ -28,7 +28,7 @@ function uvToLatLon(u: number, v: number): [number, number] {
   return [lat, lon];
 }
 
-// ── continent shapes (lat, lon in radians) ────────────────────────────────
+// Continent shapes (lat, lon in radians)
 
 interface Continent {
   lat: number;
@@ -55,7 +55,7 @@ const CONTINENTS: Continent[] = [
   { lat: 1.1, lon: -0.9, radiusLat: 0.2, radiusLon: 0.2, color: '#8aac7a' },
 ];
 
-// ── TextureSet types ─────────────────────────────────────────────────────
+// TextureSet types
 
 export interface TextureSet {
   color: THREE.CanvasTexture;
@@ -181,7 +181,7 @@ function addFilmGrain(ctx: CanvasRenderingContext2D, W: number, H: number, amoun
   ctx.putImageData(img, 0, 0);
 }
 
-// ── public API ────────────────────────────────────────────────────────────
+// Public API
 
 export function generateEarthTexture(): THREE.CanvasTexture {
   const W = 512, H = 256;
@@ -381,7 +381,7 @@ export function generateMoonBumpMap(): THREE.CanvasTexture {
   return tex;
 }
 
-// ── Rocket part textures ─────────────────────────────────────────────────
+// Rocket part textures
 
 export function generateTankTexture(size: 'S' | 'M' | 'L' | 'XL' = 'M'): TextureSet {
   const W = 2048, H = 2048;
@@ -2257,9 +2257,7 @@ export function generateFabricTexture(): TextureSet {
   return createFullTextureSet(colorCanvas, normalCanvas, roughCanvas, metalCanvas, aoCanvas);
 }
 
-// ---------------------------------------------------------------------------
 // Procedural planet textures for gas giants (fallback when .jpg is missing)
-// ---------------------------------------------------------------------------
 
 interface PlanetBand {
   y: number;   // 0-1 vertical position
