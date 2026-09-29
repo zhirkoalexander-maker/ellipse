@@ -128,16 +128,12 @@ export class Game {
     this.transitionTo(() => {
       this.unmountCurrent();
       this.sceneMgr.scene.background = new THREE.Color(0x000000);
-      // CONTINUE: resume the saved flight where it was left off (position,
-      // velocity, fuel, planets) — falls back to last build on the pad.
+      // Restore the saved flight, or take the last assembly to the pad.
       const onContinue = (hasFlightSave() || hasLastAssembly()) ? () => {
         const loadedSave = loadFlightState();
         const save = loadedSave ? migrateLegacyLunarOrbit(loadedSave, this.system) : null;
         if (save) {
-          // Old saves may reference parts that no longer exist (catalog
-          // changes) — deserializeAssembly SILENTLY drops them, which once
-          // removed every decoupler from a resumed rocket ("weight doesn't
-          // change when staging"). Detect and warn loudly instead.
+          // Reject unknown part IDs before deserialization can drop them.
           const unknown = this.collectUnknownPartIds(save.assembly);
           if (unknown.length > 0) {
             toast.show(`Saved flight has unknown parts (${unknown.join(', ')}) — old save, starting fresh`, 5000);
@@ -234,10 +230,7 @@ if (!rocket) {
   private lastFrameTime = performance.now();
 
   private loop(): void {
-    // MEASURED frame time, not a hardcoded 1/60 — the old fixed dt made the
-    // whole game run slow-motion below 60fps (weak GPU, background tab,
-    // software rendering): throttle crawled, countdowns stretched, rockets
-    // "wouldn't lift off". Clamped to avoid huge jumps after tab switches.
+    // Use elapsed time at low frame rates; cap pauses caused by tab switches.
     const now = performance.now();
     const dt = Math.min(Math.max((now - this.lastFrameTime) / 1000, 0.0005), 0.05);
     this.lastFrameTime = now;

@@ -10,7 +10,7 @@ import { getReferenceBody } from '../src/physics/SoiResolver';
 import { System } from '../src/physics/System';
 
 describe('Comprehensive Integration Tests', () => {
-  // ── Constants ──
+  // Constants
   it('all constants are valid', () => {
     expect(G).toBeCloseTo(6.67430e-11);
     expect(PART_SCALE).toBeGreaterThan(0);
@@ -22,7 +22,7 @@ describe('Comprehensive Integration Tests', () => {
     expect(EARTH_MASS).toBeGreaterThan(1e20);
   });
 
-  // ── Part Catalog ──
+  // Part Catalog
   it('all parts have required fields', () => {
     for (const p of PART_CATALOG) {
       expect(p.id).toBeTruthy();
@@ -39,7 +39,7 @@ describe('Comprehensive Integration Tests', () => {
     }
   });
 
-  // ── Assembly ──
+  // Assembly
   it('assembly totalMass includes fuel', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('capsule_mk1')!, position: [0, 1.6*PART_SCALE, 0], rotation: 0, children: [] });
@@ -64,7 +64,7 @@ describe('Comprehensive Integration Tests', () => {
     expect(adapters.length).toBeGreaterThanOrEqual(1);
   });
 
-  // ── Physics ──
+  // Physics
   it('gravity between Earth and rocket', () => {
     const earth = new Body('earth', EARTH_MASS, [0, 0, 0], [0, 0, 0]);
     const rocket = new Body('rocket', 6000, [6.371e6 + 100, 0, 0], [0, 0, 0]);
@@ -73,7 +73,7 @@ describe('Comprehensive Integration Tests', () => {
     expect(Math.abs(force[0])).toBeGreaterThan(10000);
   });
 
-  // ── Rocket mesh ──
+  // Rocket mesh
   it('default rocket mesh has children', () => {
     const a = new Assembly();
     a.addRoot({ part: findPart('capsule_mk1')!, position: [0, 1.6*PART_SCALE, 0], rotation: 0, children: [] });

@@ -78,7 +78,7 @@ export function hasLastAssembly(): boolean {
   return loadLastAssembly() !== null;
 }
 
-// ─── Full flight-state save: CONTINUE resumes WHERE YOU LEFT OFF ───
+// Flight state used by Continue.
 
 const FLIGHT_KEY = () => storageKey('flight_save');
 

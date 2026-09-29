@@ -33,10 +33,10 @@ describe('VAB camera framing', () => {
     vab.mount();
     addParts(['capsule_mk1']);
     const size = bboxSize();
-    // Camera must be close: roughly 1.2x the part span, not units away
+    // Frame the part at a useful distance.
     expect(cameraDistance()).toBeLessThan(size.y * 3 + 0.2);
     expect(cameraDistance()).toBeLessThan(0.6);
-    // Target must be INSIDE the rendered mesh bounds (com-shifted!)
+    // Use the rendered bounds after center-of-mass translation.
     const scene = vab as any;
     const box = new THREE.Box3().setFromObject(scene.rg);
     expect(scene.tg.y).toBeGreaterThan(box.min.y - 0.01);
@@ -59,12 +59,10 @@ describe('VAB camera framing', () => {
     addParts(['engine_mammoth', 'tank_xl_lfo', 'decoupler_l', 'tank_l_lfo']);
     const size = bboxSize();
     const d = cameraDistance();
-    // toMesh() com-centres the stack, so the mesh is NOT at raw stack Y —
-    // framing must follow the real bbox. Distance ~ 1.25x span.
+    // toMesh() recenters the stack; frame its rendered bounding box.
     expect(d).toBeGreaterThan(size.y * 0.5);
     expect(d).toBeLessThan(size.y * 2.5);
-    // A 4-part XL/L stack is ~0.5+ world units tall — camera must be closer
-    // than the old frozen distance of 5 by an order of magnitude.
+    // This stack fits within a small number of scene units.
     expect(d).toBeLessThan(1.5);
     expect(size.y).toBeGreaterThan(0.3);
   });

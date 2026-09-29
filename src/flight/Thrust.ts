@@ -23,7 +23,7 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
   const engines = findAllEngines(state.rocket.assembly.roots);
   if (engines.length === 0) return;
   const available = state.rocket.activeFuelMass();
-  if (available <= 0) return; // tanks dry — NO thrust
+  if (available <= 0) return; // No fuel in the active stage.
   const scale = availableThrust(state) / engines.reduce((sum, eng) => sum + eng.thrust, 0);
   let totalForceN = 0;
   let totalMassFlow = 0;
@@ -34,8 +34,7 @@ export function applyThrust(state: FlightState, dt: number, direction?: [number,
   }
   // Game-balance burn rate (see FUEL_FLOW_MULT)
   totalMassFlow *= FUEL_FLOW_MULT;
-  // Thrust proportional to fuel actually burnable this frame — engines cut off
-  // exactly when tanks run dry instead of accelerating forever on fumes.
+  // Scale the last impulse to the fuel remaining in this step.
   const requested = totalMassFlow * dt;
   const actualBurn = Math.min(requested, available);
   const burnFrac = requested > 0 ? actualBurn / requested : 1;
@@ -54,7 +53,7 @@ export function findFirstEngine(nodes: any[]): { thrust: number; isp: number } |
   return findAllEngines(nodes)[0] ?? null;
 }
 
-/** Available thrust from the current stage, including its side engines. */
+/** Rated thrust in kN for the active stage, including side engines. */
 export function totalThrust(nodes: any[]): number {
   return findAllEngines(nodes).reduce((sum, part) => sum + part.thrust, 0);
 }

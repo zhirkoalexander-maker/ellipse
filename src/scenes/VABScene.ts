@@ -57,9 +57,7 @@ export class VABScene {
     // Zoom only over the model, not the parts list.
     this._onWheel = (e:WheelEvent) => {
       if (this.root && !this.root.isConnected) return;
-      // Only zoom when the wheel is over the 3D view — scrolling the PARTS
-      // LIST must not silently zoom the camera out (that kept making the
-      // rocket look tiny for no visible reason).
+      // Leave wheel events over panels and form controls to the UI.
       const t = e.target as Element | null;
       if (t && t.closest && t.closest('#vl, #vi, #vab-header, button, input, select, .guide-overlay')) return;
       this.dt = Math.max(0.12, Math.min(40, this.dt * (e.deltaY > 0 ? 1.15 : 0.87)));

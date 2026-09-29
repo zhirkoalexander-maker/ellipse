@@ -291,10 +291,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
 
-    // Landing gear meshes are disabled.
-    // for (let i = 0; i < 3; i++) { ... }
-    // gear meshes are never added to rocketGroup
-
     // Impact prediction marker (red ring on surface)
     const markerGeom = new THREE.RingGeometry(0.05, 0.15, 16);
     const markerMat = new THREE.MeshBasicMaterial({
@@ -582,9 +578,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
   /** Resume a saved flight: position, velocity, attitude, fuel, landing state. */
   private applyFlightSave(save: FlightSave): void {
-    // Defensive: a stale/corrupted save must never resurrect the rocket
-    // inside a planet (instant 'Impact on Earth' crash on resume). Fall back
-    // to a fresh spawn on the launchpad.
+    // Adjust saves from older planet sizes and reject invalid spawn coordinates.
     const refBody = getReferenceBody(save.position as [number, number, number], this.system);
     const sdx = save.position[0] - refBody.position[0];
     const sdy = save.position[1] - refBody.position[1];
@@ -885,9 +879,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Track mission time (only when not crashed/paused)
 
 
-    // Atmosphere warp clamp: high warp in atmosphere tunnels through the 200m
-    // crash band (and drag overshot) — rockets "landed" instead of crashing.
-    // Limit to 10x below 70km altitude (KSP-style).
+    // Limit warp to 10× below 70,000 simulation metres (17.5 displayed km).
     {
       const clampRef = getReferenceBody(this.state.position, this.system);
       const cdx = this.state.position[0] - clampRef.position[0];
@@ -931,20 +923,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     _dt = simulationDt * this.timeWarp;
     this.missionTime += _dt;
 
-    // Throttle is locked only above 10x warp (silently zeroing it at ANY
-    // warp made rockets "not lift off" for no visible reason). Physics warp
-    // up to 10x is safe: thrust and drag both use the warped dt.
+    // Ordinary warp above 10× is unpowered; mission burns use separate substeps.
     const warpActive = this.timeWarp > 1;
     if (warpActive && this.warpIndex > 3 && !(this.autopilotActive && (this.autopilotPhase === 'burn' || this.autopilotPhase === 'ascent'))) {
       if (this.state.throttle > 0) toast.show('Throttle locked above 10x warp — press [ to reduce warp', 2500);
       this.state.throttle = 0;
     }
-    // Free camera is just a CAMERA — it must not silently kill the throttle
-    // (another "why doesn't it lift off" trap).
 
-    // Auto-stage when the CURRENT (lowest) stage's tanks run dry — also
-    // during warped autopilot ascent, otherwise a dry booster at 10x warp
-    // leaves the rocket dead in the water. Allowed at warp during ascent.
+    // Drop an exhausted active stage, including during autopilot ascent at warp.
     if ((!warpActive || (this.autopilotActive && this.autopilotPhase === 'ascent')) && !this.grounded && this.state.throttle > 0) {
       const dec = this.findLowestDecoupler(this.rocket.assembly.roots, false);
       if (dec) {
@@ -1463,18 +1449,15 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
 
     if (!this.crashed) {
-      // Visual offset: rocketBottomY is in MODEL units but the group renders at
-      // ROCKET_VISUAL_SCALE, so lift by rocketBottomY * ROCKET_VISUAL_SCALE to
-      // put the rocket's very bottom on the reference point (the old formula
-      // forgot the ×ROCKET_VISUAL_SCALE and left the rocket ~1 unit buried).
-      // Physics pos already accounts for terrain (getSurfaceRadiusAt at spawn).
+      // Place the model bottom at the physical reference point. Convert the
+      // model-space offset through ROCKET_VISUAL_SCALE; terrain is already included.
       const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
       this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE)
         .addScaledVector(this.presentationUp,visualOffset).add(this.currentStagingOffset());
 
       if (this.cameraMode === 'free') {
-        // Free camera: orbit around rocket - WASD keys + mouse/touch drag
+        // Orbit the free camera around the rocket using its own input state.
         const orbitSpeed = 3;
         if (this.freeCamKeys.left) this.freeCamAzimuth += orbitSpeed * baseDt;
         if (this.freeCamKeys.right) this.freeCamAzimuth -= orbitSpeed * baseDt;
@@ -2193,10 +2176,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (lateral.lengthSq() > 1e-8) desiredLandingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
     if (desiredLandingDirection.lengthSq() === 0) desiredLandingDirection.copy(up);
     desiredLandingDirection.normalize();
-    // Keep the landing attitude visually upright. Lateral braking can still
-    // lean the thrust vector at altitude, but the allowed lean closes smoothly
-    // to a few degrees near the surface instead of producing a tilted,
-    // oscillating rocket at touchdown.
+    // Reduce the allowed braking tilt from 32° to 4° as the surface approaches.
     const maxTilt = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(4 + altitude * 0.0015, 4, 32));
     const tilt = Math.acos(THREE.MathUtils.clamp(up.dot(desiredLandingDirection), -1, 1));
     if (tilt > maxTilt) {
