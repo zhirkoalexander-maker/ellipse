@@ -20,11 +20,11 @@ Rendering has its own scale. `SurfaceView` enlarges nearby terrain and reduces d
 
 ## Flight loop
 
-Thrust consumes fuel and acts along the rocket's nose. `availableThrust` raises underpowered active stages to a mass-dependent launch margin: heavy builds accelerate more slowly. Fuel flow, instruments and guidance use that same adjusted force. Drag depends on the vehicle's width and attitude, and on local air density. Planet motion uses velocity Verlet; fast unpowered flight uses orbital propagation.
+Thrust consumes fuel and acts along the rocket's nose. Drag depends on the vehicle's width and attitude, and on local air density. Planet motion uses velocity Verlet; fast unpowered flight uses orbital propagation.
 
 Manual input takes priority over guidance. A map burn, landing assist and a destination mission must not command the rocket at the same time. Automatic missions still need fuel and enough thrust to land.
 
-Contact checks use vertical speed, sideways speed and tilt. The 90 m/s landing limit uses displayed game units. Lateral contact up to 30 m/s (45 with landing support) is survivable when upright; moderate drift counts as a rough landing. A crash ends the current flight; it must not bounce the rocket away from the surface.
+Contact checks use vertical speed, sideways speed and tilt. The 90 m/s landing limit uses displayed game units. A crash ends the current flight; it must not bounce the rocket away from the surface.
 
 ## Saves
 

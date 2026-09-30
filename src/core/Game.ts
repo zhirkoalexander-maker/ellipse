@@ -78,8 +78,8 @@ export class Game {
       // Slide-in achievement card from right
       const card = document.createElement('div');
       card.className = 'achievement-pop';
-      card.style.cssText = 'position:fixed;top:80px;right:16px;z-index:310;background:rgba(8,10,24,0.92);border:1px solid #53585b;border-radius:3px;padding:10px 14px;font-family:system-ui,sans-serif;max-width:240px;pointer-events:none;';
-      card.innerHTML = `<div style="color:var(--accent-gold);font-size:11px;margin-bottom:2px;">Achievement</div><div style="color:var(--text-primary);font-size:13px;font-weight:600;">${name}</div>`;
+      card.style.cssText = 'position:fixed;top:80px;right:16px;z-index:310;background:rgba(8,10,24,0.92);border:1px solid var(--accent-gold);border-radius:8px;padding:10px 14px;box-shadow:var(--shadow-glow-gold);font-family:system-ui,sans-serif;max-width:240px;pointer-events:none;';
+      card.innerHTML = `<div style="color:var(--accent-gold);font-size:9px;letter-spacing:0.15em;margin-bottom:2px;">Achievement</div><div style="color:var(--text-primary);font-size:13px;font-weight:600;">${name}</div>`;
       document.body.appendChild(card);
       setTimeout(() => {
         card.style.transition = 'opacity 300ms ease-in, transform 300ms ease-in';
@@ -96,7 +96,8 @@ export class Game {
     loader.style.cssText = 'position:fixed;inset:0;z-index:9998;background:var(--space-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:system-ui,sans-serif;';
     loader.innerHTML = `
       <div style="width:46px;height:46px;border:2px solid rgba(234,205,158,0.2);border-top-color:var(--accent-gold);border-radius:50%;animation:spin 0.9s linear infinite;"></div>
-      <div style="color:var(--accent-gold);font-size:13px;">Loading Challenger</div>
+      <div style="color:var(--accent-gold);font-size:13px;letter-spacing:0.2em;">LOADING</div>
+      <div id="load-progress" style="color:rgba(244,245,242,0.4);font-size:10px;letter-spacing:0.1em;">preparing assets</div>
     `;
     // Spin keyframe injected inline via a style tag (so it survives even without animations.css)
     const style = document.createElement('style');
@@ -128,12 +129,16 @@ export class Game {
     this.transitionTo(() => {
       this.unmountCurrent();
       this.sceneMgr.scene.background = new THREE.Color(0x000000);
-      // Restore the saved flight, or take the last assembly to the pad.
+      // CONTINUE: resume the saved flight where it was left off (position,
+      // velocity, fuel, planets) — falls back to last build on the pad.
       const onContinue = (hasFlightSave() || hasLastAssembly()) ? () => {
         const loadedSave = loadFlightState();
         const save = loadedSave ? migrateLegacyLunarOrbit(loadedSave, this.system) : null;
         if (save) {
-          // Reject unknown part IDs before deserialization can drop them.
+          // Old saves may reference parts that no longer exist (catalog
+          // changes) — deserializeAssembly SILENTLY drops them, which once
+          // removed every decoupler from a resumed rocket ("weight doesn't
+          // change when staging"). Detect and warn loudly instead.
           const unknown = this.collectUnknownPartIds(save.assembly);
           if (unknown.length > 0) {
             toast.show(`Saved flight has unknown parts (${unknown.join(', ')}) — old save, starting fresh`, 5000);
@@ -230,7 +235,10 @@ if (!rocket) {
   private lastFrameTime = performance.now();
 
   private loop(): void {
-    // Use elapsed time at low frame rates; cap pauses caused by tab switches.
+    // MEASURED frame time, not a hardcoded 1/60 — the old fixed dt made the
+    // whole game run slow-motion below 60fps (weak GPU, background tab,
+    // software rendering): throttle crawled, countdowns stretched, rockets
+    // "wouldn't lift off". Clamped to avoid huge jumps after tab switches.
     const now = performance.now();
     const dt = Math.min(Math.max((now - this.lastFrameTime) / 1000, 0.0005), 0.05);
     this.lastFrameTime = now;

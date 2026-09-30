@@ -15,10 +15,10 @@ import { Assembly, type AssemblyNode } from '../rocket/Assembly';
 import type { Achievements } from '../core/Achievements';
 import type { Missions } from '../core/Missions';
 import { FlightState } from '../flight/FlightState';
-import { ChaseCamera, zoomDistance } from '../flight/ChaseCamera';
+import { ChaseCamera } from '../flight/ChaseCamera';
 import { Controls } from '../flight/Controls';
 import { HUD } from '../flight/HUD';
-import { applyThrust, availableThrust, totalThrust } from '../flight/Thrust';
+import { applyThrust, findFirstEngine, totalThrust } from '../flight/Thrust';
 import { SoundManager } from '../flight/SoundManager';
 import { toast } from '../ui/Toast';
 import { FIXED_DT, G, ORBIT_SCALE, VISUAL_PLANET_MULT, PART_SCALE, EARTH_MASS, ROCKET_VISUAL_SCALE } from '../config/constants';
@@ -180,8 +180,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.countdownEl = document.createElement('div');
       this.countdownEl.style.cssText = `
         position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
-        font-size:72px;font-weight:600;color:#fff;z-index:9999;
-        text-shadow:0 2px 4px #0008;
+        font-size:120px;font-weight:bold;color:#ff0;z-index:9999;
+        text-shadow:0 0 30px rgba(255,136,0,0.8);
         font-family:system-ui,sans-serif;pointer-events:none;
         transition:opacity 0.2s;
       `;
@@ -201,9 +201,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.countdownEl.classList.remove('countdown-pulse');
     // Force reflow to restart the keyframe animation
     void this.countdownEl.offsetWidth;
-    if (text === 'Liftoff') {
-      this.countdownEl.style.color = '#eeeae2';
-      this.countdownEl.style.fontSize = '28px';
+    if (text === 'LIFTOFF!') {
+      this.countdownEl.style.color = '#FF8844';
+      this.countdownEl.style.fontSize = '48px';
     } else {
       this.countdownEl.style.color = '#FFFFFF';
       this.countdownEl.style.fontSize = '72px';
@@ -290,6 +290,10 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this._debugMarker.visible = false;
     this._debugMarker.position.copy(this.rocketGroup.position);
     sceneMgr.scene.add(this._debugMarker);
+
+    // Landing gear meshes are disabled.
+    // for (let i = 0; i < 3; i++) { ... }
+    // gear meshes are never added to rocketGroup
 
     // Impact prediction marker (red ring on surface)
     const markerGeom = new THREE.RingGeometry(0.05, 0.15, 16);
@@ -419,8 +423,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else if (action === 'warpUp') this.setPlayerWarp(this.warpIndex + 1);
       else if (action === 'warp100') this.setPlayerWarp(this.warpLevels.indexOf(100));
       else if (action === 'lookDown') { this.cameraMode = 'chase'; this.hud.setFreeCamera(false); this.chase.setPolar(0.55); }
-      else if (action === 'cameraZoomIn') this.zoomCamera(0.82);
-      else if (action === 'cameraZoomOut') this.zoomCamera(1.22);
+      else if (action === 'cameraZoomIn') this.chase.zoom(0.82);
+      else if (action === 'cameraZoomOut') this.chase.zoom(1.22);
       else if (action === 'stage') this.stageOrLaunch();
       else if (action === 'parachute') this.toggleParachute();
       else if (action === 'sas') this.cycleSasMode();
@@ -476,7 +480,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
         this.cycleSasMode();
         e.preventDefault();
       } else if (e.key === 'f') {
-        this.cameraMode = 'chase'; this.hud.setFreeCamera(false);
         this.chase.reset();
         toast.show('Camera view reset');
         e.preventDefault();
@@ -541,7 +544,8 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.lifetime.listen(dom, 'wheel', (e) => {
       if (this.cameraMode === 'free') {
         e.preventDefault();
-        this.zoomCamera(e.deltaY > 0 ? 1.1 : 0.9);
+        this.freeCamDist *= e.deltaY > 0 ? 1.1 : 0.9;
+        this.freeCamDist = Math.max(0.5, Math.min(500, this.freeCamDist));
       }
     }, { passive: false });
 
@@ -578,7 +582,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
 
   /** Resume a saved flight: position, velocity, attitude, fuel, landing state. */
   private applyFlightSave(save: FlightSave): void {
-    // Adjust saves from older planet sizes and reject invalid spawn coordinates.
+    // Defensive: a stale/corrupted save must never resurrect the rocket
+    // inside a planet (instant 'Impact on Earth' crash on resume). Fall back
+    // to a fresh spawn on the launchpad.
     const refBody = getReferenceBody(save.position as [number, number, number], this.system);
     const sdx = save.position[0] - refBody.position[0];
     const sdy = save.position[1] - refBody.position[1];
@@ -879,7 +885,9 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Track mission time (only when not crashed/paused)
 
 
-    // Limit warp to 10× below 70,000 simulation metres (17.5 displayed km).
+    // Atmosphere warp clamp: high warp in atmosphere tunnels through the 200m
+    // crash band (and drag overshot) — rockets "landed" instead of crashing.
+    // Limit to 10x below 70km altitude (KSP-style).
     {
       const clampRef = getReferenceBody(this.state.position, this.system);
       const cdx = this.state.position[0] - clampRef.position[0];
@@ -923,14 +931,20 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     _dt = simulationDt * this.timeWarp;
     this.missionTime += _dt;
 
-    // Ordinary warp above 10× is unpowered; mission burns use separate substeps.
+    // Throttle is locked only above 10x warp (silently zeroing it at ANY
+    // warp made rockets "not lift off" for no visible reason). Physics warp
+    // up to 10x is safe: thrust and drag both use the warped dt.
     const warpActive = this.timeWarp > 1;
     if (warpActive && this.warpIndex > 3 && !(this.autopilotActive && (this.autopilotPhase === 'burn' || this.autopilotPhase === 'ascent'))) {
       if (this.state.throttle > 0) toast.show('Throttle locked above 10x warp — press [ to reduce warp', 2500);
       this.state.throttle = 0;
     }
+    // Free camera is just a CAMERA — it must not silently kill the throttle
+    // (another "why doesn't it lift off" trap).
 
-    // Drop an exhausted active stage, including during autopilot ascent at warp.
+    // Auto-stage when the CURRENT (lowest) stage's tanks run dry — also
+    // during warped autopilot ascent, otherwise a dry booster at 10x warp
+    // leaves the rocket dead in the water. Allowed at warp during ascent.
     if ((!warpActive || (this.autopilotActive && this.autopilotPhase === 'ascent')) && !this.grounded && this.state.throttle > 0) {
       const dec = this.findLowestDecoupler(this.rocket.assembly.roots, false);
       if (dec) {
@@ -1001,7 +1015,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else {
         aimAttitude(this.rocketQuat, this.maneuverRemaining, baseDt, 1.4);
         const alignment = new THREE.Vector3(0,1,0).applyQuaternion(this.rocketQuat).dot(this.maneuverRemaining.clone().normalize());
-        const acceleration = availableThrust(this.state) * 1000 / this.rocket.totalMass();
+        const acceleration = totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass();
         this.state.throttle = alignment > .999 ? Math.min(1, this.maneuverRemaining.length() / Math.max(.00001, acceleration * _dt)) : 0;
       }
     }
@@ -1041,7 +1055,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           this.launched = true;
           // Check thrust-to-weight ratio using actual local gravity
           // Sum ALL engines' thrust (not just first found)
-          const sumThrust = availableThrust(this.state);
+          const sumThrust = totalThrust(this.state.rocket.assembly.roots);
           const refBody = getReferenceBody(this.state.position, this.system);
           const gdx = this.state.position[0] - refBody.position[0];
           const gdy = this.state.position[1] - refBody.position[1];
@@ -1049,7 +1063,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (sumThrust > 0 && localGrav > 0) {
-            const fuelNow = this.state.rocket.activeFuelMass();
+            const fuelNow = this.state.rocket.totalFuelMass();
             if (fuelNow <= 0.01) {
               toast.show('No fuel left to launch.');
               this.launched = false;
@@ -1068,7 +1082,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
             }
           }
           if (canLiftOff) {
-            this.showCountdown('Liftoff');
+            this.showCountdown('LIFTOFF!');
             this.lifetime.timeout(() => this.hideCountdown(), 1500);
           }
         }
@@ -1449,22 +1463,24 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
 
     if (!this.crashed) {
-      // Place the model bottom at the physical reference point. Convert the
-      // model-space offset through ROCKET_VISUAL_SCALE; terrain is already included.
+      // Visual offset: rocketBottomY is in MODEL units but the group renders at
+      // ROCKET_VISUAL_SCALE, so lift by rocketBottomY * ROCKET_VISUAL_SCALE to
+      // put the rocket's very bottom on the reference point (the old formula
+      // forgot the ×ROCKET_VISUAL_SCALE and left the rocket ~1 unit buried).
+      // Physics pos already accounts for terrain (getSurfaceRadiusAt at spawn).
       const visualOffset = -this.rocketBottomY * ROCKET_VISUAL_SCALE;
 
       this.rocketGroup.position.fromArray(this.state.position).multiplyScalar(VISUAL_SCALE)
         .addScaledVector(this.presentationUp,visualOffset).add(this.currentStagingOffset());
 
       if (this.cameraMode === 'free') {
-        // Orbit the free camera around the rocket using its own input state.
+        // Free camera: orbit around rocket - WASD keys + mouse/touch drag
         const orbitSpeed = 3;
         if (this.freeCamKeys.left) this.freeCamAzimuth += orbitSpeed * baseDt;
         if (this.freeCamKeys.right) this.freeCamAzimuth -= orbitSpeed * baseDt;
         if (this.freeCamKeys.up) this.freeCamPolar = Math.max(0.05, this.freeCamPolar - orbitSpeed * 0.7 * baseDt);
         if (this.freeCamKeys.down) this.freeCamPolar = Math.min(Math.PI - 0.05, this.freeCamPolar + orbitSpeed * 0.7 * baseDt);
 
-        this.chase.setClippingDistance(this.freeCamDist);
         const rocketWorld = this.rocketGroup.position.clone();
         const ox = this.freeCamDist * Math.sin(this.freeCamPolar) * Math.cos(this.freeCamAzimuth);
         const oy = this.freeCamDist * Math.cos(this.freeCamPolar);
@@ -1567,7 +1583,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       const tgdz = this.state.position[2] - twrRefBody.position[2];
       const tgr = Math.sqrt(tgdx*tgdx + tgdy*tgdy + tgdz*tgdz) || 1;
       const localG = (G * (twrRefBody as any).mass) / (tgr * tgr);
-      const sumThrustLive = availableThrust(this.state);
+      const sumThrustLive = totalThrust(this.state.rocket.assembly.roots);
       const mass = this.state.rocket.totalMass();
       if (sumThrustLive > 0 && localG > 0 && mass > 0) {
         twr = (sumThrustLive * 1000 * this.state.throttle) / (mass * localG);
@@ -1863,7 +1879,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     const command = this.missionGuidance.update({ position: this.state.position, velocity: this.state.velocity,
       reference: this.navigationBody(this.autopilotSurfaceBody() ?? getReferenceBody(this.state.position, this.system)),
-      mass: this.rocket.totalMass(), maxAcceleration: availableThrust(this.state) * 1000 / this.rocket.totalMass(),
+      mass: this.rocket.totalMass(), maxAcceleration: totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass(),
       dt, grounded: this.grounded, fuel: this.rocket.totalFuelMass() });
     if (command.phase === 'blocked') { this.abortAutopilot(command.status); return; }
     this.autopilotPhase = command.phase;
@@ -1906,18 +1922,18 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:700;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.7);opacity:0;transition:opacity 400ms ease-out;';
     const card = document.createElement('div');
-    card.className = 'game-dialog flight-result';
-    card.style.cssText = 'width:min(420px,calc(100vw - 32px));padding:24px;';
+    card.style.cssText = 'max-width:420px;padding:32px;background:#0c1020;border:1px solid rgba(124,255,178,0.4);border-radius:10px;text-align:center;font-family:system-ui,sans-serif;';
     const days = timeS / 86400;
     const timeStr = days >= 1 ? `${days.toFixed(1)} days` : `${(timeS/3600).toFixed(1)} hours`;
     card.innerHTML = `
-      <h2>Landed on ${target[0]!.toUpperCase() + target.slice(1)}</h2>
-      <dl class="flight-result-stats">
-        <dt>Flight time</dt><dd>${timeStr}</dd>
-        <dt>Fuel used</dt><dd>${(fuelKg/1000).toFixed(1)} t</dd>
-        <dt>Mass lost</dt><dd>${(massKg/1000).toFixed(1)} t</dd>
-      </dl>
-      <button class="btn btn--primary" style="width:100%;padding:12px" id="arrival-close">Continue</button>
+      <div style="font-size:28px;font-weight:500;color:#b5d8c2;margin-bottom:6px;">Landed</div>
+      <div style="font-size:14px;color:#ddd;margin-bottom:20px;">Destination: <b style="color:#88ccff;">${target.toUpperCase()}</b></div>
+      <div style="display:flex;justify-content:center;gap:24px;margin-bottom:24px;">
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Flight time</div><div style="font-size:18px;color:#c89838;font-weight:600;margin-top:4px;">${timeStr}</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Fuel used</div><div style="font-size:18px;color:#ffaa44;font-weight:600;margin-top:4px;">${(fuelKg/1000).toFixed(1)} t</div></div>
+        <div><div style="font-size:10px;color:#889;letter-spacing:0.1em;">Mass lost</div><div style="font-size:18px;color:#ff6644;font-weight:600;margin-top:4px;">${(massKg/1000).toFixed(1)} t</div></div>
+      </div>
+      <button class="btn btn--primary" style="width:100%;padding:12px;font-size:13px;" id="arrival-close">Continue</button>
     `;
     overlay.appendChild(card);
     this.lifetime.append(overlay);
@@ -2091,11 +2107,6 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
   }
 
-  private zoomCamera(factor: number): void {
-    if (this.cameraMode === 'free') this.freeCamDist = zoomDistance(this.freeCamDist, factor);
-    else this.chase.zoom(factor);
-  }
-
   private stageOrLaunch(): void {
     if (this.paused || this.crashed || this.lifetime.disposed) return;
     if (!this.grounded) {
@@ -2103,13 +2114,13 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       else toast.show('Return time warp to ×1 before staging.');
       return;
     }
-    const thrust = availableThrust(this.state) * 1000;
+    const thrust = totalThrust(this.rocket.assembly.roots) * 1000;
     const body = getReferenceBody(this.state.position, this.system);
     const radiusSq = new THREE.Vector3(...this.state.position).distanceToSquared(new THREE.Vector3(...body.position));
     const gravity = G * body.mass / Math.max(1, radiusSq);
     const twr = thrust / (this.rocket.totalMass() * gravity);
     const reason = thrust <= 0 ? 'No engine — add an engine in Vehicle Assembly.'
-      : this.rocket.activeFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
+      : this.rocket.totalFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
       : twr <= 1 ? `Insufficient thrust (TWR ${twr.toFixed(2)}). Use a stronger engine or reduce mass.`
       : '';
     if (reason) {
@@ -2161,7 +2172,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     }
     if (!this.landingAssist || this.grounded) {
       if (!this.grounded && altitude < 20000 && verticalSpeed < 0) {
-        this.landingStatus = `Ground ${gameMetres(altitude).toFixed(0)} m · descent ${gameMetres(-verticalSpeed).toFixed(1)} m/s · DRIFT ${gameMetres(lateral.length()).toFixed(1)} m/s · L: assist`;
+        this.landingStatus = `GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(-verticalSpeed).toFixed(1)} m/s · DRIFT ${gameMetres(lateral.length()).toFixed(1)} m/s · L: assist`;
       }
       return;
     }
@@ -2170,13 +2181,16 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       this.landingStatus = 'Landing assist off';
       return;
     }
-    const maxAcceleration = this.rocket.activeFuelMass() > 0 ? availableThrust(this.state) * 1000 / this.rocket.totalMass() : 0;
+    const maxAcceleration = this.rocket.totalFuelMass() > 0 ? totalThrust(this.rocket.assembly.roots) * 1000 / this.rocket.totalMass() : 0;
     const command = landingCommand({ altitude, verticalSpeed, horizontalSpeed: lateral.length(), gravity: G * ref.mass / (radius * radius), maxAcceleration });
     const desiredLandingDirection = up.clone().multiplyScalar(command.verticalAcceleration);
     if (lateral.lengthSq() > 1e-8) desiredLandingDirection.addScaledVector(lateral.normalize(), -command.lateralAcceleration);
     if (desiredLandingDirection.lengthSq() === 0) desiredLandingDirection.copy(up);
     desiredLandingDirection.normalize();
-    // Reduce the allowed braking tilt from 32° to 4° as the surface approaches.
+    // Keep the landing attitude visually upright. Lateral braking can still
+    // lean the thrust vector at altitude, but the allowed lean closes smoothly
+    // to a few degrees near the surface instead of producing a tilted,
+    // oscillating rocket at touchdown.
     const maxTilt = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(4 + altitude * 0.0015, 4, 32));
     const tilt = Math.acos(THREE.MathUtils.clamp(up.dot(desiredLandingDirection), -1, 1));
     if (tilt > maxTilt) {
@@ -2193,7 +2207,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     // Point the engine in the useful direction before applying descent thrust.
     const aligned = Math.max(0, nose.dot(this.landingDirection));
     this.state.throttle = aligned > 0.55 ? command.throttle : 0;
-    this.landingStatus = `${command.insufficientThrust ? 'Low thrust · ' : 'Landing · '}Ground ${gameMetres(altitude).toFixed(0)} m · descent ${gameMetres(Math.max(0, -verticalSpeed)).toFixed(1)} m/s · L: cancel`;
+    this.landingStatus = `${command.insufficientThrust ? 'LOW THRUST — ' : 'LANDING — '}GROUND ${gameMetres(altitude).toFixed(0)} m · DESCENT ${gameMetres(Math.max(0, -verticalSpeed)).toFixed(1)} m/s · L: cancel`;
   }
 
   /** Test the travelled segment, not only the next endpoint: fast falls must not tunnel. */
@@ -2242,7 +2256,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     this.sound.stopEngine(); this.sound.playLand(); this.engineFlame.stop();
     this.screenShake = outcome === 'rough' ? 0.2 : 0;
     this.stagingOffset.set(0,0,0);
-    this.landingStatus = `Landed on ${body.name[0]!.toUpperCase() + body.name.slice(1)}`;
+    this.landingStatus = `Landed on ${body.name.toUpperCase()} · throttle up to launch again`;
     this.achievements.unlock(`land_${body.name}`);
     if (Math.abs(vertical) < 3) this.achievements.unlock('first_landing');
     if (this.parachuteDeployed) this.achievements.unlock('parachute_landing');
@@ -2250,7 +2264,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     if (this.autopilotActive && body.name === this.autopilotTarget) {
       this.autopilotActive = false; this.autopilotPhase = 'arrived';
       this.missionGuidance = null; this.missionRate = 1; this.timeWarp = 1; this.warpIndex = 0; this.hud.setWarp(1);
-      this.hud.setAutopilotStatus('LANDED', body.name, 'Engines off');
+      this.hud.setAutopilotStatus('LANDED', body.name, 'Mission complete — engines shut down');
       this.showArrivalOverlay(body.name, this.missionTime - this.autopilotStartMissionTime,
         this.autopilotStartFuel - this.rocket.totalFuelMass(), this.autopilotStartMass - this.rocket.totalMass());
     }
@@ -2383,14 +2397,14 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
       opacity:0;transition:opacity 360ms ease-out;
     `;
     overlay.innerHTML = `
-      <section class="game-dialog flight-result" style="width:min(420px,calc(100vw - 32px));padding:24px;">
-        <h2>Crashed</h2>
-        <p style="margin:0 0 24px;line-height:1.6;color:#c4c9cc;">${reason}</p>
-        <div style="display:flex;gap:12px;">
-          <button id="crash-menu" class="btn btn--secondary" style="flex:1;padding:12px;">Menu</button>
-          <button id="crash-restart" class="btn btn--primary" style="flex:1;padding:12px;">Restart</button>
-        </div>
-      </section>
+      <div class="crash-shake" style="text-align:center;">
+        <div style="font-size:36px;font-weight:600;color:#ed9681;margin-bottom:8px;">Crashed</div>
+        <div style="font-size:16px;color:#ccc;margin-bottom:32px;">${reason}</div>
+      </div>
+      <div style="display:flex;gap:16px;">
+        <button id="crash-menu" style="padding:12px 32px;font-size:18px;border:1px solid #555;border-radius:6px;background:#222;color:#f1f3f5;cursor:pointer;transition:all 0.15s;">Menu</button>
+        <button id="crash-restart" style="padding:12px 32px;font-size:18px;border:none;border-radius:6px;background:#4488ff;color:#fff;cursor:pointer;transition:all 0.15s;">Restart</button>
+      </div>
     `;
     this.lifetime.append(overlay);
     this.crashOverlay = overlay;

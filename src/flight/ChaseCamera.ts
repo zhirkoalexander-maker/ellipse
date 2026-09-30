@@ -5,18 +5,16 @@ import { ORBIT_SCALE, VISUAL_PLANET_MULT } from '../config/constants';
 
 const VISUAL_SCALE = ORBIT_SCALE * VISUAL_PLANET_MULT;
 
-// Numerical guards only: allow close inspection through a whole-system view.
-const MIN_DIST = 0.02;
-const MAX_DIST = 1e12;
-export function zoomDistance(distance: number, factor: number): number {
-  if (!Number.isFinite(factor) || factor <= 0) return distance;
-  return Math.max(MIN_DIST, Math.min(MAX_DIST, distance * factor));
-}
+const MIN_DIST = 4;
+const MAX_DIST = 80;
 const LERP_SPEED = 25;
 const ORBIT_SPEED = 3;
 const ZOOM_SPEED = 2;
 
-// Initial distance before fitting the camera to the assembled rocket.
+// Rockets render at ROCKET_VISUAL_SCALE (×60), so a default stack is ~18 scene
+// units tall. A DEFAULT_DIST of 2 put the camera INSIDE the fuselage — the user
+// stared at rocket texture and liftoff looked like "nothing happens" while the
+// HUD altitude climbed. Pull far enough out to frame the whole rocket + pad.
 const DEFAULT_DIST = 14;
 const DEFAULT_AZIMUTH = 0;
 const DEFAULT_POLAR = Math.PI / 2.5;
@@ -27,8 +25,8 @@ export class ChaseCamera {
   private surfaceFrame = new THREE.Quaternion();
   camera: THREE.PerspectiveCamera;
   private fittedDist = DEFAULT_DIST;
-  private originalNear: number;
-  private originalFar: number;
+  private minZoomDist = MIN_DIST;
+  private maxZoomDist = MAX_DIST;
   private dist = DEFAULT_DIST;
   private targetDist = DEFAULT_DIST;
   private azimuth = DEFAULT_AZIMUTH;
@@ -47,8 +45,6 @@ export class ChaseCamera {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
-    this.originalNear = camera.near;
-    this.originalFar = camera.far;
     this.setupKeyboard();
     this.lifetime.listen(window, 'blur', () => this.clearInput());
   }
@@ -103,6 +99,10 @@ export class ChaseCamera {
     const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * this.camera.aspect);
     const halfAngle = Math.max(0.001, Math.min(verticalHalfAngle, horizontalHalfAngle));
     this.fittedDist = Math.max(DEFAULT_DIST, Math.min(MAX_DIST, 1.15 * sphereRadius / Math.sin(halfAngle)));
+    // Keep a useful, controllable framing range. A wheel event or a held key
+    // must never pull the chase camera hundreds of units away from the craft.
+    this.minZoomDist = Math.max(MIN_DIST, this.fittedDist * 0.38);
+    this.maxZoomDist = Math.min(MAX_DIST, Math.max(this.fittedDist * 2.4, this.fittedDist + 10));
     this.targetDist = this.fittedDist;
     this.dist = this.fittedDist;
     this.initialized = false;
@@ -119,16 +119,8 @@ export class ChaseCamera {
   }
 
   zoom(delta: number): void {
-    this.targetDist = zoomDistance(this.targetDist, delta);
-  }
-
-  setClippingDistance(distance: number): void {
-    const near = Math.min(distance * .05, Math.max(this.originalNear, distance * .001));
-    const far = Math.max(this.originalFar, distance * 4);
-    if (near !== this.camera.near || far !== this.camera.far) {
-      this.camera.near = near; this.camera.far = far;
-      this.camera.updateProjectionMatrix();
-    }
+    this.targetDist *= delta;
+    this.targetDist = Math.max(this.minZoomDist, Math.min(this.maxZoomDist, this.targetDist));
   }
 
   enableOrbit(el: HTMLElement): void {
@@ -192,7 +184,6 @@ export class ChaseCamera {
 
     // Smooth interpolation
     this.dist += (this.targetDist - this.dist) * Math.min(1, LERP_SPEED * cameraDt);
-    this.setClippingDistance(this.dist);
     this.azimuth += (this.targetAzimuth - this.azimuth) * Math.min(1, LERP_SPEED * cameraDt * 0.5);
     this.polar += (this.targetPolar - this.polar) * Math.min(1, LERP_SPEED * cameraDt * 0.5);
 
@@ -231,8 +222,6 @@ export class ChaseCamera {
   }
 
   dispose(): void {
-    this.camera.near = this.originalNear; this.camera.far = this.originalFar;
-    this.camera.updateProjectionMatrix();
     this.lifetime.dispose();
     this.orbitLifetime.dispose();
     this.clearInput();

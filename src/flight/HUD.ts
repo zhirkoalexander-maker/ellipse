@@ -91,7 +91,7 @@ export class HUD {
       b.textContent = label;
       b.title = title;
       b.setAttribute('aria-label', title);
-      b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:#e6e8e6;border:1px solid rgba(255,255,255,0.1);border-radius:3px;font:400 12px system-ui;cursor:pointer;`;
+      b.style.cssText = `padding:10px 16px;background:rgba(0,0,0,0.6);color:${color};border:1px solid rgba(255,255,255,0.1);border-radius:6px;font:400 12px system-ui;cursor:pointer;letter-spacing:0.05em;`;
       this.lifetime.listen(b, 'click', () => {
         if (action === 'autopilotOpen') this.openAutopilotPicker();
         else this.onAction?.(action);
@@ -167,9 +167,9 @@ export class HUD {
     this.autopilotPicker = document.createElement('div');
     this.autopilotPicker.className = 'autopilot-picker'; this.autopilotPicker.hidden = true;
     this.autopilotPicker.innerHTML = `
-      <section class="autopilot-dialog game-dialog" role="dialog" aria-modal="true" aria-label="Autopilot mission">
+      <section class="autopilot-dialog" role="dialog" aria-modal="true" aria-label="Autopilot mission">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong style="font-size:19px;font-weight:500">Autopilot</strong><button type="button" data-action="autopilotClose" aria-label="Close autopilot">✕</button></div>
-        <p style="color:#a6b8c9;margin:0 0 20px">Pick a destination. Autopilot flies there and lands.</p>
+        <p style="color:#a6b8c9;margin:0 0 20px">Choose where to land. Autopilot will use the rocket’s engines and fuel.</p>
         <label>Destination<select aria-label="Destination"><option value="moon">Moon</option><option value="mercury">Mercury</option><option value="venus">Venus</option><option value="earth">Earth</option><option value="mars">Mars</option><option value="pluto">Pluto</option></select></label>
         <label style="display:flex;align-items:center;gap:9px;margin-bottom:22px" title="On: choose time warp yourself. Off: autopilot adjusts it."><input type="checkbox" style="width:18px;height:18px;accent-color:#eacd9e">Manual warp</label>
         <button type="button" data-action="autopilotStart" style="width:100%">Start flight</button>
@@ -202,7 +202,7 @@ export class HUD {
     this.autopilotMission.className = 'autopilot-mission'; this.autopilotMission.hidden = true;
     this.autopilotTitle = document.createElement('strong');
     this.autopilotDetail = document.createElement('div'); this.autopilotDetail.style.color = '#b7c8d6';
-    const cancel = document.createElement('button'); cancel.textContent = 'Stop autopilot'; cancel.dataset.action = 'autopilotCancel';
+    const cancel = document.createElement('button'); cancel.textContent = 'Cancel mission'; cancel.dataset.action = 'autopilotCancel';
     this.lifetime.listen(cancel, 'click', () => this.onAction?.('autopilotCancel'));
     const warpLabel = document.createElement('label');
     warpLabel.style.cssText = 'display:flex;align-items:center;gap:7px;margin-top:7px;cursor:pointer';
@@ -310,7 +310,7 @@ export class HUD {
     orbitPanel.style.cssText = 'position:fixed;top:96px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:11px;background:rgba(8,10,24,0.8);border:1px solid rgba(68,136,204,0.25);border-radius:6px;padding:8px 12px;color:#88ccff;min-width:140px;';
     orbitPanel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
-        <span style="color:rgba(244,245,242,0.5);font-size:9px;">ORBIT</span>
+        <span style="color:rgba(244,245,242,0.5);font-size:9px;letter-spacing:0.1em;">ORBIT</span>
         <span class="orbit-ecc" style="color:#88ccff;font-size:9px;">—</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
@@ -351,7 +351,7 @@ export class HUD {
     const fuelRight = document.createElement('div');
     fuelRight.classList.add('hud-panel-in-right');
     fuelRight.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;pointer-events:none;font-family:monospace;font-size:12px;background:rgba(8,10,24,0.8);border:1px solid rgba(200,152,56,0.2);border-radius:6px;padding:8px 12px;color:#ffaa44;';
-    fuelRight.innerHTML = '<span style="color:rgba(244,245,242,0.5);">Fuel</span> <span class="fuel-r-kg">4500 kg</span><br><div style="width:80px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px;"><div class="fuel-r-bar" style="width:100%;height:100%;background:#ffaa44;border-radius:3px;"></div></div>';
+    fuelRight.innerHTML = '<span style="color:rgba(244,245,242,0.5);">FUEL</span> <span class="fuel-r-kg">4500 kg</span><br><div style="width:80px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:4px;"><div class="fuel-r-bar" style="width:100%;height:100%;background:#ffaa44;border-radius:3px;"></div></div>';
     this.root.appendChild(fuelRight);
     this._fuelRKg = fuelRight.querySelector('.fuel-r-kg') as HTMLElement;
     this._fuelRBar = fuelRight.querySelector('.fuel-r-bar') as HTMLElement;

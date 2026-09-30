@@ -4,10 +4,6 @@ import { Quaternion, Vector3 } from 'three';
 import { steerAttitude, aimAttitude } from '../../src/flight/Attitude';
 
 describe('landing guidance', () => {
-  it.each([false,true])('survives 5 m/s descent, 17 m/s drift and 4 degrees of tilt with support=%s', supported => {
-    expect(landingOutcome(-5,17,4,supported)).toBe('rough');
-    expect(landingOutcome(-5,60,4,supported)).toBe('crash');
-  });
   it.each([false,true])('accepts an upright touchdown up to 90 m/s with support=%s', supported=>{
     expect(landingOutcome(-90,0,0,supported)).toBe('rough');
     expect(landingOutcome(-60,2,10,supported)).toBe('rough');

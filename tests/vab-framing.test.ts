@@ -33,10 +33,10 @@ describe('VAB camera framing', () => {
     vab.mount();
     addParts(['capsule_mk1']);
     const size = bboxSize();
-    // Frame the part at a useful distance.
+    // Camera must be close: roughly 1.2x the part span, not units away
     expect(cameraDistance()).toBeLessThan(size.y * 3 + 0.2);
     expect(cameraDistance()).toBeLessThan(0.6);
-    // Use the rendered bounds after center-of-mass translation.
+    // Target must be INSIDE the rendered mesh bounds (com-shifted!)
     const scene = vab as any;
     const box = new THREE.Box3().setFromObject(scene.rg);
     expect(scene.tg.y).toBeGreaterThan(box.min.y - 0.01);
@@ -59,10 +59,12 @@ describe('VAB camera framing', () => {
     addParts(['engine_mammoth', 'tank_xl_lfo', 'decoupler_l', 'tank_l_lfo']);
     const size = bboxSize();
     const d = cameraDistance();
-    // toMesh() recenters the stack; frame its rendered bounding box.
+    // toMesh() com-centres the stack, so the mesh is NOT at raw stack Y —
+    // framing must follow the real bbox. Distance ~ 1.25x span.
     expect(d).toBeGreaterThan(size.y * 0.5);
     expect(d).toBeLessThan(size.y * 2.5);
-    // This stack fits within a small number of scene units.
+    // A 4-part XL/L stack is ~0.5+ world units tall — camera must be closer
+    // than the old frozen distance of 5 by an order of magnitude.
     expect(d).toBeLessThan(1.5);
     expect(size.y).toBeGreaterThan(0.3);
   });
@@ -139,7 +141,7 @@ it('treats saved rocket names as text and fits when the canvas is double-clicked
 it('quick start builds only game parts and releases the old preview on rebuild and exit',()=>{
  const vab=new VABScene(()=>{},()=>{});vab.mount();
  try{
-  const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Use starter'));
+  const preset=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Build a rocket'));
   expect(preset).toBeDefined();preset!.click();
   expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(['engine_ant','tank_s_lfo','tank_s_lfo','capsule_s']);
   const group=(vab as any).rg as THREE.Group;

@@ -1,5 +1,7 @@
 # Changes
 
+The game source has been restored to 2.5.33 to match the public site. The later releases below remain in the commit history.
+
 ## 2.5.35
 
 New title screen using a frame from the game. Shorter guide and walkthrough, matching dialog styles and quieter flight controls. Removed the unused app scaffold and design preview; updated the README and GitHub project description.

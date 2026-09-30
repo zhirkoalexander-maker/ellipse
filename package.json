@@ -1,7 +1,7 @@
 {
   "name": "challenger",
   "private": true,
-  "version": "2.5.35",
+  "version": "2.5.33",
   "type": "module",
   "scripts": {
     "dev": "vite",

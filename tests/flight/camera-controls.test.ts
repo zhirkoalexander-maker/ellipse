@@ -54,24 +54,15 @@ it.each([16 / 9, 9 / 16])('frames a tall rocket inside the camera frustum at asp
  chase.zoom(0.5); chase.follow(state(), 1, undefined, true); chase.reset(); chase.follow(state(), 1, undefined, true);
  expect(camera.position.length()).toBeCloseTo(fittedDistance, 8);
 });
-it('allows close inspection and system-scale zoom, then restores the fitted view', () => {
+it('keeps manual zoom inside a bounded range', () => {
  const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 1000);
  const chase = new ChaseCamera(camera); owned.push(chase);
  chase.frame(40, 5); chase.initialiseAt(state(), new THREE.Quaternion(), new THREE.Vector3(0, 1, 0));
  const fitted = camera.position.length();
- chase.zoom(0.001); chase.follow(state(), 1, undefined, true);
- expect(camera.position.length()).toBeLessThan(0.1);
- expect(camera.near).toBeLessThan(camera.position.length() / 10);
- chase.zoom(1e10); chase.follow(state(), 1, undefined, true);
- expect(camera.position.length()).toBeGreaterThan(1e8);
- expect(camera.far).toBeGreaterThan(camera.position.length());
- const depth = (distance: number) => Math.round((new THREE.Vector3(0,0,-distance).applyMatrix4(camera.projectionMatrix).z * .5 + .5) * (2 ** 24 - 1));
- expect(depth(camera.position.length() * 2) - depth(camera.position.length())).toBeGreaterThan(1000);
- chase.reset(); chase.follow(state(), 1, undefined, true);
- expect(camera.position.length()).toBeCloseTo(fitted);
- for(const invalid of [NaN, Infinity, -1, 0]) chase.zoom(invalid);
- chase.follow(state(), 1, undefined, true);
- expect(camera.position.length()).toBeCloseTo(fitted);
+ chase.zoom(0.0001); chase.follow(state(), 1, undefined, true);
+ expect(camera.position.length()).toBeGreaterThanOrEqual(fitted * 0.38 - 1e-6);
+ chase.zoom(1000); chase.follow(state(), 1, undefined, true);
+ expect(camera.position.length()).toBeLessThanOrEqual(80 + 1e-6);
 });
 it('eases a change of planetary up without rolling the craft view in one frame',()=>{
  const camera=new THREE.PerspectiveCamera(), chase=new ChaseCamera(camera);owned.push(chase);
