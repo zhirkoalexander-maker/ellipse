@@ -1,0 +1,42 @@
+.main-menu {
+  position: fixed; inset: 0; z-index: 500; overflow: auto;
+  display: flex; align-items: center; padding: 64px clamp(24px, 7vw, 112px);
+  background: #10171d url('../../public/menu-launch.webp') center right / cover no-repeat;
+  isolation: isolate;
+}
+.main-menu::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(90deg, #11181ff2 0%, #11181fe8 26%, #11181f80 50%, #11181f00 78%);
+}
+.main-menu__content { width: min(100%, 400px); }
+.menu-logo { margin-bottom: 36px; }
+.menu-logo h1 { margin: 0; font-size: clamp(36px, 5vw, 64px); letter-spacing: -.045em; line-height: 1.1; }
+.menu-logo p { margin: 12px 0 0; color: #c1cbd0; font-size: 16px; }
+.main-menu__flights { display: grid; gap: 10px; max-width: 300px; }
+.main-menu__flights .menu-btn { justify-content: flex-start; padding: 17px 20px; font-size: 16px; }
+.main-menu__flights .btn--secondary { background: #18232ce8; border-color: #617078; color: #f1f2ed; }
+.main-menu__links { display: flex; flex-wrap: wrap; margin: 24px 0 0 -12px; }
+.main-menu__links .menu-btn { padding: 12px; font-size: 14px; }
+.main-menu__version { margin-top: 32px; font: 12px var(--font-data); color: #acb7bd; }
+.menu-overlay { position: fixed; inset: 0; z-index: 600; display: grid; place-items: center; padding: 12px; background: #0e151deb; }
+.menu-dialog { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow: auto; padding: 28px; color: var(--text-primary); background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; font: 14px/1.6 var(--font-body); }
+.menu-dialog h2 { margin-top: 0; font-size: 24px; }
+.mission-row { padding: 12px 0; border-bottom: 1px solid var(--panel-border); }
+.mission-name { font-weight: 600; }
+.mission-row--done .mission-name { color: var(--success); }
+.mission-description { margin-top: 3px; font-size: 13px; color: var(--text-secondary); }
+@media (max-width: 600px) {
+  .main-menu { padding: 70px 24px 28px; background-position: 60% center; }
+  .main-menu::before { background: #11181fd6; }
+  .main-menu__content { margin: auto 0; }
+  .main-menu__flights { max-width: none; }
+  .menu-dialog { padding: 20px; }
+}
+@media (max-height: 550px) {
+  .main-menu { align-items: flex-start; padding-top: 24px; padding-bottom: 24px; }
+  .menu-logo { margin-bottom: 18px; }
+  .menu-logo h1 { font-size: 36px; }
+  .main-menu__flights .menu-btn { padding: 12px 20px; }
+  .main-menu__links { margin-top: 12px; }
+  .main-menu__version { margin-top: 12px; }
+}

@@ -1,3 +1,4 @@
+import './MainMenu.css';
 import { PlayerCounter } from '../ui/PlayerCounter';
 import { Tutorial, shouldShowTutorial } from '../ui/Tutorial';
 import { Lifetime } from '../core/Lifetime';
@@ -27,46 +28,48 @@ export class MainMenuScene {
     this.life.listen(window,'keydown',e=>{if(e.key==='Escape'){this.helpOverlay?.remove();this.helpOverlay=null;this.missionsOverlay?.remove();this.missionsOverlay=null;}});
 
     this.root = document.createElement('div');
-    this.root.className = 'panel';
+    this.root.className = 'main-menu';
     this.root.appendChild(this.playerCounter.element);
-    this.root.style.cssText = `
-      position: fixed; inset: 0; z-index: 500;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: rgba(16,19,22,0.97);
-      border: none; border-radius: 0;
-    `;
+    const content = document.createElement('div');
+    content.className = 'main-menu__content';
+    this.root.appendChild(content);
 
     const logo = document.createElement('div');
     logo.className = 'menu-logo';
-    logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
-      <div class="text-display" style="font-size:clamp(28px, 7vw, 44px);letter-spacing:0;color:var(--text-primary);">CHALLENGER</div>
-      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0;">Rocket simulator</div>
+      <h1 class="text-display">Challenger</h1>
+      <p>Build a rocket. Bring it home.</p>
     `;
-    this.root.appendChild(logo);
+    content.appendChild(logo);
+    const flights = document.createElement('nav');
+    flights.className = 'main-menu__flights';
+    flights.setAttribute('aria-label', 'Play');
+    content.appendChild(flights);
+    const links = document.createElement('nav');
+    links.className = 'main-menu__links';
+    links.setAttribute('aria-label', 'Game information');
+    content.appendChild(links);
 
     const btn = (label: string, variant: string, cb: () => void): HTMLButtonElement => {
       const b = document.createElement('button');
       b.className = `btn btn--${variant} menu-btn`;
       b.textContent = label;
-      b.style.cssText = 'margin: 6px; min-width: 220px; padding: 12px 24px; font-size: 14px;';
       b.addEventListener('click', cb);
       return b;
     };
-    this.root.appendChild(btn('Flight', 'primary', this.onPlay));
+    flights.appendChild(btn('Flight', 'primary', this.onPlay));
     const continueButton = btn('Continue', 'secondary', () => this.onContinue?.());
     continueButton.disabled = !this.onContinue;
     continueButton.title = this.onContinue ? 'Open your last flight or build' : 'No saved flight yet. Choose Flight to start.';
-    if (!this.onContinue) { continueButton.style.opacity = '0.45'; continueButton.style.cursor = 'default'; }
-    this.root.appendChild(continueButton);
-    this.root.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
-    this.root.appendChild(btn('Missions', 'ghost', () => this.toggleMissions()));
-    this.root.appendChild(btn('Settings', 'ghost', this.onSettings));
-    this.root.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
+    flights.appendChild(continueButton);
+    flights.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
+    links.appendChild(btn('Missions', 'ghost', () => this.toggleMissions()));
+    links.appendChild(btn('Settings', 'ghost', this.onSettings));
+    links.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
     version.textContent = `v${appVersion}`;
-    version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
-    this.root.appendChild(version);
+    version.className = 'main-menu__version';
+    content.appendChild(version);
 
   }
 
@@ -74,11 +77,9 @@ export class MainMenuScene {
     if (this.missionsOverlay) { this.missionsOverlay.remove(); this.missionsOverlay = null; return; }
     if (!this.missions) return;
     const overlay = document.createElement('div');
-    overlay.className = 'guide-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;background:rgba(6,8,20,0.9);';
+    overlay.className = 'guide-overlay menu-overlay';
     const card = document.createElement('div');
-    card.className = 'guide-card';
-    card.style.cssText = 'max-width:520px;max-height:80vh;overflow-y:auto;padding:28px;font-family:system-ui,sans-serif;color:#ddd;background:#191e23;border:1px solid rgba(200,152,56,0.2);border-radius:8px;';
+    card.className = 'guide-card menu-dialog';
     const completed = new Set(this.missions.getCompleted());
     card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;">
         <div style="color:#eceee9;font-size:18px;">Missions</div>
@@ -89,11 +90,11 @@ export class MainMenuScene {
     for (const m of MISSIONS) {
       const done = completed.has(m.id);
       const row = document.createElement('div');
-      row.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:4px;background:${done ? 'rgba(124,255,178,0.06)' : 'rgba(255,255,255,0.02)'};border-left:3px solid ${done ? '#7CFFB2' : '#3A4055'};`;
+      row.className = `mission-row${done ? ' mission-row--done' : ''}`;
       row.innerHTML = `
         <div>
-          <div style="font-size:13px;color:${done ? '#7CFFB2' : '#ddd'};font-weight:600;">${done ? '☑' : '☐'} ${m.name}</div>
-          <div style="font-size:11px;color:#889;margin-top:2px;">${m.description}</div>
+          <div class="mission-name">${done ? '✓ ' : ''}${m.name}</div>
+          <div class="mission-description">${m.description}</div>
         </div>
 `;
       list.appendChild(row);
@@ -114,31 +115,29 @@ export class MainMenuScene {
   private toggleHelp(): void {
     if (this.helpOverlay) { this.helpOverlay.remove(); this.helpOverlay = null; return; }
     const overlay = document.createElement('div');
-    overlay.className = 'guide-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,8,20,0.95);';
+    overlay.className = 'guide-overlay menu-overlay';
     const card = document.createElement('div');
-    card.className = 'guide-card';
-    card.style.cssText = 'width:min(560px,calc(100vw - 24px));box-sizing:border-box;max-height:90dvh;overflow:auto;padding:24px;font:14px/1.6 system-ui;color:#ddd;';
+    card.className = 'guide-card menu-dialog';
     card.classList.add('flight-guide');
     card.innerHTML = `<h2>Guide</h2>
-      <p class="guide-note">Use an English keyboard layout for the letter keys.</p>
+      <p class="guide-note">Keyboard: switch to English for W, A, S and D.</p>
       <h3>First flight</h3>
-      <p>Choose <b>Flight</b> in the menu, then press <b>Launch</b> or Space. The engines start after the countdown.</p>
+      <p><b>Flight</b> gives you a ready-made rocket. Press <b>Launch</b> or Space to lift off.</p>
       <p>↑ and ↓ change throttle. W/S and A/D steer. Drag to move the camera; scroll or pinch to zoom.</p>
       <button class="btn btn--secondary" id="guide-tour" style="padding:10px 16px">Show me</button>
       <details><summary>Build a rocket</summary>
         <p>Open <b>Vehicle assembly</b>. Start with an S engine, two 5 t tanks and an S capsule. Add them in that order, then choose <b>Take to pad</b>.</p>
-        <p>For side engines, select <b>Side pair</b> and the tank they attach to. Add an engine pair and decouplers. Either can go on first. If there is no tank yet, choose one from the parts list.</p>
+        <p>For side engines, select a tank and choose <b>Side pair</b>. Add engines and side decouplers so you can drop them later.</p>
         <p>Space releases the side decouplers first, then the lowest main stage. Both capsules have a parachute built in.</p>
       </details>
       <details><summary>Fly to the Moon</summary>
         <p>Open <b>Map</b>, select <b>Moon</b>, then <b>Autopilot to destination</b>. Autopilot uses your engines and fuel to fly there and land.</p>
         <p>Steering or changing throttle takes back control. Leave <b>Manual warp</b> off to let autopilot adjust time warp.</p>
-        <p>For the return trip, select <b>Earth</b> in the map and start autopilot again. You will need fuel left for the journey.</p>
+        <p>To come home, select <b>Earth</b> and start autopilot again. Save some fuel for the return.</p>
       </details>
       <details><summary>Land</summary>
         <p><b>Above surface</b> shows the distance to the ground. Use <b>Landing view</b> to look down.</p>
-        <p>Point the engine toward the ground and use throttle to slow your descent. Start braking before you get close. Press <b>L</b> if you want landing assist to handle it.</p>
+        <p>Keep the engine pointing down and fire it to slow down. Brake early. <b>L</b> turns on landing assist.</p>
         <p><b>P</b> opens the parachute. It needs an atmosphere, so use your engine to land on the Moon.</p>
       </details>
       <details><summary>Keyboard controls</summary><table>

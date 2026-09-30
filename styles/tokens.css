@@ -1,5 +1,5 @@
 :root {
-  --font-body: Arial, Helvetica, sans-serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Trebuchet MS", Arial, sans-serif;
   --font-data: ui-monospace, "SFMono-Regular", Menlo, monospace;
   /* SPACE ENVIRONMENT */
@@ -9,9 +9,9 @@
   --nebula: #2A1A3A;
 
   /* PANELS */
-  --panel-bg: #20262B;
-  --panel-bg-alt: #1B2025;
-  --panel-border: #3D454D;
+  --panel-bg: #202930;
+  --panel-bg-alt: #192229;
+  --panel-border: #46535C;
   --panel-elevated: #242B31;
   --panel-hover: #2E333A;
 
@@ -22,7 +22,7 @@
   --text-data: #F4F5F2;
 
   /* ACCENTS */
-  --accent-gold: #D5B786;
+  --accent-gold: #DDB77A;
   --accent-gold-hover: #E1C69C;
   --accent-gold-dim: #C4A87A;
   --accent-blue: #506779;
