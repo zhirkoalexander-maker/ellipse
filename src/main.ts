@@ -25,10 +25,10 @@ function showStartupError(error: unknown): void {
   document.body.appendChild(panel);
 }
 
-try {
+async function start(): Promise<void> {
   migrateLegacySaves();
   const game = new Game();
-  void game.start().catch(showStartupError);
-} catch (error) {
-  showStartupError(error);
+  await game.start();
 }
+
+void start().catch(showStartupError);
