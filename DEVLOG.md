@@ -1,138 +1,109 @@
-# Changes
+# Release notes
 
-The game source has been restored to 2.5.33 to match the public site. The later releases below remain in the commit history.
+The current game uses 2.5.33 as its base. Later updates changed menu styling and tutorial images. The version number remains 2.5.33. The later 2.5.34 and 2.5.35 changes below are historical releases, not a list of features in the current build.
 
-## 2.5.35
+## 2.5.35 — before the rollback
 
-New title screen using a frame from the game. Shorter guide and walkthrough, matching dialog styles and quieter flight controls. Removed the unused app scaffold and design preview; updated the README and GitHub project description.
+The title screen used a frame from the game. The guide and walkthrough were shortened, dialogs were given matching styles, and the flight controls were made visually quieter. The unused app scaffold and design preview were removed. The README and GitHub description were updated too.
 
-## 2.5.34
+## 2.5.34 — before the rollback
 
-Heavy rockets now get enough thrust to leave the pad at full throttle, with slower ascent as mass increases. Fuel use, instruments and guidance share the adjusted thrust. Flight zoom has a much wider range, including free-camera buttons; F returns to the fitted view. Moderate sideways drift now produces a rough landing instead of an immediate crash.
+Underpowered heavy rockets received extra thrust at full throttle so they could leave the pad, with slower ascent for larger builds. Fuel use, instruments and guidance used the same adjusted force. Camera zoom gained a much wider range and free-camera buttons; F still returned to the fitted view. Moderate sideways drift became a rough landing instead of an immediate crash.
 
 ## 2.5.33
 
-- Replace the illustrated tutorial with screenshots of the actual game, highlighted controls and close-ups on phones. Playback and first-visit dismissal still work as before.
-- Simplify the menu and dialog styling, remove the orbit logo and decorative status glow, and use local system fonts.
+The tutorial's illustrations were replaced with screenshots of the actual game, highlighted controls and closer views on phones. Playback and first-visit dismissal stayed in place. The menu and dialogs were simplified, the orbit logo and decorative status glow were removed, and the interface switched to local system fonts.
 
 ## 2.5.32
 
-- Shorten the guide and put building, Moon trips, landing and controls in separate expandable sections. Update it for the S/XL parts.
-- Rewrite tutorial captions, mission names and flight messages in plain English. Remove shouty headings and decorative button emoji.
+The guide was split into expandable sections for building, Moon trips, landing and controls, with instructions for the S/XL parts. Tutorial captions, mission names and flight messages were rewritten. Decorative button emoji and unnecessary uppercase labels were removed.
 
 ## 2.5.31
 
-- Trim Vehicle assembly to 16 parts in S and XL sizes. Old builds still load with their original parts.
-- Offer two tanks per size: 5/10 t for S and 250/500 t for XL. Each pair has identical dimensions and dry mass, with different fuel capacity and bodywork.
-- Use an S capsule in the starter rocket. Both new capsules include a parachute.
+The new-build catalog was reduced to 16 parts in S and XL. Older builds still loaded with their original parts. Each size gained two tank capacities: 5/10 t for S and 250/500 t for XL. Within each pair, dimensions and dry mass stayed the same while capacity and bodywork differed. The starter rocket switched to an S capsule. Both new capsules included a parachute.
 
 ## 2.5.30
 
-- Let the first central fuel tank be added while Side pair is selected, so the assembly instructions no longer send you in circles. Show the next step beside the attachment selector.
+Side pair placement could now start with a central fuel tank. Previously the instructions could send the player back and forth between parts without allowing the first attachment. The next required step was shown beside the attachment selector.
 
 ## 2.5.29
 
-- Separating a stage no longer changes the rocket’s altitude or orbit. Upper-stage engines wait until their stage is exposed.
-- Continue remembers stability, landing assistance and automatic trips back to the same planet, including trip statistics.
-- Fix the attitude indicator’s horizon and roll. Add a Pause button.
-- Replace the large side separator discs with compact mounts and cover upper-stage engines with a detachable interstage.
-- Increase assembly text sizes and keep attachment controls accessible on short screens.
+Staging no longer changed the rocket's altitude or orbit, and upper-stage engines waited until their stage was exposed. Continue restored stability mode, landing assistance and automatic trips back to the same planet, including trip statistics. The attitude indicator's horizon and roll were corrected, and flight gained a Pause button.
+
+Large side-separator discs were replaced with compact mounts. Upper-stage engines received a detachable interstage. Assembly text was enlarged and attachment controls were kept accessible in short windows.
 
 ## 2.5.28
 
-- Add side-mounted engine pairs in Vehicle assembly, with optional side decouplers, tank selection and Undo.
-- Fit tapered joints to the adjoining parts, including the Mk1 capsule.
-- Keep separated stages intact, preserve their pose and advance them at the current simulation speed.
+Vehicle assembly gained side-mounted engine pairs, optional side decouplers, tank selection and Undo. Tapered joints were fitted to the adjoining parts, including the Mk1 capsule. Separated stages stayed intact, kept their pose and moved at the current simulation speed.
 
 ## 2.5.27
 
-- Rename the game to Challenger. Existing saves, designs and settings carry over.
+The game was renamed Challenger. Existing saves, designs and settings carried over from the Ellipse storage keys.
 
 ## 2.5.26
 
-- Keep only the Planets map view. Selecting destinations and adjusting course stay in that view.
-- Add the English keyboard layout reminder to the guide.
+The map was reduced to its Planets view, keeping destination selection and course corrections there. The guide gained the English keyboard layout reminder.
 
 ## 2.5.25
 
-- Keep the flight path on the map and remove the line from the flight view.
-- Manual warp changes time speed without cancelling autopilot. Toggle it during a mission to return to automatic warp.
+The flight-path line was removed from the flight view while remaining on the map at that time. Manual warp could change the time rate without cancelling autopilot, and switching it off during a mission returned warp control to autopilot.
 
 ## 2.5.24
 
-- Reorganize the flight instruments and remove the delta-v readout.
+The flight instruments were reorganized and the delta-v readout was removed.
 
 ## 2.5.23
 
-- Skip terrain calculations that have no effect on the launch pad, open water or distant regions. Surface heights stay the same.
+Terrain calculations with no effect on the launch pad, open water or distant regions were skipped. The resulting surface heights stayed the same.
 
 ## 2.5.22
 
-- Draw only live exhaust particles; keep the same plume simulation.
-- Missions keep completion progress without points or rewards.
-- Add a shared browser-based player count to the menu.
+Only live exhaust particles were drawn, without changing the plume simulation. Mission completion remained, but points and rewards were removed. A shared browser-based player count was added to the menu.
 
 ## 2.5.21
 
-- Removed imported vehicles and their startup downloads. Quick start uses the four-part starter rocket.
-- Release old VAB previews when rebuilding or leaving the editor.
-- Batch static rocket decorations without reducing mesh detail.
+Imported vehicles and their startup downloads were removed. Quick start used the four-part starter rocket. Old assembly previews were released when rebuilding or leaving the editor, and static rocket decorations were batched without reducing mesh detail.
 
 ## 2.5.20
 
-- Reuse terrain buffers and materials when moving across a planet.
-- Skip invisible surface detail calculations and unchanged HUD text updates.
-- Stop drawing the 3D view underneath the map; flight simulation continues.
+Terrain buffers and materials were reused as the rocket moved across a planet. Invisible surface-detail calculations and unchanged HUD text updates were skipped. The 3D view stopped drawing underneath the map while the flight simulation continued.
 
 ## 2.5.19
 
-- Three separated mountains inland from the launch site.
-- Shorter guide with a replayable animated tour, shown on the first visit.
+Three separated mountains were added inland from the launch site. The guide was shortened and a replayable animated tour was shown on the first visit.
 
 ## 2.5.18
 
-- Moved the launch coast closer, with a narrower beach and darker water.
-- Lower, broader hills near the pad; finer grass and soil detail.
+The launch coast moved closer to the pad, with a narrower beach and darker water. Nearby hills became lower and broader, with finer grass and soil detail.
 
 ## 2.5.16
 
-- Map opens on the rocket flight path, with brighter lines and predicted impact markers.
-- Earlier surface warnings, time-to-ground estimate and a more visible landing readout.
-- Reduced hull drag during atmospheric entry; parachute braking is unchanged.
-- Automatic missions cruise at up to 40× and slow down on approach.
+At this point the map opened on the rocket's flight path, with brighter lines and predicted impact markers. Surface warnings appeared earlier, with an estimated time to the ground and a more visible landing readout. Hull drag was reduced during atmospheric entry; parachute braking stayed the same. Automatic missions could cruise at up to 40× and slow down on approach.
 
 ## 2.5.15
 
-- Smoother map zoom and view changes. Dragging now redraws on every display frame.
+Map zoom and view changes became smoother. Dragging redrew the map on every display frame.
 
 ## 2.5.14
 
-- Fixed keyboard and touch takeover from autopilot, and conflicts between landing assist and course corrections.
-- Restart keeps the original rocket after saving and continuing a staged flight.
-- Fixed rocket names in the Load dialog, storage-error handling and double-click framing in assembly.
-- Auto-save and sound settings now work. Removed settings that had no effect.
-- Fixed the 7000 m/s mission reward and menu overlay cleanup.
-- Rewrote the guide and README. Removed repeated source snapshots and outdated work plans from the docs.
+Keyboard and touch input could take over from autopilot correctly, and conflicts between landing assist and course corrections were fixed. Restart kept the original rocket after saving and continuing a flight that had already separated stages.
+
+Other fixes covered rocket names in the Load dialog, storage errors, double-click framing in assembly, the 7000 m/s mission reward and menu-overlay cleanup. Autosave and sound settings were made functional; settings that did nothing were removed. The guide and README were rewritten, and repeated source snapshots and outdated work plans were removed from the documentation.
 
 ## 2.5.13
 
-- Reduced displayed distances and speeds while increasing visual motion near the surface.
-- Fixed excessive atmospheric braking and manual-throttle takeover from landing assist.
-- Rebuilt the launch coastline at sea level, with a beach and visible inland ridges.
+Displayed distances and speeds were reduced while visual motion near the surface increased. Excessive atmospheric braking and manual-throttle takeover from landing assist were fixed. The launch coastline was rebuilt at sea level with a beach and visible inland ridges.
 
 ## 2.5.12
 
-- Smaller distant planet discs.
-- A system overview, direct destination selection and collapsible course controls on the map.
+Distant planet discs became smaller. The map gained a system overview, direct destination selection and collapsible course controls.
 
 ## 2.5.11
 
-- Detailed surface maps for Earth, the Moon, Mars and Mercury.
-- Updated gas planets and rings; fixed planets showing through each other.
+Earth, the Moon, Mars and Mercury received detailed surface maps. Gas planets and rings were updated, and planets no longer showed through one another.
 
 ## 2.5.10
 
-- Upright touchdowns up to 90 m/s.
-- Disabled engine audio and fitted the full lunar orbit in the map view.
+Upright touchdowns up to 90 m/s were allowed. Engine audio was disabled, and the map could fit the full lunar orbit.
 
-Earlier changes are in Git history.
+Earlier changes are in the Git history.

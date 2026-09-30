@@ -1,37 +1,41 @@
 # Code and flight model
 
-`src/core/Game.ts` owns the menu, assembly screen and flight scene. Each screen removes its listeners, overlays and rendering resources when it closes.
+The current game uses the 2.5.33 flight model. Later interface work does not include the adaptive thrust or relaxed sideways landing limits from 2.5.34. Those changes are still available in the commit history.
 
-| Directory | Contents |
-| --- | --- |
-| `src/scenes` | Menu, rocket assembly and flight loop |
-| `src/flight` | Input, HUD, camera, guidance and atmospheric drag |
-| `src/physics` | Gravity, orbital propagation and reference bodies |
-| `src/planets` | Planet geometry, textures and terrain |
-| `src/rocket`, `src/parts` | Assemblies, staging, engines, fuel and part models |
-| `src/storage` | Design saves, flight saves and older-save migration |
-| `src/ui` | Map and settings |
+## Where a flight starts
 
-## Coordinates
+`src/core/Game.ts` creates the planetary system and switches between the menu, Vehicle assembly and flight. `src/main.ts` migrates saved data before creating the game. The first-visit tutorial belongs to the menu.
 
-The simulation keeps positions, velocities and forces in SI units. The HUD and map use a game-distance scale of 0.25, defined in `GameUnits.ts`. Convert both displayed values and player-entered burn values at the UI boundary. Do not scale the physics state or saved coordinates.
+The editor produces an `Assembly`. Flight wraps that assembly in a `Rocket`, with separate state for position, velocity, orientation and controls. The original launch assembly is kept as a separate copy because staging changes the vehicle you are currently flying. Restart can then return the complete rocket to the pad.
 
-Rendering has its own scale. `SurfaceView` enlarges nearby terrain and reduces distant planet discs. It does not move collision surfaces. Terrain geometry and contact checks use `rockyTerrain`; Earth coast shading shares the launch frame with that function.
+Most of the flight orchestration is in `src/scenes/FlightScene.ts`. Input, instruments, camera, drag, thrust and guidance have their own files in `src/flight`. Gravity and planet motion are in `src/physics`; part definitions and models are in `src/parts`. Assembly, fuel access and stage selection are in `src/rocket`.
 
-## Flight loop
+## Three different scales
 
-Thrust consumes fuel and acts along the rocket's nose. Drag depends on the vehicle's width and attitude, and on local air density. Planet motion uses velocity Verlet; fast unpowered flight uses orbital propagation.
+The simulation uses metres, seconds and kilograms. Planet positions and saved flight coordinates use these units too. The numbers shown in the HUD and map apply a distance scale of 0.25 from `GameUnits.ts`. Speeds use the same scale; mass and time do not. A displayed course correction is converted back before it is applied to the simulation.
 
-Manual input takes priority over guidance. A map burn, landing assist and a destination mission must not command the rocket at the same time. Automatic missions still need fuel and enough thrust to land.
+Rendering has a separate scale. `SurfaceView` changes the apparent size of nearby ground, and distant planet discs are reduced so they do not fill the sky. Those visual changes do not move the collision surface. This distinction matters when comparing a screenshot, an altitude readout and the raw flight state: they are not three interchangeable measurements.
 
-Contact checks use vertical speed, sideways speed and tilt. The 90 m/s landing limit uses displayed game units. A crash ends the current flight; it must not bounce the rocket away from the surface.
+Surface geometry and contact checks use the heights supplied by `Terrain.ts`. Earth's coastal appearance also uses the coordinates in `EarthGeography.ts`. Changing only the visible surface can leave a rocket standing above it or colliding below it, so geometry and collision heights need to agree.
+
+## Engines, guidance and contact
+
+An active engine applies thrust along the rocket's nose and consumes fuel accessible to its stage. The force comes from the engine's rated thrust and the current throttle. When the remaining fuel cannot cover a whole simulation step, the impulse is reduced to match the fuel actually burned. Thrust therefore stops when the tanks run dry.
+
+Fuel consumption includes the game's burn-rate multiplier. The atmosphere model uses the vehicle's width and attitude, local density and velocity relative to the current body. Planet motion uses velocity Verlet; fast unpowered flight can use orbital propagation. These choices are for the game's scale and travel times rather than a real launch vehicle's performance.
+
+Manual steering or throttle takes control away from automatic guidance. Map corrections, landing assist and destination autopilot share the same rocket, engines and fuel. They are mutually exclusive flight controls. Selecting a destination does not itself move the rocket there.
+
+Surface contact uses descent speed, sideways speed and tilt. The 90 m/s vertical landing limit is in displayed units, and it does not override the other limits. Deploying actual landing legs or a parachute affects the supported-landing checks. A failed contact ends the flight instead of applying a bounce that sends the wreck back into the air.
 
 ## Saves
 
-Flight saves include body motion, remaining fuel, vehicle attitude, guidance state and the original launch assembly. Continue restores the current vehicle; Restart uses the launch assembly. Older saves without that field fall back to the remaining vehicle.
+Flight saves contain the remaining assembly, fuel, body motion, vehicle attitude, guidance state and original launch design. Restoring the planets as well as the rocket prevents a resumed flight from finding its destination somewhere else in its orbit. Continue uses the remaining vehicle; Restart uses the launch design when the save has one. Older saves fall back to the vehicle they contain.
 
-Browser storage may be unavailable or full. Failed writes must not prevent flight, and save dialogs must report failures instead of claiming success.
+Named designs are separate from flight saves. Browser storage is also used for settings, tutorial dismissal and progress. Storage access can fail or run out of space; the save code handles those failures and reports unsuccessful writes rather than reporting a successful save. There is no account or server copy of a flight.
 
-## Verification
+## Checking changes
 
-Run `npm test` and `npm run build`. The suite covers complete Moon and Mars missions, manual input, staging, terrain contact, warp, saves and scene cleanup. Check WebGL rendering and desktop/mobile controls in a browser as well; DOM tests do not compile shaders.
+`npm test` runs the automated checks, including Moon and Mars transfers, staging, manual takeover, surface contact and save restoration. `npm run build` checks TypeScript and produces the site.
+
+The test environment uses jsdom with canvas stubs. It can check state changes and DOM controls, but it does not establish that WebGL shaders compile on a real device. Terrain, camera, part-model and interface changes also need a browser run. For a staging change, a useful check is to launch, drop a section, save, continue and restart: that exercises both the remaining rocket and the original launch design.
