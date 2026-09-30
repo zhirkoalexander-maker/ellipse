@@ -191,7 +191,7 @@
   flex: 1;
   font-size: 10px;
   padding: 6px 4px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   background: rgba(58, 64, 85, 0.4);
   border-color: rgba(58, 64, 85, 0.6);
   color: var(--text-secondary);
@@ -230,7 +230,7 @@
 .flight-readouts {
   position: fixed; top: 16px; left: 16px; z-index: 100; pointer-events: auto;
   box-sizing: border-box; width: 184px; padding: 10px 12px;
-  background: #111d2b; color: #edf2f5; border: 1px solid #405161; border-radius: 8px;
+  background: #111d2b; color: #edf2f5; border: 1px solid #405161; border-radius: 4px;
   font: 12px/1.35 Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
 }
 .telemetry-group + .telemetry-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid #304151; }

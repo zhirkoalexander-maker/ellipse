@@ -11,12 +11,12 @@ export function shouldShowTutorial():boolean {
 }
 type Lesson = {title:string;text:string;frame:keyof typeof frames;alt:string;note?:string};
 const steps: Lesson[] = [
-  {title:'Start here',text:'Flight opens a starter on the pad. Vehicle assembly is where you build your own.',frame:'menu',alt:'The game menu, with Flight selected.',note:'Use an English keyboard layout for the letter keys.'},
+  {title:'Start here',text:'Choose Flight to use the starter rocket, or Vehicle assembly to build one.',frame:'menu',alt:'The game menu, with Flight selected.',note:'Use an English keyboard layout for the letter keys.'},
   {title:'Build a rocket',text:'Add an S engine, two 5 t tanks and an S capsule. Then choose Take to pad.',frame:'assembly',alt:'A four-part rocket in Vehicle assembly, beside the parts list and Take to pad button.'},
   {title:'Lift off',text:'Press Launch or Space and wait for the countdown. ↑ / ↓ change throttle; W/S and A/D steer.',frame:'launch',alt:'The starter rocket on its launch pad, with the Launch button below.'},
-  {title:'Fly to the Moon',text:'Choose Moon in Map, then Autopilot to destination. Leave the controls alone while it flies and lands.',frame:'moon',alt:'The map destination panel with Moon selected and the autopilot button below.'},
-  {title:'Landing',text:'Above surface tells you how far away the ground is. Start braking early, or press L for landing assist.',frame:'landing',alt:'A descending rocket and its Above surface readout, showing height and descent speed.'},
-  {title:'Return to Earth',text:'On the Moon, pick Earth in Map and start autopilot again. Keep enough fuel for the trip home.',frame:'return',alt:'The map destination panel with Earth selected for the return flight.'},
+  {title:'Fly to the Moon',text:'Open Map, pick Moon and press Autopilot to destination. Steering or changing throttle takes back control.',frame:'moon',alt:'The map destination panel with Moon selected and the autopilot button below.'},
+  {title:'Landing',text:'Watch Above surface as you descend. Fire the engine to slow down, or press L for landing assist.',frame:'landing',alt:'A descending rocket and its Above surface readout, showing height and descent speed.'},
+  {title:'Return to Earth',text:'Ready to come home? Pick Earth in Map and start autopilot again. You still need fuel.',frame:'return',alt:'The map destination panel with Earth selected for the return flight.'},
 ];
 
 export class Tutorial {

@@ -8,6 +8,7 @@ try {
  const page=await browser.newPage();await page.setViewport({width:960,height:640,deviceScaleFactor:1});
  await page.evaluateOnNewDocument(()=>{localStorage.setItem('challenger_player_counted_v1','1');localStorage.setItem('challenger_tutorial_seen','1');});
  await page.goto(process.argv[2]||'http://127.0.0.1:4175/ellipse/',{waitUntil:'networkidle0'});
+ await page.waitForSelector('.menu-btn');
  await page.addStyleTag({content:'.toast-stack,.player-counter{visibility:hidden!important}'});
  await page.evaluate(()=>{const version=document.querySelector('.menu-logo')?.parentElement?.lastElementChild;if(version&&/^v\d/.test(version.textContent||''))version.style.visibility='hidden';});
  await mkdir('public/tutorial',{recursive:true});
