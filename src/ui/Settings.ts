@@ -23,9 +23,9 @@ export class SettingsPanel {
   constructor(current: Settings, onClose:()=>void) {
     this.root.className='settings-overlay';
     this.root.style.cssText='position:fixed;inset:0;z-index:9999;background:#101316ed;display:grid;place-items:center';
-    const card=document.createElement('div');card.className='game-dialog';
+    const card=document.createElement('div');card.className='panel panel--elevated';
     card.style.cssText='width:min(360px,calc(100vw - 24px));box-sizing:border-box;padding:24px;max-height:90dvh;overflow:auto';
-    card.innerHTML='<h2>Settings</h2><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Autosave<input type="checkbox" id="settings-autosave"></label><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Sound effects<input type="checkbox" id="settings-sound"></label><p style="font-size:13px;color:#aab5c2">Turning autosave off keeps your last saved flight. Save rocket designs separately in Vehicle assembly.</p><button class="btn btn--primary" style="width:100%;padding:12px">Done</button>';
+    card.innerHTML='<h2>Settings</h2><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Save flights automatically<input type="checkbox" id="settings-autosave"></label><label style="display:flex;justify-content:space-between;gap:16px;margin:20px 0">Sound effects<input type="checkbox" id="settings-sound"></label><p style="font-size:13px;color:#aab5c2">Saves stay in this browser. Switching autosave off keeps your last save. Use Save in Vehicle assembly to keep a rocket design.</p><button class="btn btn--primary" style="width:100%;padding:12px">Done</button>';
     const auto=card.querySelector<HTMLInputElement>('#settings-autosave')!,sound=card.querySelector<HTMLInputElement>('#settings-sound')!;
     auto.checked=current.autoSave;sound.checked=current.sfxVolume>0;
     const close=()=>{if(!saveSettings({...current,autoSave:auto.checked,sfxVolume:sound.checked ? .8 : 0}))toast.show('Could not save settings. Browser storage is unavailable.');onClose();};

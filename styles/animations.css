@@ -1,4 +1,4 @@
-/* Animations (subtle / fast) */
+/* ─── ANIMATIONS (subtle / fast) ─── */
 
 /* Toast stack container */
 .toast-stack {
@@ -42,7 +42,7 @@
   to   { opacity: 0; transform: translateY(-4px); }
 }
 
-/* Main menu (quick fade, no motion) */
+/* ─── MAIN MENU (quick fade, no motion) ─── */
 .menu-logo, .menu-btn {
   opacity: 0;
   animation: fade-in 180ms ease-out forwards;
@@ -59,11 +59,11 @@
 }
 
 
-/* Guide overlay (quick fade) */
+/* ─── GUIDE OVERLAY (quick fade) ─── */
 .guide-overlay { animation: fade-in 160ms ease-out; }
 .guide-card { animation: fade-in 200ms ease-out; }
 
-/* Hud panel quick fade */
+/* ─── HUD PANEL QUICK FADE ─── */
 .hud-panel-in-left,
 .hud-panel-in-right,
 .hud-panel-in-bottom,
@@ -71,7 +71,7 @@
   animation: fade-in 200ms ease-out;
 }
 
-/* Scene transition (fast) */
+/* ─── SCENE TRANSITION (fast) ─── */
 .scene-fade {
   position: fixed;
   inset: 0;
@@ -87,7 +87,7 @@
   to   { opacity: 0; }
 }
 
-/* Countdown (subtle scale) */
+/* ─── COUNTDOWN (subtle scale) ─── */
 .countdown-pulse {
   animation: countdown-pop 0.5s ease-out;
 }
@@ -97,7 +97,7 @@
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
-/* Stage flash (brief) */
+/* ─── STAGE FLASH (brief) ─── */
 .stage-flash {
   position: fixed;
   inset: 0;
@@ -113,7 +113,7 @@
   100% { opacity: 0; }
 }
 
-/* Button feedback */
+/* ─── BUTTON FEEDBACK ─── */
 .btn--primary {
   transition: background 100ms ease-out, border-color 100ms ease-out, transform 60ms ease-out;
 }
@@ -124,7 +124,7 @@
 }
 .btn--action:active { transform: scale(0.95); }
 
-/* Crash overlay (quick shake) */
+/* ─── CRASH OVERLAY (quick shake) ─── */
 .crash-shake {
   animation: crash-shake 320ms ease-out;
 }
@@ -136,7 +136,7 @@
   80% { transform: translate(2px, -1px); }
 }
 
-/* Achievement (quick slide) */
+/* ─── ACHIEVEMENT (quick slide) ─── */
 .achievement-pop {
   animation: achievement-pop 280ms ease-out;
 }
@@ -145,13 +145,13 @@
   100% { opacity: 1; transform: translateX(0); }
 }
 
-/* Bottom bar button press */
+/* ─── BOTTOM BAR BUTTON PRESS ─── */
 .hud-ctrl-btn {
   transition: transform 60ms ease-out, background 100ms ease-out;
 }
 .hud-ctrl-btn:active { transform: scale(0.94); }
 
-/* Twr warning pulse (subtle) */
+/* ─── TWR WARNING PULSE (subtle) ─── */
 .twr-warn {
   animation: twr-pulse 1.6s ease-in-out infinite;
 }

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 export class Stars {
-  static readonly RADIUS = 50000;
   private group: THREE.Group;
   private skyMat: THREE.ShaderMaterial;
   private time = 0;
@@ -9,7 +8,7 @@ export class Stars {
   constructor() {
     this.group = new THREE.Group();
 
-    const skyGeom = new THREE.SphereGeometry(Stars.RADIUS, 64, 48);
+    const skyGeom = new THREE.SphereGeometry(50000, 64, 48);
     skyGeom.scale(-1, 1, 1);
     this.skyMat = new THREE.ShaderMaterial({
       uniforms: {
@@ -86,11 +85,7 @@ export class Stars {
     this.group.add(new THREE.Mesh(skyGeom, this.skyMat));
   }
 
-  update(dt: number, camera?: THREE.PerspectiveCamera): void {
-    if (camera) {
-      const radius = Math.min(camera.far * .5, Math.max(Stars.RADIUS, camera.near * 8));
-      this.group.scale.setScalar(radius / Stars.RADIUS);
-    }
+  update(dt: number): void {
     this.time += dt;
     this.skyMat.uniforms.uTime!.value = this.time;
   }

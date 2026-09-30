@@ -55,17 +55,22 @@ describe('FlightScene launch from KSC pad', () => {
     // Full throttle so the countdown starts immediately.
     anyFlight.state.throttle = 1;
 
-    // Three seconds of countdown followed by seven seconds of ascent.
+    // 3s countdown + 7s of climbing with the new controllable thrust balance.
     for (let i = 0; i < 600; i++) {
       flight.update(1 / 60);
     }
 
-    // Earth and the rocket must advance in the same frame, with contact
-    // speed measured relative to Earth, to avoid a false crash on liftoff.
+    // Regression guards for the "crash right after 3-2-1" bug:
+    //  1. Ballistic position integration must run AFTER system.propagate and the
+    //     collision check — integrating the absolute velocity (which on liftoff
+    //     includes Earth's 17 km/s orbital motion) first would dip the rocket
+    //     ~250 m inside the planet before the reference body moves. Now it must
+    //     climb normally.
+    //  2. Vertical speed for the surface band uses the body-RELATIVE velocity.
     expect(anyFlight.crashed).toBe(false);
     expect(anyFlight.launched).toBe(true);
     expect(anyFlight.grounded).toBe(false);
-    // The flight scene contains no trajectory line.
+    // Trajectory belongs on the map, not as a thread through the flight view.
     const flightLines: THREE.Object3D[] = [];
     sceneMgr.scene.traverse(object => { if (object instanceof THREE.Line) flightLines.push(object); });
     expect(flightLines).toHaveLength(0);
@@ -80,8 +85,10 @@ describe('FlightScene launch from KSC pad', () => {
     const fsurfaceR = earth.getSurfaceRadiusAt([px, py, pz]) ?? earth.radius;
     expect(fd - fsurfaceR).toBeGreaterThan(150);
 
-    // Check the rendered bottom, including the model scale and origin offset,
-    // against the planet mesh rather than only checking the physics position.
+    // Visual regression: the rocket must NOT be buried in the ground. Its group
+    // is placed at state.position*VISUAL_SCALE + upDir*visualOffset, and the
+    // model hangs up to rocketBottomY*ROCKET_VISUAL_SCALE below the origin.
+    // The earth MESH sphere has radius = earth.visualRadius (the doubled radius).
     const group = (anyFlight.rocketGroup as { position: { x: number; y: number; z: number } }).position;
     const ecdx = group.x - earth.position[0] * VISUAL_SCALE;
     const ecdy = group.y - earth.position[1] * VISUAL_SCALE;

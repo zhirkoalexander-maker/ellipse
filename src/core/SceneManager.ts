@@ -34,7 +34,7 @@ export class SceneManager {
       this.lastFpsUpdate = t;
     }
     this.stars.getMesh().position.copy(this.camera.position);
-    this.stars.update(dt, this.camera);
+    this.stars.update(dt);
   }
 
   getFps(): number { return this.fps; }
