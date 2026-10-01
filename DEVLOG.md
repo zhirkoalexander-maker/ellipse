@@ -2,6 +2,10 @@
 
 The current game uses 2.5.33 as its base. Later updates changed menu styling and tutorial images. The version number remains 2.5.33. The later 2.5.34 and 2.5.35 changes below are historical releases, not a list of features in the current build.
 
+## Updates to the 2.5.33 build
+
+The ground-clearance display stays visible when hovering close to the surface. Launch checks now use fuel available to the current stage, and manually throttling a dry stage no longer repeats the countdown.
+
 ## 2.5.35 — before the rollback
 
 The title screen used a frame from the game. The guide and walkthrough were shortened, dialogs were given matching styles, and the flight controls were made visually quieter. The unused app scaffold and design preview were removed. The README and GitHub description were updated too.
