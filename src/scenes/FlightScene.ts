@@ -1063,9 +1063,11 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
           const gr = Math.sqrt(gdx*gdx + gdy*gdy + gdz*gdz) || 1;
           const localGrav = (G * refBody.mass) / (gr * gr);
           if (sumThrust > 0 && localGrav > 0) {
-            const fuelNow = this.state.rocket.totalFuelMass();
+            const fuelNow = this.state.rocket.activeFuelMass();
             if (fuelNow <= 0.01) {
-              toast.show('No fuel left to launch.');
+              toast.show('The current stage has no fuel. Add a tank to this stage or restart.');
+              this.state.throttle = 0;
+              this.hideCountdown();
               this.launched = false;
               this.countdownTimer = 0;
               this.countdownCooldown = 5;
@@ -2120,7 +2122,7 @@ private rocketTopY = 0; // highest point of rocket mesh in local space
     const gravity = G * body.mass / Math.max(1, radiusSq);
     const twr = thrust / (this.rocket.totalMass() * gravity);
     const reason = thrust <= 0 ? 'No engine — add an engine in Vehicle Assembly.'
-      : this.rocket.totalFuelMass() <= 0.01 ? 'No fuel — add a fuel tank or start a new flight.'
+      : this.rocket.activeFuelMass() <= 0.01 ? 'The current stage has no fuel. Add a tank to this stage or restart.'
       : twr <= 1 ? `Insufficient thrust (TWR ${twr.toFixed(2)}). Use a stronger engine or reduce mass.`
       : '';
     if (reason) {
