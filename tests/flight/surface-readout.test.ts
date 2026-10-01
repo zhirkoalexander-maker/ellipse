@@ -9,3 +9,10 @@ it('shows readable surface clearance while descending and hides on the pad',()=>
 });
 
 it('warns early during fast descent with time at current descent speed',()=>{expect(surfaceReadout(160000,-8000,false)).toMatchObject({visible:true,time:'~20 s to surface',near:true});});
+
+it('keeps ground clearance visible while hovering just above a landing site',()=>{
+ expect(surfaceReadout(160,0,false)).toMatchObject({visible:true,height:'40 m',time:'Holding altitude'});
+ expect(surfaceReadout(160,-0.2,false).visible).toBe(true);
+ expect(surfaceReadout(8000,0,false).visible).toBe(false);
+ expect(surfaceReadout(0,0,true).visible).toBe(false);
+});
