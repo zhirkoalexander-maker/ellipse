@@ -128,3 +128,23 @@ it('pauses and resumes from visible buttons without a keyboard', () => {
   document.querySelector<HTMLButtonElement>('[data-action="resume"]')?.click();
   expect(f.paused).toBe(false);
 });
+
+it('does not start a launch when fuel is unavailable to the current stage', () => {
+  const f = create();
+  expect(f.rocket.totalFuelMass()).toBeGreaterThan(0);
+  vi.spyOn(f.rocket, 'activeFuelMass').mockReturnValue(0);
+  document.querySelector<HTMLButtonElement>('[data-action="stage"]')!.click();
+  expect(f.state.throttle).toBe(0);
+  expect(f.countdownActive).toBe(false);
+  expect(document.querySelector('.flight-landing-status')?.textContent).toContain('current stage');
+});
+
+it('does not repeat a countdown after manually throttling a stage with no accessible fuel', () => {
+  const f = create();
+  vi.spyOn(f.rocket, 'activeFuelMass').mockReturnValue(0);
+  f.state.throttle = 1;
+  step(f, 4);
+  expect(f.grounded).toBe(true);
+  expect(f.state.throttle).toBe(0);
+  expect(f.countdownActive).toBe(false);
+});
