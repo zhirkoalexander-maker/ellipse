@@ -28,48 +28,46 @@ export class MainMenuScene {
     this.life.listen(window,'keydown',e=>{if(e.key==='Escape'){this.helpOverlay?.remove();this.helpOverlay=null;this.missionsOverlay?.remove();this.missionsOverlay=null;}});
 
     this.root = document.createElement('div');
-    this.root.className = 'main-menu';
+    this.root.className = 'panel classic-menu';
     this.root.appendChild(this.playerCounter.element);
-    const content = document.createElement('div');
-    content.className = 'main-menu__content';
-    this.root.appendChild(content);
+    this.root.style.cssText = `
+      position: fixed; inset: 0; z-index: 500;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(16,19,22,0.97);
+      border: none; border-radius: 0;
+    `;
 
     const logo = document.createElement('div');
     logo.className = 'menu-logo';
+    logo.style.cssText = 'margin-bottom: var(--space-8); text-align: center;';
     logo.innerHTML = `
-      <h1 class="text-display">Challenger</h1>
-      <p>Build a rocket. Bring it home.</p>
+      <div class="text-display" style="font-size:clamp(28px, 7vw, 44px);letter-spacing:0;color:var(--text-primary);">CHALLENGER</div>
+      <div class="text-caption" style="margin-top:var(--space-2);letter-spacing:0;">Rocket simulator</div>
     `;
-    content.appendChild(logo);
-    const flights = document.createElement('nav');
-    flights.className = 'main-menu__flights';
-    flights.setAttribute('aria-label', 'Play');
-    content.appendChild(flights);
-    const links = document.createElement('nav');
-    links.className = 'main-menu__links';
-    links.setAttribute('aria-label', 'Game information');
-    content.appendChild(links);
+    this.root.appendChild(logo);
 
     const btn = (label: string, variant: string, cb: () => void): HTMLButtonElement => {
       const b = document.createElement('button');
       b.className = `btn btn--${variant} menu-btn`;
       b.textContent = label;
+      b.style.cssText = 'margin: 6px; min-width: 220px; padding: 12px 24px; font-size: 14px;';
       b.addEventListener('click', cb);
       return b;
     };
-    flights.appendChild(btn('Flight', 'primary', this.onPlay));
+    this.root.appendChild(btn('Flight', 'primary', this.onPlay));
     const continueButton = btn('Continue', 'secondary', () => this.onContinue?.());
     continueButton.disabled = !this.onContinue;
     continueButton.title = this.onContinue ? 'Open your last flight or build' : 'No saved flight yet. Choose Flight to start.';
-    flights.appendChild(continueButton);
-    flights.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
-    links.appendChild(btn('Missions', 'ghost', () => this.toggleMissions()));
-    links.appendChild(btn('Settings', 'ghost', this.onSettings));
-    links.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
+    if (!this.onContinue) { continueButton.style.opacity = '0.45'; continueButton.style.cursor = 'default'; }
+    this.root.appendChild(continueButton);
+    this.root.appendChild(btn('Vehicle assembly', 'secondary', this.onVab));
+    this.root.appendChild(btn('Missions', 'ghost', () => this.toggleMissions()));
+    this.root.appendChild(btn('Settings', 'ghost', this.onSettings));
+    this.root.appendChild(btn('Guide', 'ghost', () => this.toggleHelp()));
     const version = document.createElement('div');
     version.textContent = `v${appVersion}`;
-    version.className = 'main-menu__version';
-    content.appendChild(version);
+    version.style.cssText = 'margin-top:18px;font:11px system-ui;color:#788495;';
+    this.root.appendChild(version);
 
   }
 

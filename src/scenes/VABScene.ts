@@ -321,19 +321,19 @@ export class VABScene {
     const dm=this.assembly.totalMass(), fl=this.assembly.totalFuelCapacity();
     const countParts = (nodes: typeof this.assembly.roots): number => nodes.reduce((sum,n) => sum + 1 + countParts(n.children),0);
     const count = countParts(this.assembly.roots);
-    this.info.innerHTML = `<div style="margin-bottom:6px;">${count} parts · ${(dm/1000).toFixed(1)} t${fl ? ' · '+(fl/1000).toFixed(1)+' t fuel' : ''}</div><div id="build-stack" style="max-height:24vh;overflow:auto;display:flex;flex-direction:column;gap:3px;"></div>`;
+    this.info.innerHTML = `<div style="margin-bottom:6px;">${count} parts · ${(dm/1000).toFixed(1)} t${fl ? ' · '+(fl/1000).toFixed(1)+' t fuel' : ''}</div><div style="margin-bottom:6px;color:#aebbc6;">Bottom to top</div><div id="build-stack" style="max-height:24vh;overflow:auto;display:flex;flex-direction:column;gap:3px;"></div>`;
     const list = this.info.querySelector('#build-stack')!;
-    // Display the physical top first, while retaining bottom-first assembly order.
-    for (let i = this.nm.length - 1; i >= 0; i--) {
+    // The first row is the bottom of the rocket.
+    for (let i = 0; i < this.nm.length; i++) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:3px;padding:4px;background:rgba(255,255,255,0.05);';
       const label = document.createElement('span');
-      label.textContent = this.nm[i]!;
+      label.textContent = `${i + 1}. ${this.nm[i]}`;
       label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       row.appendChild(label);
       for (const [action, symbol, title, disabled] of [
-        ['move-up', '↑', 'Move up', i === this.nm.length - 1],
-        ['move-down', '↓', 'Move down', i === 0],
+        ['move-up', '↑', 'Move toward nose:', i === this.nm.length - 1],
+        ['move-down', '↓', 'Move toward base:', i === 0],
         ['remove', '×', 'Remove', false],
       ] as const) {
         const button = document.createElement('button');
