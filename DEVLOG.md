@@ -4,6 +4,10 @@ The current game uses 2.5.33 as its base. Later updates changed menu styling and
 
 ## Updates to the 2.5.33 build
 
+Vehicle assembly lists central parts from bottom to top, matching the order they are added. The rows are numbered; moving a part still changes its physical position in the rocket.
+
+The main menu was returned to the plain 2.5.33 layout. Gameplay fixes remain. The tutorial menu screenshot matches the restored layout.
+
 The ground-clearance display stays visible when hovering close to the surface. Launch checks now use fuel available to the current stage, and manually throttling a dry stage no longer repeats the countdown.
 
 ## 2.5.35 — before the rollback

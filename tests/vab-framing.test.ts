@@ -180,3 +180,17 @@ it.each(['engine_ant','decoupler_s'])('can add a central tank and side pair with
   expect(mounts.every(n=>n.radial && n.children[0]?.part.kind==='engine')).toBe(true);
  }finally{vab.unmount();}
 });
+
+it('lists central parts in click order while stacking the first part at the bottom', () => {
+ const vab=new VABScene(()=>{},()=>{});vab.mount();
+ try {
+  const ids=['engine_ant','tank_s_lfo','capsule_s'];
+  for(const id of ids)document.querySelector<HTMLButtonElement>(`button[title='Add ${findPart(id)!.name}']`)!.click();
+  expect(vab.assembly.roots.map(n=>n.part.id)).toEqual(ids);
+  const heights=vab.assembly.roots.map(n=>n.position[1]);
+  expect(heights[0]).toBeLessThan(heights[1]!);
+  expect(heights[1]).toBeLessThan(heights[2]!);
+  const names=[...document.querySelectorAll('#build-stack > div > span')].map(e=>e.textContent);
+  expect(names).toEqual(ids.map((id,i)=>`${i+1}. ${findPart(id)!.name}`));
+ }finally{vab.unmount();}
+});

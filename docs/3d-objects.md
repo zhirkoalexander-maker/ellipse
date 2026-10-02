@@ -16,7 +16,7 @@ The launch pad is a useful reference point when editing terrain. The rocket need
 
 ## Menu and tutorial images
 
-`public/menu-launch.webp` is a screenshot of the starter rocket in the game. It is a static background, not an imported spacecraft model or a second running 3D scene.
+`public/menu-launch.webp` is a screenshot of the starter rocket in the game. It was used by the screenshot menu. The restored 2.5.33 menu does not display it.
 
 The tutorial uses the images in `public/tutorial`. `scripts/capture-tutorial.mjs` captures the game with Puppeteer and records highlight positions in `src/ui/TutorialFrames.json`. It also makes closer views for small screens. The script navigates through the menu, assembly screen, flight and map. It is intended for a local game server so taking screenshots does not increment the public player counter.
 

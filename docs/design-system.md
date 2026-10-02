@@ -1,6 +1,6 @@
 # Interface notes
 
-The menu uses a screenshot of the starter rocket. Flight, Continue and Vehicle assembly sit together on the left; Missions, Settings and Guide are below them. On a narrow display the background darkens so the text stays readable over the rocket. The image is static and does not need an additional 3D scene.
+The main menu keeps the layout from 2.5.33: a plain dark background, centered title and a vertical stack of buttons. Gameplay and other interface fixes are maintained separately from this layout.
 
 The panels use dark slate, light text and an amber primary button. Most text uses the system font, with a separate display face for the title and monospace figures in the instruments. Green and red carry flight-state information.
 
