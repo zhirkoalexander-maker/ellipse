@@ -1,10 +1,12 @@
 # Challenger
 
-Build rockets, explore the solar system and try to land.
+I wanted a game where you can build a rocket, fly to the Moon and try to land. There are other planets too, if you want to go further.
 
-[Play in your browser](https://zhirkoalexander-maker.github.io/ellipse/)
+[Play](https://zhirkoalexander-maker.github.io/ellipse/)
 
-Requires Node.js 20+.
+The controls are in Guide. Your saved rockets and flights stay in the browser you used to play.
+
+To run it on your computer, install Node.js 20 or newer, then:
 
 ```sh
 npm ci
@@ -13,10 +15,9 @@ npm run dev
 
 Open http://localhost:3000/ellipse/.
 
+If you change the code, you can check it with:
+
 ```sh
 npm test
 npm run build
 ```
-
-Saves are stored in your browser.
-Flight controls and instructions are available in the in-game Guide.
