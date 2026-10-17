@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Challenger</title>
+    <link rel="icon" type="image/svg+xml" href="/ellipse/favicon.svg" />
+    <style>
+      html, body { overflow: hidden; position: fixed; width: 100%; height: 100%; margin: 0; padding: 0; }
+      #rotate-hint { display: none !important; }
+      #rotate-hint {
+        display: none; position: fixed; inset: 0; z-index: 9999;
+        background: #0a0a12; color: #889; font: 600 18px/1.4 sans-serif;
+        justify-content: center; align-items: center; text-align: center;
+        flex-direction: column; gap: 16px;
+      }
+    </style>
+    <script type="module" crossorigin src="/ellipse/assets/game-DSx_ImX2.js"></script>
+    <link rel="modulepreload" crossorigin href="/ellipse/assets/PartCatalog-Bki1XYx9.js">
+    <link rel="stylesheet" crossorigin href="/ellipse/assets/game-CslwZhcN.css">
+  </head>
+  <body>
+    <div id="loading-screen" style="display:none;"></div>
+    <div id="rotate-hint">
+      <div style="font-size:48px">↻</div>
+      <div>Please rotate your device to landscape</div>
+    </div>
+    <div id="app" style="position:fixed;inset:0;z-index:1;"></div>
+    <script>
+      window.onerror = function(m) { alert('JS Error: '+m); };
+      (function(){
+        var v = 'v2.5.33';
+        if (sessionStorage.getItem('challenger_ver') && sessionStorage.getItem('challenger_ver') !== v) {
+          sessionStorage.setItem('challenger_ver', v);
+          location.reload(true);
+        } else {
+          sessionStorage.setItem('challenger_ver', v);
+        }
+      })();
+      if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/ellipse/sw.js').then(function(reg) {
+          reg.update();
+        }).catch(function(){});
+      }
+    </script>
+  </body>
+</html>
